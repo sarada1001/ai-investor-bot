@@ -13,8 +13,8 @@ load_dotenv()
 # ==========================================
 # 📱 LINE Botの設定
 # ==========================================
-LINE_ACCESS_TOKEN = "ここに長い文字列（チャネルアクセストークン）を貼り付けます"
-LINE_USER_ID = "ここにUから始まる文字列（ユーザーID）を貼り付けます"
+LINE_ACCESS_TOKEN = "rLmNKB5qoOYjlQ1W7G46SpD2dhH3uxCNxqHYnyqWKTmPRWGPP0ZpqrfWs8y3MRFXym3ctwIZXlC14eo2LxXjx++Hha4Fgy2RJX1Ii1LCuRuThgkshqMko1DHIgbDrm812uX+2ywiI6vA9GuJiBy3pAdB04t89/1O/w1cDnyilFU="
+LINE_USER_ID = "U266575a29b79da182dfad34f6e879603"
 
 def send_line_message(text):
     url = "https://api.line.me/v2/bot/message/push"
@@ -28,7 +28,7 @@ def send_line_message(text):
 # ==========================================
 # 📰 監視設定
 # ==========================================
-COMPANIES = ["エクサウィザーズ", "QDレーザ", "ENEOS"]
+COMPANIES = ["エクサウィザーズ", "QDレーザ", "三菱重工"]
 CHECK_INTERVAL_SECONDS = 900  # 15分おきにチェック（900秒）
 
 seen_urls = set()
