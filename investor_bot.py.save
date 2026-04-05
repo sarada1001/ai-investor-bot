@@ -1,0 +1,53 @@
+nano investor_bot.pyimport os
+import warnings
+from dotenv import load_dotenv
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.vectorstores import Chroma
+
+# 不要な警告を非表示にする
+warnings.filterwarnings('ignore')
+load_dotenv()
+
+file_path = "unzipped_docs/2026年3月期第３四半期_決算一式/2026年3月期第３四半期 決算説明_質疑応答（書き起こし）.pdf"
+
+print("① PDFを読み込んでいます...")
+loader = PyPDFLoader(file_path)
+documents = loader.load()
+
+print("② 文章を分割しています...")
+text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+texts = text_splitter.split_documents(documents)
+
+print("③ ベクトルデータベース（Chroma）を構築中...")
+# Google APIを使わず、ローカルの優秀なモデルでベクトル化します
+embeddings = HuggingFaceEmbeddings(model_name="intfloat/multilingual-e5-small")
+db = Chroma.from_documents(texts, embeddings)
+
+print("④ 情報を検索してAI（Gemini）に分析させています...\n")
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0)
+
+query = "この質疑応答の中で、機関投資家が一番気にしている（突っ込んでいる）リスクや懸念点は何ですか？また、それに対して経営陣はどう回答していますか？箇条書きで分かりやすく抽出して。"
+
+# Step A: データベースから検索
+docs = db.similarity_search(query, k=4)
+context = "\n\n".join([doc.page_content for doc in docs])
+
+# Step B: プロンプトに検索結果を結合
+prompt = f"""
+あなたはプロの機関投資家・金融アナリストです。
+以下の【検索された決算書の該当箇所】を元に、【質問】に答えてください。
+
+【検索された決算書の該当箇所】
+{context}
+
+【質問】
+{query}
+"""
+
+# Step C: AIに回答させる
+print(f"質問: {query}\n" + "="*50)
+response = llm.invoke(prompt)
+print(response.content)
