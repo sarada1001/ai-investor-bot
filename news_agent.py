@@ -28,16 +28,17 @@ def send_line_message(text):
 # ==========================================
 # 📰 監視設定
 # ==========================================
-COMPANIES = ["エクサウィザーズ", "QDレーザ", "三菱重工"]
-CHECK_INTERVAL_SECONDS = 900  # 15分おきにチェック（900秒）
+# 監視したい銘柄のリスト（三菱重工も入っています）
+COMPANIES = ["エクサウィザーズ", "QDレーザ", "ENEOS", "三菱重工"]
+CHECK_INTERVAL_SECONDS = 900  # 15分おきにチェック
 
 seen_urls = set()
 
 # ==========================================
-# 🤖 AIニュース監視ループ
+# 🤖 AIニュース監視ループ（不死身バージョン・修正済）
 # ==========================================
 def monitor_news_loop():
-    print("🟢 【監視スタート】AIエージェントが24時間監視を開始しました！(停止は Ctrl+C)\n")
+    print("🟢 【監視スタート】AIエージェントが24時間監視を開始しました！\n")
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 
     while True:
@@ -60,29 +61,36 @@ def monitor_news_loop():
                 print(f"  🚨 新着記事発見！ [{company}]: {title}")
                 print(f"  -> AIに株価への影響を判定させています...")
 
-                prompt = f"""
-                あなたはプロの株式投資アナリストです。
-                以下の対象企業に関する最新ニュースのタイトルを読み、株価に対する影響を分析してください。
+                # 🌟 【例外処理】エラーが起きても死なずにリカバリーする
+                try:
+                    prompt = f"""
+                    あなたはプロの株式投資アナリストです。
+                    以下の対象企業に関する最新ニュースのタイトルを読み、株価に対する影響を分析してください。
 
-                【対象企業】: {company}
-                【ニュースタイトル】: {title}
+                    【対象企業】: {company}
+                    【ニュースタイトル】: {title}
 
-                以下の形式で簡潔に出力してください。
-                【判定】ポジティブ / ネガティブ / 中立 のいずれか
-                【理由】投資家目線での理由を1〜2文で。
-                """
-                
-                analysis = llm.invoke(prompt).content
+                    以下の形式で簡潔に出力してください。
+                    【判定】ポジティブ / ネガティブ / 中立 のいずれか
+                    【理由】投資家目線での理由を1〜2文で。
+                    """
+                    analysis = llm.invoke(prompt).content
 
-                message = f"📰 【AI監視速報: {company}】\n\n■ 記事:\n{title}\n\n{analysis}\n\n■ リンク:\n{link}"
-                send_line_message(message)
-                
-                seen_urls.add(link)
-                print(f"  -> ✅ LINEへ速報を送信完了！")
-                
-                # API制限回避のためのクールダウン
-                print(f"  -> ⏳ API制限回避のため、10秒間待機します...")
-                time.sleep(10)
+                    message = f"📰 【AI監視速報: {company}】\n\n■ 記事:\n{title}\n\n{analysis}\n\n■ リンク:\n{link}"
+                    send_line_message(message)
+                    
+                    seen_urls.add(link)
+                    print(f"  -> ✅ LINEへ速報を送信完了！")
+                    
+                    # API制限回避のための待機時間（15秒）
+                    print(f"  -> ⏳ 15秒間待機します...")
+                    time.sleep(15)
+
+                except Exception as e:
+                    # エラー（API制限など）が起きた時の処理。本当のエラー理由を表示
+                    print(f"  -> ⚠️ エラー発生: {e}")
+                    print(f"  -> 60秒休憩してスキップします...")
+                    time.sleep(60)
 
         print(f"-> パトロール完了。次の巡回まで {CHECK_INTERVAL_SECONDS/60}分 待機します...\n")
         time.sleep(CHECK_INTERVAL_SECONDS)
