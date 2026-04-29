@@ -5,7 +5,9 @@ role: |
   BBSから読み込み、3つの視点を統合して最終的な売買判断を下す。
   判断は「買い/様子見/売り」の3択＋確信度スコア（0-100）で表現する。
 
-allowed_skills: []  # 直接Skillは呼ばない。BBS経由でサブエージェント出力を読む
+allowed_skills:
+  - signal_scorer   # weighted scoring + dynamic weight adjustment
+  - alpaca_trade    # paper trading execution (get_account / order)
 
 depends_on_bbs_keys:
   - news_analysis
@@ -24,6 +26,8 @@ system_prompt: |
 
   出力形式（必須）:
     - action: "BUY" | "HOLD" | "SELL"
+    - target_company: 判断対象の銘柄名（日本語。例: "エクサウィザーズ"）
+    - target_ticker: Yahoo Finance ティッカー（例: "4840.T"）
     - confidence: 0-100（整数）
     - rationale: 各エージェントの根拠を統合した理由（200文字以内）
     - position_size_pct: 推奨ポジションサイズ（総資産の何%か、最大20%）

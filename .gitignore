@@ -39,6 +39,9 @@ chroma_db/
 # BBS セッションログ（実行ごとに生成される一時ファイル）
 bbs/
 
+# ポートフォリオ実行状態（ローカル実行環境に依存）
+portfolio_state.json
+
 # 決算PDF・ZIPなど（著作権・容量の観点から除外）
 unzipped_docs/
 *.zip

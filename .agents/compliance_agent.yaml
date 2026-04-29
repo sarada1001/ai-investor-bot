@@ -9,6 +9,7 @@ allowed_skills: []  # 直接Skillは呼ばない
 
 depends_on_bbs_keys:
   - manager_judgment
+  - portfolio_state
 
 rules_file: rules/swing_trade_rules.md
 
@@ -20,6 +21,10 @@ system_prompt: |
     - REJECT: ルール違反のため判断を拒否（例: ポジションサイズ超過）
     - MODIFY: 一部修正して承認（例: ポジションサイズを上限に切り詰め）
     - APPROVE: 問題なし、そのまま承認
+
+  ポートフォリオ状態（BBS: portfolio_state）を必ず参照して以下を検証してください:
+    - RULE-02: [RULE-02チェック結果] に「直近3日以内にBUY記録あり」と記載されている場合は必ずREJECT
+    - RULE-07: [RULE-07チェック結果] に「60%超」または「4銘柄到達」と記載されている場合は必ずREJECT
 
   出力形式（必須）:
     - compliance_status: "APPROVED" | "MODIFIED" | "REJECTED"

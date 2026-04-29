@@ -32,6 +32,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 import skills.news_monitor as _news_monitor_mod
 import skills.rag_search as _rag_search_mod
 import skills.technical_calc as _technical_calc_mod
+import skills.portfolio_tracker as _portfolio_mod
+import skills.signal_scorer as _signal_scorer_mod
+import skills.alpaca_trade as _alpaca_mod
 
 # =========================================================
 # BBS (Bulletin Board System) — 共有テキストメモリ
@@ -189,48 +192,94 @@ class TechnicalAgent(BaseAgent):
 class ManagerAgent(BaseAgent):
     def __init__(self, bbs: BBS):
         super().__init__("manager_agent", bbs)
+        assert "signal_scorer" in self.config["allowed_skills"], \
+            f"{self.name}: signal_scorer へのアクセス権がありません"
 
     def run(self) -> dict:
-        print(f"\n[{self.name}] BBS読み取り → 統合判断を開始します...")
+        print(f"\n[{self.name}] BBS読み取り → 重み付きスコアリング判断を開始します...")
 
         news_data = self.bbs.read("news_analysis") or {}
         fundamental_data = self.bbs.read("fundamental_analysis") or {}
         technical_data = self.bbs.read("technical_analysis") or {}
 
-        bbs_summary = (
-            f"=== NewsAgent出力 ===\n{json.dumps(news_data, ensure_ascii=False, indent=2)}\n\n"
-            f"=== FundamentalAgent出力 ===\n{json.dumps(fundamental_data, ensure_ascii=False, indent=2)}\n\n"
-            f"=== TechnicalAgent出力 ===\n{json.dumps(technical_data, ensure_ascii=False, indent=2)}"
-        )
+        # --- ファンダメンタルシグナルを1回だけLLMで抽出（全銘柄共通）---
+        print(f"  [{self.name}] ファンダメンタルシグナルを抽出中...")
+        fa_signal, fa_reason = _signal_scorer_mod.extract_fundamental_signal(fundamental_data, self.llm)
 
-        system = self.config["system_prompt"]
-        prompt = (
-            f"{system}\n\n"
-            f"以下のBBSデータを統合して売買判断を下してください。\n"
-            f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
-            f'{{"action":"BUY"|"HOLD"|"SELL","confidence":0-100,'
-            f'"rationale":"理由","position_size_pct":0-20,'
-            f'"stop_loss_pct":1-8,"target_hold_days":3-20}}\n\n'
-            f"=== BBSデータ ===\n{bbs_summary}"
-        )
+        # --- 全銘柄をスコアリングして最良機会を選択 ---
+        tickers = technical_data.get("tickers", {})
+        best_result: dict | None = None
+        best_company = ""
+        best_ticker = ""
 
-        try:
-            raw = self.llm.invoke(prompt).content.strip()
-            import re
-            m = re.search(r'\{.*\}', raw, re.DOTALL)
-            judgment = json.loads(m.group()) if m else {"action": "HOLD", "confidence": 0, "rationale": raw}
-        except Exception as e:
+        for company, ticker_info in tickers.items():
+            if ticker_info.get("error"):
+                continue
+            result = _signal_scorer_mod.run(
+                news_data=news_data,
+                fundamental_data=fundamental_data,
+                technical_data=technical_data,
+                target_company=company,
+                fundamental_signal=fa_signal,
+                fundamental_reason=fa_reason,
+            )
+            if best_result is None or abs(result["score"]) > abs(best_result["score"]):
+                best_result = result
+                best_company = company
+                best_ticker = ticker_info.get("ticker", "")
+
+        if best_result is None:
             judgment = {
-                "action": "HOLD",
-                "confidence": 0,
-                "rationale": f"判断生成エラー: {e}",
-                "position_size_pct": 0,
-                "stop_loss_pct": 5,
-                "target_hold_days": 5,
+                "action": "HOLD", "target_company": "", "target_ticker": "",
+                "confidence": 0, "rationale": "テクニカルデータ取得失敗のためHOLD",
+                "position_size_pct": 0, "stop_loss_pct": 5, "target_hold_days": 5,
             }
+            self.bbs.write(self.name, self.config["output_bbs_key"], judgment)
+            return judgment
+
+        # --- LLMで根拠テキストを生成（スコアの説明のみ）---
+        score_info = best_result
+        rationale_prompt = (
+            f"スイングトレード分析結果を投資家向けに100文字以内で要約してください。\n\n"
+            f"対象銘柄: {best_company}\n"
+            f"判断: {score_info['action']} (加重スコア: {score_info['score']:.3f})\n"
+            f"ニュース({score_info['weights']['news']:.0%}): "
+            f"{score_info['signals']['news']:+.2f} — {score_info['signal_reasons']['news']}\n"
+            f"ファンダメンタルズ({score_info['weights']['fundamental']:.0%}): "
+            f"{score_info['signals']['fundamental']:+.2f} — {score_info['signal_reasons']['fundamental']}\n"
+            f"テクニカル({score_info['weights']['technical']:.0%}): "
+            f"{score_info['signals']['technical']:+.2f} — {score_info['signal_reasons']['technical']}\n"
+            f"ウェイト調整: {score_info['weight_reason']}"
+        )
+        try:
+            rationale = self.llm.invoke(rationale_prompt).content.strip()[:200]
+        except Exception as e:
+            rationale = f"{best_company}: スコア{score_info['score']:.3f}により{score_info['action']} (LLMエラー: {e})"
+
+        # --- スコアから派生パラメータを計算 ---
+        score_abs = abs(score_info["score"])
+        position_size_pct = max(5, min(20, round(score_abs * 20)))
+        stop_loss_pct = max(3, min(8, round(8 - score_abs * 5)))
+        target_hold_days = max(3, min(20, round(5 + score_abs * 15)))
+
+        judgment = {
+            "action": score_info["action"],
+            "target_company": best_company,
+            "target_ticker": best_ticker,
+            "confidence": score_info["confidence"],
+            "rationale": rationale,
+            "position_size_pct": position_size_pct,
+            "stop_loss_pct": stop_loss_pct,
+            "target_hold_days": target_hold_days,
+            "score_breakdown": score_info,
+        }
 
         self.bbs.write(self.name, self.config["output_bbs_key"], judgment)
-        print(f"  [{self.name}] 判断: {judgment.get('action')} (確信度: {judgment.get('confidence')}%)")
+        print(
+            f"  [{self.name}] 判断: {judgment['action']} "
+            f"(スコア: {score_info['score']:+.3f}, 確信度: {judgment['confidence']}%)"
+            f" → {best_company}"
+        )
         return judgment
 
 
@@ -249,6 +298,26 @@ class ComplianceAgent(BaseAgent):
 
         manager_judgment = self.bbs.read("manager_judgment") or {}
         news_data = self.bbs.read("news_analysis") or {}
+        portfolio_data = self.bbs.read("portfolio_state") or {}
+
+        target_company = manager_judgment.get("target_company", "")
+        recent_buy_flag = _portfolio_mod.recent_buy_within_days(
+            {"recent_decisions": portfolio_data.get("recent_decisions_last10", [])},
+            company=target_company,
+        ) if target_company else False
+        holding_cnt = portfolio_data.get("holding_count", 0)
+        total_pct = portfolio_data.get("total_position_pct", 0.0)
+        new_size = manager_judgment.get("position_size_pct", 0)
+
+        rule02_note = (
+            f"直近3日以内にBUY記録あり → RULE-02違反のためREJECT必須"
+            if recent_buy_flag
+            else "直近3日以内のBUY記録なし → 問題なし"
+        )
+        rule07_note = (
+            f"保有銘柄数 {holding_cnt}/4、追加後総ポジション {total_pct + new_size:.1f}% "
+            f"({'60%超 → REJECT必須' if total_pct + new_size > 60 or holding_cnt >= 4 else '上限内'})"
+        )
 
         system = self.config["system_prompt"]
         prompt = (
@@ -256,6 +325,10 @@ class ComplianceAgent(BaseAgent):
             f"=== コンプライアンスルール ===\n{self.rules_text}\n\n"
             f"=== ManagerAgentの判断 ===\n{json.dumps(manager_judgment, ensure_ascii=False, indent=2)}\n\n"
             f"=== NewsAgentの出力（RULE-06検証用） ===\n{json.dumps(news_data, ensure_ascii=False, indent=2)}\n\n"
+            f"=== ポートフォリオ現状（RULE-02/07検証用） ===\n"
+            f"{json.dumps(portfolio_data, ensure_ascii=False, indent=2)}\n\n"
+            f"[RULE-02チェック結果] 対象銘柄「{target_company}」: {rule02_note}\n"
+            f"[RULE-07チェック結果] {rule07_note}\n\n"
             f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
             f'{{"compliance_status":"APPROVED"|"MODIFIED"|"REJECTED",'
             f'"violations":[],"final_action":"BUY"|"HOLD"|"SELL",'
@@ -319,6 +392,7 @@ def send_line_message(text: str) -> None:
 def _build_line_report(bbs: BBS, final_decision: dict) -> str:
     news = bbs.read("news_analysis") or {}
     manager = bbs.read("manager_judgment") or {}
+    alpaca_order = bbs.read("alpaca_order")
 
     action_emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "⏸"}.get(
         final_decision.get("final_action", "HOLD"), "❓"
@@ -329,6 +403,19 @@ def _build_line_report(bbs: BBS, final_decision: dict) -> str:
         emoji = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}.get(a.get("sentiment", ""), "❔")
         articles_summary += f"  {emoji} {a['company']}: {a['title'][:30]}...\n"
 
+    if alpaca_order:
+        if alpaca_order.get("error"):
+            alpaca_line = f"\n⚠️ Alpaca発注エラー: {str(alpaca_order['error'])[:60]}"
+        else:
+            alpaca_line = (
+                f"\n🏦 Alpaca Paper発注:\n"
+                f"  {alpaca_order.get('symbol')} {str(alpaca_order.get('side','')).upper()} "
+                f"{alpaca_order.get('qty')}株\n"
+                f"  OrderID: {str(alpaca_order.get('order_id',''))[:16]}..."
+            )
+    else:
+        alpaca_line = "\n🏦 Alpaca: 発注なし（日本株 or HOLD）"
+
     return (
         f"🤖 【スイングトレード AIレポート】\n"
         f"{'='*30}\n"
@@ -337,6 +424,7 @@ def _build_line_report(bbs: BBS, final_decision: dict) -> str:
         f"💼 推奨サイズ: {final_decision.get('final_position_size_pct', 0)}%\n"
         f"\n📌 ManagerAgent根拠:\n{manager.get('rationale', 'なし')[:150]}\n"
         f"\n📰 注目ニュース:\n{articles_summary}"
+        f"{alpaca_line}\n"
         f"\n⚠️ 違反ルール: {', '.join(final_decision.get('violations') or ['なし'])}\n"
         f"{'='*30}\n"
         f"✏️ {final_decision.get('compliance_note', '')}"
@@ -356,6 +444,13 @@ def orchestrate(notify_line: bool = True) -> dict:
 
     bbs = BBS(session_id)
 
+    # --- ポートフォリオ状態を読み込み BBS に書き込む ---
+    portfolio_state = _portfolio_mod.load()
+    portfolio_summary = _portfolio_mod.get_summary(portfolio_state)
+    bbs.write("Orchestrator", "portfolio_state", portfolio_summary)
+    print(f"  [Portfolio] 保有銘柄数: {portfolio_summary['holding_count']}, "
+          f"総ポジション: {portfolio_summary['total_position_pct']}%")
+
     # --- フェーズ1: 情報収集エージェント（独立実行）---
     print("\n[ Phase 1 ] 情報収集エージェント群を起動...")
     NewsAgent(bbs).run()
@@ -364,11 +459,65 @@ def orchestrate(notify_line: bool = True) -> dict:
 
     # --- フェーズ2: 統合判断 ---
     print("\n[ Phase 2 ] ManagerAgent が統合判断を実行...")
-    ManagerAgent(bbs).run()
+    manager_judgment = ManagerAgent(bbs).run()
 
     # --- フェーズ3: コンプライアンス検閲 ---
     print("\n[ Phase 3 ] ComplianceAgent が最終検閲を実行...")
     final_decision = ComplianceAgent(bbs).run()
+
+    # --- ポートフォリオ状態を更新して永続化 ---
+    target_company = manager_judgment.get("target_company", "") if isinstance(manager_judgment, dict) else ""
+    target_ticker = manager_judgment.get("target_ticker", "") if isinstance(manager_judgment, dict) else ""
+    final_action = final_decision.get("final_action", "HOLD")
+    final_position_pct = final_decision.get("final_position_size_pct", 0)
+
+    current_price: float | None = None
+    if target_company and final_action in ("BUY", "SELL"):
+        technical_data = bbs.read("technical_analysis") or {}
+        ticker_data = technical_data.get("tickers", {}).get(target_company, {})
+        current_price = (
+            ticker_data.get("ma25", {}).get("latest_price")
+            if not ticker_data.get("error")
+            else None
+        )
+        _portfolio_mod.apply_decision(
+            portfolio_state,
+            company=target_company,
+            ticker=target_ticker,
+            action=final_action,
+            position_size_pct=final_position_pct,
+            current_price=current_price,
+        )
+        _portfolio_mod.save(portfolio_state)
+        print(f"  [Portfolio] 状態を更新: {target_company} → {final_action} "
+              f"({final_position_pct}%, 価格: {current_price})")
+
+    # --- フェーズ3.5: Alpaca Paper Trading 発注 ---
+    # 米国株（ティッカーに "." を含まない）かつ ComplianceAgent 承認済みの場合のみ発注
+    alpaca_order: dict | None = None
+    _is_us_ticker = bool(target_ticker and "." not in target_ticker)
+    _compliance_ok = final_decision.get("compliance_status") in ("APPROVED", "MODIFIED")
+
+    if final_action in ("BUY", "SELL") and target_ticker and _compliance_ok:
+        if _is_us_ticker:
+            print(f"\n[ Phase 3.5 ] Alpaca Paper Trading 発注...")
+            try:
+                account_info = _alpaca_mod.get_account_info()
+                buying_power = account_info["buying_power"]
+                if current_price and current_price > 0 and final_position_pct > 0:
+                    qty = max(1.0, round(buying_power * (final_position_pct / 100) / current_price, 4))
+                else:
+                    qty = 1.0
+                alpaca_order = _alpaca_mod.place_market_order(target_ticker, qty, final_action.lower())
+                bbs.write("Orchestrator", "alpaca_order", alpaca_order)
+                print(f"  [Alpaca] 発注完了: {target_ticker} {final_action} {qty}株 "
+                      f"→ OrderID: {alpaca_order['order_id']}")
+            except Exception as e:
+                alpaca_order = {"error": str(e), "ticker": target_ticker}
+                bbs.write("Orchestrator", "alpaca_order", alpaca_order)
+                print(f"  [Alpaca] 発注失敗: {e}")
+        else:
+            print(f"\n[ Phase 3.5 ] Alpaca: {target_ticker} は日本株のためスキップ（portfolio_state のみ更新）")
 
     # --- フェーズ4: BBSダンプ & LINE通知 ---
     print(f"\n{'='*50}")

@@ -32,6 +32,9 @@ feedparser==6.0.12
 # --- HTTP クライアント（LINE Messaging API） ---
 requests==2.32.5
 
+# --- Alpaca 株式取引 ---
+alpaca-py==0.40.0
+
 # --- 設定・ユーティリティ ---
 python-dotenv==1.2.2
 PyYAML==6.0.3
