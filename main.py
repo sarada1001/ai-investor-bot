@@ -50,14 +50,15 @@ load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import skills.news_monitor   as _news_mod
-import skills.technical_calc as _tech_mod
-import skills.rag_search      as _rag_mod
-import skills.edgar_fetcher   as _edgar_mod
-import skills.alpaca_trade    as _alpaca_mod
-import skills.macro_monitor   as _macro_mod
-import skills.social_monitor  as _social_mod
-import skills.risk_calculator as _risk_mod
+import skills.news_monitor            as _news_mod
+import skills.technical_calc          as _tech_mod
+import skills.rag_search               as _rag_mod
+import skills.edgar_fetcher            as _edgar_mod
+import skills.alpaca_trade             as _alpaca_mod
+import skills.macro_monitor            as _macro_mod
+import skills.social_monitor           as _social_mod
+import skills.risk_calculator          as _risk_mod
+import skills.training_data_collector  as _training_mod
 
 # =========================================================
 # 定数
@@ -226,6 +227,16 @@ def _stage_header(n: int, title: str) -> None:
 def _mock_banner(sub: str = "") -> None:
     bar = "█" * (_W + 2)
     msg = "⚠️  [MOCK MODE]  トークン消費0でテスト実行中  ⚠️"
+    print(f"\n{bar}")
+    print(f"  {msg}")
+    if sub:
+        print(f"  {sub}")
+    print(f"{bar}\n")
+
+
+def _hybrid_banner(sub: str = "") -> None:
+    bar = "▓" * (_W + 2)
+    msg = "🔄  [HYBRID MODE]  リアル市場データ / 発注スキップ  🔄"
     print(f"\n{bar}")
     print(f"  {msg}")
     if sub:
@@ -1014,10 +1025,11 @@ def _run_mock_risk(bbs: BBS, ticker: str) -> None:
 
 
 def run_trade_cycle(
-    ticker: str       = TARGET_TICKER,
-    dry_run: bool     = False,
-    notify_line: bool = False,
-    mock_mode: bool   = False,
+    ticker: str        = TARGET_TICKER,
+    dry_run: bool      = False,
+    notify_line: bool  = False,
+    mock_mode: bool    = False,
+    hybrid_mode: bool  = False,
 ) -> dict:
     """
     AAPL スイングトレード分析サイクルをステージゲート方式で実行する。
@@ -1028,15 +1040,20 @@ def run_trade_cycle(
     Stage 3: ManagerAgent（最終評価 & 発注）
 
     Args:
-        ticker:      対象ティッカー（デフォルト: AAPL）
-        dry_run:     True の場合 Alpaca 発注をスキップ（テスト用）
-        notify_line: True の場合、最終判断を LINE 通知
-        mock_mode:   True の場合、全 LLM/API 呼び出しをスキップしてダミーデータでフローをテスト
+        ticker:       対象ティッカー（デフォルト: AAPL）
+        dry_run:      True の場合 Alpaca 発注をスキップ（テスト用）
+        notify_line:  True の場合、最終判断を LINE 通知
+        mock_mode:    True の場合、全 LLM/API 呼び出しをスキップしてダミーデータでフローをテスト
+        hybrid_mode:  True の場合、Stage 1/3/4 はリアル市場データ取得、
+                      Stage 2 (Fundamental/EDGAR) はモック、発注はスキップ。
+                      学習データ品質向上のためのモード。
     """
     session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     _main_header(ticker, session_id)
     if mock_mode:
         _mock_banner()
+    elif hybrid_mode:
+        _hybrid_banner()
 
     bbs = BBS(session_id)
 
@@ -1045,6 +1062,7 @@ def run_trade_cycle(
     if mock_mode:
         _run_mock_stage1(bbs, ticker)
     else:
+        # hybrid_mode=True の場合もリアル API を使用（yfinance + Gemini）
         TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
         NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
         MacroAgent(bbs).run(phase_tag="S1-3/4")
@@ -1108,11 +1126,23 @@ def run_trade_cycle(
             )
         if mock_mode:
             _mock_banner("テスト実行完了（Gate: HOLD）。実際のAPIは一切呼び出されていません。")
+        elif hybrid_mode:
+            _hybrid_banner("ハイブリッド実行完了（Gate: HOLD）。市場データはリアル、発注はスキップされました。")
+        record_id = _training_mod.save_training_record(
+            session_id=session_id,
+            ticker=ticker,
+            bbs_entries=bbs.read_all(),
+            judgment=judgment,
+            mock_mode=mock_mode,
+            hybrid_mode=hybrid_mode,
+        )
+        _log(f"[学習データ] 保存完了: record_id={record_id}")
         return judgment
 
     # ── Stage 2: Fundamental 深層分析 ────────────────────────────
     _stage_header(2, "ファンダメンタルズ深層分析  [FundamentalAgent]")
-    if mock_mode:
+    if mock_mode or hybrid_mode:
+        # hybrid_mode ではコスト節約のため EDGAR/ChromaDB 呼び出しをスキップし neutral シグナルを使用
         _run_mock_stage2(bbs, ticker)
     else:
         FundamentalAgent(bbs).run(ticker, phase_tag="S2")
@@ -1128,6 +1158,7 @@ def run_trade_cycle(
         if mock_mode:
             _run_mock_risk(bbs, ticker)
         else:
+            # hybrid_mode=True の場合もリアル yfinance で ATR・価格を取得
             RiskAgent(bbs).run(ticker)
 
         risk_data  = bbs.read("risk_analysis") or {}
@@ -1135,11 +1166,16 @@ def run_trade_cycle(
 
         _sep()
         _log(f"Alpaca に {ticker} {rec_shares}株 買い注文を送信します...")
-        if dry_run or mock_mode:
-            label = "mock_mode" if mock_mode else "dry_run"
+        if dry_run or mock_mode or hybrid_mode:
+            if hybrid_mode:
+                label = "hybrid_mode"
+            elif mock_mode:
+                label = "mock_mode"
+            else:
+                label = "dry_run"
             _log(f"  ({label}=True のため実際の発注はスキップ)")
             order_result = {
-                "dry_run": True, "mock": mock_mode,
+                "dry_run": True, "mock": mock_mode or hybrid_mode,
                 "symbol": ticker, "qty": rec_shares, "side": "buy",
             }
         else:
@@ -1202,7 +1238,17 @@ def run_trade_cycle(
 
     if mock_mode:
         _mock_banner("テスト実行完了。実際のAPIは一切呼び出されていません。")
-
+    elif hybrid_mode:
+        _hybrid_banner("ハイブリッド実行完了。市場データはリアル、発注はスキップされました。")
+    record_id = _training_mod.save_training_record(
+        session_id=session_id,
+        ticker=ticker,
+        bbs_entries=bbs.read_all(),
+        judgment=judgment,
+        mock_mode=mock_mode,
+        hybrid_mode=hybrid_mode,
+    )
+    _log(f"[学習データ] 保存完了: record_id={record_id}")
     return judgment
 
 
@@ -1232,6 +1278,13 @@ if __name__ == "__main__":
         "--mock", action="store_true",
         help="モックモード: LLM/API 呼び出しをスキップしてシステムフローをテスト (トークン消費ゼロ)"
     )
+    parser.add_argument(
+        "--hybrid", action="store_true",
+        help=(
+            "ハイブリッドモード: Stage1/3/4 でリアル市場データ (yfinance + Gemini) を取得し、"
+            "Stage2 (Fundamental/EDGAR) はモック、発注はスキップ。学習データ品質向上用。"
+        ),
+    )
     args = parser.parse_args()
 
     run_trade_cycle(
@@ -1239,4 +1292,5 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         notify_line=args.notify_line,
         mock_mode=args.mock,
+        hybrid_mode=args.hybrid,
     )

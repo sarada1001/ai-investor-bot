@@ -10,7 +10,8 @@ from io import StringIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import skills.portfolio_monitor as _portfolio_mod
+import skills.portfolio_monitor       as _portfolio_mod
+import skills.training_data_collector as _training_mod
 
 _W = 62  # ターミナル表示幅
 
@@ -87,6 +88,15 @@ def run_exit_check() -> list[dict]:
         if action == "SELL":
             print(f"\n  ⚠️  [{ticker}] {reason}")
             print(f"  ⚠️  [{ticker}] ストップロス到達のため売却注文を送信しました\n")
+            updated = _training_mod.update_outcome(
+                ticker=ticker,
+                pnl_pct=pnl_pct,
+                exit_price=current_price,
+                exit_reason=reason,
+            )
+            if updated:
+                label = "WIN" if pnl_pct >= 0 else "LOSS"
+                print(f"  📚 [{ticker}] 学習データ更新: outcome_label={label}  (record {updated}件)")
 
     sell_count = sum(1 for d in decisions if d["action"] == "SELL")
     hold_count = len(decisions) - sell_count
@@ -152,7 +162,9 @@ def run_screener():
 
     if not top_picks:
         print("⚠️ 本日はスクリーニング条件を満たす有望銘柄が見つかりませんでした。")
-        return []
+        forced = random.sample(watch_list, min(random.randint(1, 2), len(watch_list)))
+        print(f"⚠️ 学習データ収集のため、強制的に分析フェーズへ移行します: {forced}")
+        return forced
 
     print(f"\n🎯 スクリーニング完了！本日のAI投資会議 候補銘柄: {top_picks}")
     return top_picks
@@ -178,8 +190,8 @@ if __name__ == "__main__":
             print(f"🚀 候補銘柄 [{ticker}] のAI投資会議を開始します...")
             time.sleep(2)
 
-            # main.py をモックモードで呼び出す（LLMのAPI課金ゼロ）
-            subprocess.run(["python3", "main.py", "--mock", "--ticker", ticker])
+            # ハイブリッドモード: リアル市場データ (yfinance + Gemini) で分析、発注はスキップ
+            subprocess.run(["python3", "main.py", "--hybrid", "--ticker", ticker])
 
             print(f"✅ [{ticker}] の分析サイクル完了。\n")
             time.sleep(3)
