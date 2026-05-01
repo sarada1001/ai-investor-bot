@@ -33,7 +33,11 @@ if not log_files:
 
 # 📂 サイドバー（左側のメニュー）に選択項目を配置してスッキリさせる
 st.sidebar.header("📁 セッション履歴")
+if st.sidebar.button("🔄 最新のログを取得"):
+    st.rerun()
 selected_file = st.sidebar.selectbox("確認したい会議ログを選択", log_files)
+
+
 
 try:
     with open(selected_file, 'r', encoding='utf-8') as f:
