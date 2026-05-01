@@ -1,25 +1,46 @@
 """
-main.py — スイングトレード金融マルチエージェントシステム
-ECC (everything-claude-code) アーキテクチャ
+main.py — ECC スイングトレード自律エンジン（AAPL ターゲット）
 
-実行フロー:
-  NewsAgent → FundamentalAgent → TechnicalAgent
-      ↓ (全員がBBSに書き込む)
-  ManagerAgent (BBS読み取り → 統合判断 → BBS書き込み)
-      ↓
-  ComplianceAgent (BBS読み取り → 検閲 → 最終決定)
-      ↓
-  LINE通知（最終判断のみ）
+実行フロー（ステージゲート方式）:
+  Stage 1 : TechnicalAgent + NewsAgent + MacroAgent + SocialAgent（安価スキャン）
+  Gate    : マクロ NEGATIVE → ブレーキ発動 HOLD
+            技術・ニュース双方 NEUTRAL 以下 → HOLD
+  Stage 2 : FundamentalAgent（Gate 通過時のみ: Multi-HyDE RAG + EDGAR 取得）
+  Stage 3 : ManagerAgent（BBS レポートを総合評価 → Strong Buy のみ発注）
+  Stage 4 : RiskAgent（STRONG BUY 時のみ: ポジションサイジング + ストップロス算出）
+
+Strong Buy 条件（すべて満たすこと）:
+  - 加重スコア ≥ 0.60  (FA×0.40, Tech×0.20, Macro×0.20, News×0.10, Social×0.10)
+  - ファンダメンタルシグナル > 0 (positive 必須)
+  - テクニカルシグナル ≥ 0    (negative 不可)
+  - ニュースシグナル   ≥ 0    (negative 不可)
+  - マクロシグナル    ≥ 0    (NEGATIVE 時は強制 HOLD)
+
+Gate / マクロブレーキ:
+  - MacroAgent が NEGATIVE → ブレーキ発動: FundamentalAgent スキップ → 即 HOLD
+  - Tech & News 双方 NEUTRAL 以下 → Fundamental スキップ → 即 HOLD
+  - ManagerAgent でも macro=NEGATIVE 時は安全弁として強制 HOLD
+
+Social クロスバリデーション（ManagerAgent):
+  - SNS センチメント POSITIVE でも hype_score ≥ 0.7 かつ FA・Tech の裏付けなし
+    → 「根拠なき買い煽り」判定: Social スコアを −0.5 にペナルティ
+
+RiskAgent（Stage 4）:
+  - Fixed Fractional: 口座残高の 2% ÷ (ATR×2) = 最大許容株数
+  - Kelly Criterion(簡略): 勝率55%・利益/損失比1.5 → Kelly分率×口座÷株価
+  - 両者の小さい方を recommended_shares とし、損切り価格と共に BBS に記録
 """
+
+from __future__ import annotations
 
 import os
 import sys
 import json
 import time
 import datetime
-import requests
 import warnings
 import yaml
+import requests
 from pathlib import Path
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -27,18 +48,100 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 warnings.filterwarnings("ignore")
 load_dotenv()
 
-# --- 内部モジュール ---
 sys.path.insert(0, str(Path(__file__).parent))
-import skills.news_monitor as _news_monitor_mod
-import skills.rag_search as _rag_search_mod
-import skills.technical_calc as _technical_calc_mod
-import skills.portfolio_tracker as _portfolio_mod
-import skills.signal_scorer as _signal_scorer_mod
-import skills.alpaca_trade as _alpaca_mod
+
+import skills.news_monitor   as _news_mod
+import skills.technical_calc as _tech_mod
+import skills.rag_search      as _rag_mod
+import skills.edgar_fetcher   as _edgar_mod
+import skills.alpaca_trade    as _alpaca_mod
+import skills.macro_monitor   as _macro_mod
+import skills.social_monitor  as _social_mod
+import skills.risk_calculator as _risk_mod
+
+# =========================================================
+# 定数
+# =========================================================
+
+TARGET_TICKER    = "AAPL"
+STRONG_BUY_SCORE = 0.60   # 加重スコアの Strong Buy 閾値
+BUY_QTY          = 1.0    # 発注数量（株）
+
+# 5 要素の合計ウェイト = 1.00
+WEIGHTS: dict[str, float] = {
+    "fundamental": 0.40,
+    "technical":   0.20,
+    "macro":       0.20,
+    "news":        0.10,
+    "social":      0.10,
+}
+
+SOCIAL_HYPE_THRESHOLD = 0.7   # このスコア以上を「高Hype」と判定
+
+SIGNAL_MAP: dict[str, float] = {
+    "positive": +1.0,
+    "neutral":   0.0,
+    "negative": -1.0,
+}
+
+# モックモード用ダミーBBSデータ（APIトークン消費ゼロでフローテスト）
+MOCK_BBS_DATA: dict[str, dict] = {
+    "news_analysis": {
+        "articles": [{
+            "sentiment": "positive",
+            "reason": "AAPL unveils revolutionary new AI features, driving positive market sentiment.",
+            "title": "[MOCK] AAPL unveils revolutionary new AI features",
+        }],
+        "avg_sentiment_score": 1.0,
+    },
+    "technical_analysis": {
+        "trend": "positive",
+        "trend_reason": "MACD golden cross confirmed. RSI is at healthy 58.",
+    },
+    "macro_analysis": {
+        "trend": "neutral",
+        "trend_reason": "SPY is trading flat. VIX remains stable at 15.2.",
+    },
+    "fundamental_analysis": {
+        "trend": "positive",
+        "trend_reason": "Q2 earnings show 20% revenue growth and strong iPhone sales.",
+        "analyses": [],
+        "data_available": True,
+    },
+    "social_analysis": {
+        "ticker": TARGET_TICKER,
+        "sentiment": "POSITIVE",
+        "hype_score": 0.8,
+        "reason": (
+            "Lots of rocket emojis 🚀 and YOLO mentions on Reddit r/wallstreetbets, "
+            "but lacking fundamental discussion about P/E or earnings."
+        ),
+        "post_count": 5,
+        "source": "mock_reddit_wsb",
+    },
+    "risk_analysis": {
+        "ticker":                  TARGET_TICKER,
+        "account_balance":         100_000.0,
+        "current_price":           185.00,
+        "atr":                     6.25,
+        "stop_loss_price":         172.50,
+        "stop_loss_pct":           6.76,
+        "risk_amount":             2000.0,
+        "fixed_fractional_shares": 40,
+        "kelly_shares":            35,
+        "recommended_shares":      35,
+        "reason": (
+            "Volatility is moderate. Risking 2% of total account balance ($2,000). "
+            "ATR=$6.25 × 2 = stop distance $12.50. "
+            "Fixed Fractional=40株, Kelly=35株 → 保守的な 35株を採用。"
+        ),
+    },
+}
 
 # =========================================================
 # BBS (Bulletin Board System) — 共有テキストメモリ
 # =========================================================
+
 BBS_DIR = Path("bbs")
 BBS_DIR.mkdir(exist_ok=True)
 
@@ -65,7 +168,7 @@ class BBS:
         }
         self._data["entries"].append(entry)
         self._save()
-        print(f"  [BBS] {agent_name} → '{key}' を書き込みました。")
+        _log(f"[BBS] {agent_name} → '{key}' 書き込み完了")
 
     def read(self, key: str) -> dict | str | None:
         for entry in reversed(self._data["entries"]):
@@ -89,8 +192,60 @@ class BBS:
 
 
 # =========================================================
-# Agent基底クラス
+# ログ出力ヘルパー
 # =========================================================
+
+_W = 62  # ターミナル表示幅
+
+
+def _sep() -> None:
+    print(f"│  {'┄' * (_W - 4)}")
+
+
+def _log(msg: str) -> None:
+    print(f"│  {msg}")
+
+
+def _phase_header(tag: str, name: str) -> None:
+    title = f" {tag}: {name} "
+    line  = title.center(_W - 2, "─")
+    print(f"\n┌{line}┐")
+
+
+def _phase_footer() -> None:
+    print(f"└{'─' * _W}┘")
+
+
+def _stage_header(n: int, title: str) -> None:
+    label = f"  ◆ Stage {n}: {title}"
+    print(f"\n{'━' * (_W + 2)}")
+    print(label)
+    print(f"{'━' * (_W + 2)}")
+
+
+def _mock_banner(sub: str = "") -> None:
+    bar = "█" * (_W + 2)
+    msg = "⚠️  [MOCK MODE]  トークン消費0でテスト実行中  ⚠️"
+    print(f"\n{bar}")
+    print(f"  {msg}")
+    if sub:
+        print(f"  {sub}")
+    print(f"{bar}\n")
+
+
+def _main_header(ticker: str, session_id: str) -> None:
+    print(f"\n╔{'═' * _W}╗")
+    print(f"║  ECC スイングトレード自律エンジン  [{ticker}]".ljust(_W + 1) + "║")
+    print(f"║  セッション: {session_id}".ljust(_W + 1) + "║")
+    print(f"╚{'═' * _W}╝")
+
+
+def _decision_box(lines: list[str]) -> None:
+    print(f"\n╔{'═' * _W}╗")
+    for line in lines:
+        print(f"║  {line}".ljust(_W + 1) + "║")
+    print(f"╚{'═' * _W}╝")
+
 
 def _load_agent_config(agent_name: str) -> dict:
     path = Path(".agents") / f"{agent_name}.yaml"
@@ -98,280 +253,17 @@ def _load_agent_config(agent_name: str) -> dict:
         return yaml.safe_load(f)
 
 
-class BaseAgent:
-    def __init__(self, config_name: str, bbs: BBS):
-        self.config = _load_agent_config(config_name)
-        self.name = self.config["name"]
-        self.bbs = bbs
-        self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-
-    def run(self) -> dict:
-        raise NotImplementedError
-
-
 # =========================================================
-# 1. NewsAgent
+# LINE 通知（オプション）
 # =========================================================
 
-class NewsAgent(BaseAgent):
-    def __init__(self, bbs: BBS):
-        super().__init__("news_agent", bbs)
-        # 許可スキルの検証
-        assert "news_monitor" in self.config["allowed_skills"], \
-            f"{self.name}: news_monitor へのアクセス権がありません"
-
-    def run(self) -> dict:
-        print(f"\n[{self.name}] ニュース監視を開始します...")
-        companies = self.config["params"]["companies"]
-
-        # Skill呼び出し（許可されたスキルのみ）
-        result = _news_monitor_mod.run(companies=companies)
-
-        self.bbs.write(self.name, self.config["output_bbs_key"], result)
-        print(f"  [{self.name}] 新着記事: {result['new_count']}件")
-        return result
-
-
-# =========================================================
-# 2. FundamentalAgent
-# =========================================================
-
-class FundamentalAgent(BaseAgent):
-    def __init__(self, bbs: BBS):
-        super().__init__("fundamental_agent", bbs)
-        assert "rag_search" in self.config["allowed_skills"], \
-            f"{self.name}: rag_search へのアクセス権がありません"
-
-    def run(self) -> dict:
-        print(f"\n[{self.name}] ファンダメンタルズ分析を開始します...")
-        params = self.config["params"]
-        queries = params.get("default_queries", [])
-        persist_dir = params.get("persist_dir", "chroma_db_saved")
-        top_k = params.get("top_k", 6)
-
-        analyses = []
-        for q in queries:
-            result = _rag_search_mod.run(query=q, persist_dir=persist_dir, top_k=top_k)
-            analyses.append({"query": q, "analysis": result["analysis"]})
-            time.sleep(2)
-
-        output = {"queries": analyses, "persist_dir": persist_dir}
-        self.bbs.write(self.name, self.config["output_bbs_key"], output)
-        print(f"  [{self.name}] {len(analyses)}件のクエリ分析完了。")
-        return output
-
-
-# =========================================================
-# 3. TechnicalAgent
-# =========================================================
-
-class TechnicalAgent(BaseAgent):
-    def __init__(self, bbs: BBS):
-        super().__init__("technical_agent", bbs)
-        assert "technical_calc" in self.config["allowed_skills"], \
-            f"{self.name}: technical_calc へのアクセス権がありません"
-
-    def run(self) -> dict:
-        print(f"\n[{self.name}] テクニカル指標の計算を開始します...")
-        params = self.config["params"]
-        tickers = params.get("tickers", {})
-        period = params.get("period", "3mo")
-
-        result = _technical_calc_mod.run(tickers=tickers, period=period)
-
-        self.bbs.write(self.name, self.config["output_bbs_key"], result)
-        succeeded = [k for k, v in result["tickers"].items() if not v.get("error")]
-        print(f"  [{self.name}] 計算完了: {succeeded}")
-        return result
-
-
-# =========================================================
-# 4. ManagerAgent
-# =========================================================
-
-class ManagerAgent(BaseAgent):
-    def __init__(self, bbs: BBS):
-        super().__init__("manager_agent", bbs)
-        assert "signal_scorer" in self.config["allowed_skills"], \
-            f"{self.name}: signal_scorer へのアクセス権がありません"
-
-    def run(self) -> dict:
-        print(f"\n[{self.name}] BBS読み取り → 重み付きスコアリング判断を開始します...")
-
-        news_data = self.bbs.read("news_analysis") or {}
-        fundamental_data = self.bbs.read("fundamental_analysis") or {}
-        technical_data = self.bbs.read("technical_analysis") or {}
-
-        # --- ファンダメンタルシグナルを1回だけLLMで抽出（全銘柄共通）---
-        print(f"  [{self.name}] ファンダメンタルシグナルを抽出中...")
-        fa_signal, fa_reason = _signal_scorer_mod.extract_fundamental_signal(fundamental_data, self.llm)
-
-        # --- 全銘柄をスコアリングして最良機会を選択 ---
-        tickers = technical_data.get("tickers", {})
-        best_result: dict | None = None
-        best_company = ""
-        best_ticker = ""
-
-        for company, ticker_info in tickers.items():
-            if ticker_info.get("error"):
-                continue
-            result = _signal_scorer_mod.run(
-                news_data=news_data,
-                fundamental_data=fundamental_data,
-                technical_data=technical_data,
-                target_company=company,
-                fundamental_signal=fa_signal,
-                fundamental_reason=fa_reason,
-            )
-            if best_result is None or abs(result["score"]) > abs(best_result["score"]):
-                best_result = result
-                best_company = company
-                best_ticker = ticker_info.get("ticker", "")
-
-        if best_result is None:
-            judgment = {
-                "action": "HOLD", "target_company": "", "target_ticker": "",
-                "confidence": 0, "rationale": "テクニカルデータ取得失敗のためHOLD",
-                "position_size_pct": 0, "stop_loss_pct": 5, "target_hold_days": 5,
-            }
-            self.bbs.write(self.name, self.config["output_bbs_key"], judgment)
-            return judgment
-
-        # --- LLMで根拠テキストを生成（スコアの説明のみ）---
-        score_info = best_result
-        rationale_prompt = (
-            f"スイングトレード分析結果を投資家向けに100文字以内で要約してください。\n\n"
-            f"対象銘柄: {best_company}\n"
-            f"判断: {score_info['action']} (加重スコア: {score_info['score']:.3f})\n"
-            f"ニュース({score_info['weights']['news']:.0%}): "
-            f"{score_info['signals']['news']:+.2f} — {score_info['signal_reasons']['news']}\n"
-            f"ファンダメンタルズ({score_info['weights']['fundamental']:.0%}): "
-            f"{score_info['signals']['fundamental']:+.2f} — {score_info['signal_reasons']['fundamental']}\n"
-            f"テクニカル({score_info['weights']['technical']:.0%}): "
-            f"{score_info['signals']['technical']:+.2f} — {score_info['signal_reasons']['technical']}\n"
-            f"ウェイト調整: {score_info['weight_reason']}"
-        )
-        try:
-            rationale = self.llm.invoke(rationale_prompt).content.strip()[:200]
-        except Exception as e:
-            rationale = f"{best_company}: スコア{score_info['score']:.3f}により{score_info['action']} (LLMエラー: {e})"
-
-        # --- スコアから派生パラメータを計算 ---
-        score_abs = abs(score_info["score"])
-        position_size_pct = max(5, min(20, round(score_abs * 20)))
-        stop_loss_pct = max(3, min(8, round(8 - score_abs * 5)))
-        target_hold_days = max(3, min(20, round(5 + score_abs * 15)))
-
-        judgment = {
-            "action": score_info["action"],
-            "target_company": best_company,
-            "target_ticker": best_ticker,
-            "confidence": score_info["confidence"],
-            "rationale": rationale,
-            "position_size_pct": position_size_pct,
-            "stop_loss_pct": stop_loss_pct,
-            "target_hold_days": target_hold_days,
-            "score_breakdown": score_info,
-        }
-
-        self.bbs.write(self.name, self.config["output_bbs_key"], judgment)
-        print(
-            f"  [{self.name}] 判断: {judgment['action']} "
-            f"(スコア: {score_info['score']:+.3f}, 確信度: {judgment['confidence']}%)"
-            f" → {best_company}"
-        )
-        return judgment
-
-
-# =========================================================
-# 5. ComplianceAgent
-# =========================================================
-
-class ComplianceAgent(BaseAgent):
-    def __init__(self, bbs: BBS):
-        super().__init__("compliance_agent", bbs)
-        rules_path = Path(self.config["rules_file"])
-        self.rules_text = rules_path.read_text(encoding="utf-8") if rules_path.exists() else "ルールファイルなし"
-
-    def run(self) -> dict:
-        print(f"\n[{self.name}] ManagerAgent判断を検閲します...")
-
-        manager_judgment = self.bbs.read("manager_judgment") or {}
-        news_data = self.bbs.read("news_analysis") or {}
-        portfolio_data = self.bbs.read("portfolio_state") or {}
-
-        target_company = manager_judgment.get("target_company", "")
-        recent_buy_flag = _portfolio_mod.recent_buy_within_days(
-            {"recent_decisions": portfolio_data.get("recent_decisions_last10", [])},
-            company=target_company,
-        ) if target_company else False
-        holding_cnt = portfolio_data.get("holding_count", 0)
-        total_pct = portfolio_data.get("total_position_pct", 0.0)
-        new_size = manager_judgment.get("position_size_pct", 0)
-
-        rule02_note = (
-            f"直近3日以内にBUY記録あり → RULE-02違反のためREJECT必須"
-            if recent_buy_flag
-            else "直近3日以内のBUY記録なし → 問題なし"
-        )
-        rule07_note = (
-            f"保有銘柄数 {holding_cnt}/4、追加後総ポジション {total_pct + new_size:.1f}% "
-            f"({'60%超 → REJECT必須' if total_pct + new_size > 60 or holding_cnt >= 4 else '上限内'})"
-        )
-
-        system = self.config["system_prompt"]
-        prompt = (
-            f"{system}\n\n"
-            f"=== コンプライアンスルール ===\n{self.rules_text}\n\n"
-            f"=== ManagerAgentの判断 ===\n{json.dumps(manager_judgment, ensure_ascii=False, indent=2)}\n\n"
-            f"=== NewsAgentの出力（RULE-06検証用） ===\n{json.dumps(news_data, ensure_ascii=False, indent=2)}\n\n"
-            f"=== ポートフォリオ現状（RULE-02/07検証用） ===\n"
-            f"{json.dumps(portfolio_data, ensure_ascii=False, indent=2)}\n\n"
-            f"[RULE-02チェック結果] 対象銘柄「{target_company}」: {rule02_note}\n"
-            f"[RULE-07チェック結果] {rule07_note}\n\n"
-            f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
-            f'{{"compliance_status":"APPROVED"|"MODIFIED"|"REJECTED",'
-            f'"violations":[],"final_action":"BUY"|"HOLD"|"SELL",'
-            f'"final_position_size_pct":0-20,"compliance_note":"理由"}}'
-        )
-
-        try:
-            raw = self.llm.invoke(prompt).content.strip()
-            import re
-            m = re.search(r'\{.*\}', raw, re.DOTALL)
-            decision = json.loads(m.group()) if m else {
-                "compliance_status": "REJECTED",
-                "violations": ["パースエラー"],
-                "final_action": "HOLD",
-                "final_position_size_pct": 0,
-                "compliance_note": raw[:100],
-            }
-        except Exception as e:
-            decision = {
-                "compliance_status": "REJECTED",
-                "violations": [str(e)],
-                "final_action": "HOLD",
-                "final_position_size_pct": 0,
-                "compliance_note": f"検閲エラーのためHOLDに強制変更: {e}",
-            }
-
-        self.bbs.write(self.name, self.config["output_bbs_key"], decision)
-        print(f"  [{self.name}] ステータス: {decision.get('compliance_status')} → 最終アクション: {decision.get('final_action')}")
-        return decision
-
-
-# =========================================================
-# LINE通知
-# =========================================================
-
-LINE_ACCESS_TOKEN = os.getenv(
-    "LINE_ACCESS_TOKEN",
-    "rLmNKB5qoOYjlQ1W7G46SpD2dhH3uxCNxqHYnyqWKTmPRWGPP0ZpqrfWs8y3MRFXym3ctwIZXlC14eo2LxXjx++Hha4Fgy2RJX1Ii1LCuRuThgkshqMko1DHIgbDrm812uX+2ywiI6vA9GuJiBy3pAdB04t89/1O/w1cDnyilFU=",
-)
-LINE_USER_ID = os.getenv("LINE_USER_ID", "U266575a29b79da182dfad34f6e879603")
+LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN", "")
+LINE_USER_ID      = os.getenv("LINE_USER_ID", "")
 
 
 def send_line_message(text: str) -> None:
+    if not LINE_ACCESS_TOKEN or not LINE_USER_ID:
+        return
     try:
         requests.post(
             "https://api.line.me/v2/bot/message/push",
@@ -379,167 +271,972 @@ def send_line_message(text: str) -> None:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
             },
-            data=json.dumps({
-                "to": LINE_USER_ID,
-                "messages": [{"type": "text", "text": text}],
-            }),
+            data=json.dumps({"to": LINE_USER_ID,
+                             "messages": [{"type": "text", "text": text}]}),
             timeout=10,
         )
     except Exception as e:
-        print(f"  [LINE] 送信失敗: {e}")
+        _log(f"[LINE] 送信失敗: {e}")
 
 
-def _build_line_report(bbs: BBS, final_decision: dict) -> str:
-    news = bbs.read("news_analysis") or {}
-    manager = bbs.read("manager_judgment") or {}
-    alpaca_order = bbs.read("alpaca_order")
+# =========================================================
+# Stage 1-A — TechnicalAgent
+# =========================================================
 
-    action_emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "⏸"}.get(
-        final_decision.get("final_action", "HOLD"), "❓"
-    )
+class TechnicalAgent:
+    NAME = "TechnicalAgent"
 
-    articles_summary = ""
-    for a in (news.get("articles") or [])[:3]:
-        emoji = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}.get(a.get("sentiment", ""), "❔")
-        articles_summary += f"  {emoji} {a['company']}: {a['title'][:30]}...\n"
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
 
-    if alpaca_order:
-        if alpaca_order.get("error"):
-            alpaca_line = f"\n⚠️ Alpaca発注エラー: {str(alpaca_order['error'])[:60]}"
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-1/3") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        _log(f"{ticker} のテクニカル指標を計算中 (期間: 6ヶ月)...")
+        _sep()
+
+        try:
+            result = _tech_mod.analyze_ticker(ticker, period="6mo")
+        except Exception as e:
+            result = {"ticker": ticker, "error": str(e)}
+            _log(f"エラー: {e}")
+            self.bbs.write(self.NAME, "technical_analysis", result)
+            _phase_footer()
+            return result
+
+        if result.get("error"):
+            _log(f"取得エラー: {result['error']}")
+            self.bbs.write(self.NAME, "technical_analysis", result)
+            _phase_footer()
+            return result
+
+        ind  = result.get("indicators", {})
+        rsi  = ind.get("rsi",  {})
+        macd = ind.get("macd", {})
+        sma  = ind.get("sma25", {})
+
+        _log(f"最新価格   : ${result.get('latest_price', 0):.2f}  ({result.get('latest_date', '')})")
+        _log(f"RSI(14)    : {rsi.get('value', '-')}")
+        _log(f"MACD       : {macd.get('trend', '-')}  (histogram={macd.get('histogram', 0):+.4f})")
+        _log(f"SMA25      : {sma.get('sma25', '-'):.2f}  ({sma.get('position', '-')} / {sma.get('diff_pct', 0):+.2f}%)")
+        _sep()
+        _log(f"シグナルサマリー: {result.get('signal_summary', '')}")
+        _sep()
+        trend  = result.get("trend", "neutral")
+        t_icon = {"positive": "📈", "negative": "📉", "neutral": "➡️"}.get(trend, "❓")
+        _log(f"テクニカルトレンド判定: {t_icon} {trend.upper()}")
+        _log(f"根拠: {result.get('trend_reason', '')[:80]}")
+
+        self.bbs.write(self.NAME, "technical_analysis", result)
+        _phase_footer()
+        return result
+
+
+# =========================================================
+# Stage 1-B — NewsAgent
+# =========================================================
+
+class NewsAgent:
+    NAME = "NewsAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-2/3") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        _log(f"{ticker} の最新ニュースを取得中 (yfinance)...")
+        _sep()
+
+        try:
+            result = _news_mod.fetch_ticker_news(ticker, max_articles=3)
+        except Exception as e:
+            result = {"ticker": ticker, "articles": [], "new_count": 0, "error": str(e)}
+            _log(f"エラー: {e}")
+
+        articles = result.get("articles", [])
+        _log(f"取得完了: {len(articles)} 件")
+        _sep()
+
+        sentiment_scores: list[float] = []
+        for a in articles:
+            s = a.get("sentiment", "neutral")
+            sentiment_scores.append(SIGNAL_MAP.get(s, 0.0))
+            icon = {"positive": "📈", "negative": "📉", "neutral": "➡️"}.get(s, "❓")
+            title_short = a.get("title", "")[:55]
+            _log(f"{icon} [{s:8s}] {title_short}...")
+            _log(f"           理由: {a.get('reason','')[:60]}")
+
+        avg_signal = round(sum(sentiment_scores) / len(sentiment_scores), 4) if sentiment_scores else 0.0
+        avg_label  = "強気" if avg_signal > 0.3 else "弱気" if avg_signal < -0.3 else "中立"
+        _sep()
+        _log(f"センチメント平均スコア: {avg_signal:+.2f}  ({avg_label})")
+
+        for a in articles:
+            a.setdefault("company", ticker)
+        result["avg_sentiment_score"] = avg_signal
+
+        self.bbs.write(self.NAME, "news_analysis", result)
+        _phase_footer()
+        return result
+
+
+# =========================================================
+# Stage 1-C — MacroAgent
+# =========================================================
+
+class MacroAgent:
+    NAME = "MacroAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+        self._cfg = _load_agent_config("macro_agent")
+
+    def run(self, phase_tag: str = "S1-3/3") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        period = self._cfg.get("params", {}).get("period", "1mo")
+        _log(f"市場全体の指標を取得中 (SPY / ^VIX, period={period})...")
+        _sep()
+
+        try:
+            result = _macro_mod.run(period=period)
+        except Exception as e:
+            result = {
+                "spy": {}, "vix": {},
+                "signal_summary": f"取得エラー: {e}",
+                "trend": "neutral",
+                "trend_reason": f"マクロデータ取得失敗: {e}",
+                "error": str(e),
+            }
+            _log(f"エラー: {e}")
+
+        if result.get("error"):
+            _log(f"データ取得エラー: {result['error']} → NEUTRAL で継続")
         else:
-            alpaca_line = (
-                f"\n🏦 Alpaca Paper発注:\n"
-                f"  {alpaca_order.get('symbol')} {str(alpaca_order.get('side','')).upper()} "
-                f"{alpaca_order.get('qty')}株\n"
-                f"  OrderID: {str(alpaca_order.get('order_id',''))[:16]}..."
-            )
-    else:
-        alpaca_line = "\n🏦 Alpaca: 発注なし（日本株 or HOLD）"
+            spy = result.get("spy", {})
+            vix = result.get("vix", {})
+            _log(f"SPY  価格  : ${spy.get('latest_price', '-')}")
+            _log(f"SPY  SMA乖離: {spy.get('diff_pct', 0):+.2f}%  ({spy.get('position', '-')})")
+            _log(f"SPY  5日R  : {spy.get('return_5d_pct', 0):+.2f}%")
+            _sep()
+            _log(f"VIX  現在値: {vix.get('latest', '-'):.1f}  ({vix.get('level', '-')})")
+            _log(f"VIX  5日平均: {vix.get('avg_5d', '-'):.1f}  トレンド: {vix.get('trend', '-')}")
+            _sep()
+            _log(f"サマリー: {result.get('signal_summary', '')}")
 
-    return (
-        f"🤖 【スイングトレード AIレポート】\n"
-        f"{'='*30}\n"
-        f"{action_emoji} 最終判断: {final_decision.get('final_action', 'N/A')}\n"
-        f"📊 コンプライアンス: {final_decision.get('compliance_status', 'N/A')}\n"
-        f"💼 推奨サイズ: {final_decision.get('final_position_size_pct', 0)}%\n"
-        f"\n📌 ManagerAgent根拠:\n{manager.get('rationale', 'なし')[:150]}\n"
-        f"\n📰 注目ニュース:\n{articles_summary}"
-        f"{alpaca_line}\n"
-        f"\n⚠️ 違反ルール: {', '.join(final_decision.get('violations') or ['なし'])}\n"
-        f"{'='*30}\n"
-        f"✏️ {final_decision.get('compliance_note', '')}"
+        _sep()
+        trend  = result.get("trend", "neutral")
+        t_icon = {"positive": "📈", "negative": "📉", "neutral": "➡️"}.get(trend, "❓")
+        brake  = "  ← ⚠ ブレーキ発動！" if trend == "negative" else ""
+        _log(f"マクロ環境判定: {t_icon} {trend.upper()}{brake}")
+        _log(f"根拠: {result.get('trend_reason', '')[:80]}")
+
+        self.bbs.write(self.NAME, "macro_analysis", result)
+        _phase_footer()
+        return result
+
+
+# =========================================================
+# Stage 1-D — SocialAgent
+# =========================================================
+
+class SocialAgent:
+    NAME = "SocialAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-4/4") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        _log(f"{ticker} のSNSセンチメントを分析中 (Reddit r/wallstreetbets 風モック)...")
+        _sep()
+
+        try:
+            result = _social_mod.fetch_social_sentiment(ticker, hype_mode=True)
+        except Exception as e:
+            result = {
+                "ticker": ticker, "sentiment": "NEUTRAL", "hype_score": 0.5,
+                "reason": f"取得エラー: {e}", "error": str(e),
+            }
+            _log(f"エラー: {e}")
+
+        sentiment  = result.get("sentiment", "NEUTRAL")
+        hype_score = result.get("hype_score", 0.0)
+        reason     = result.get("reason", "")
+        source     = result.get("source", "")
+        posts      = result.get("posts_preview", [])
+
+        s_icon   = {"POSITIVE": "📈", "NEGATIVE": "📉", "NEUTRAL": "➡️"}.get(sentiment, "❓")
+        filled   = int(hype_score * 10)
+        hype_bar = "█" * filled + "░" * (10 - filled)
+
+        _log(f"データソース   : {source}  (投稿数: {result.get('post_count', 0)}件)")
+        if posts:
+            _log(f"投稿サンプル   : {posts[0][:65]}...")
+        _sep()
+        _log(f"センチメント判定: {s_icon} {sentiment}")
+        _log(f"買い煽りスコア  : [{hype_bar}] {hype_score:.2f}  "
+             f"{'⚠️  高Hype警戒 (FA/Tech裏付け必要)' if hype_score >= SOCIAL_HYPE_THRESHOLD else '✅ 正常範囲'}")
+        _sep()
+        _log(f"判定根拠: {reason[:80]}")
+
+        self.bbs.write(self.NAME, "social_analysis", result)
+        _phase_footer()
+        return result
+
+
+# =========================================================
+# Stage 2 — FundamentalAgent
+# =========================================================
+
+class FundamentalAgent:
+    NAME = "FundamentalAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+        self._cfg = _load_agent_config("fundamental_agent")
+
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S2") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        params      = self._cfg.get("params", {})
+        persist_dir = params.get("persist_dir", "chroma_db_saved")
+        top_k       = params.get("top_k", 4)
+        queries     = params.get("aapl_queries", [])
+
+        # ── Step 1: ChromaDB にデータがあるか確認 ──────────────────
+        _log(f"ChromaDB にデータが存在するか確認中 (persist_dir={persist_dir})...")
+        probe = _rag_mod.run(
+            company=ticker,
+            queries=[queries[0]] if queries else ["Apple revenue"],
+            persist_dir=persist_dir,
+            top_k=2,
+        )
+        data_available = probe.get("data_available", False)
+
+        if not data_available:
+            _sep()
+            _log(f"DBに {ticker} の資料なし → edgar_fetcher で最新 10-Q を取得します...")
+            fetch_result = _edgar_mod.run(
+                ticker=ticker,
+                prefer_quarterly=True,
+                persist_dir=persist_dir,
+            )
+            if fetch_result.get("error"):
+                _log(f"EDGAR 取得エラー: {fetch_result['error']}")
+                result = {
+                    "ticker": ticker, "trend": "neutral",
+                    "trend_reason": f"EDGAR 取得失敗: {fetch_result['error']}",
+                    "data_available": False, "analyses": [],
+                }
+                self.bbs.write(self.NAME, "fundamental_analysis", result)
+                _phase_footer()
+                return result
+            _log(f"取得完了: {fetch_result.get('form')} / {fetch_result.get('date')}")
+            _log(f"  保存先: {fetch_result.get('output_path')}")
+            _log(f"  追加チャンク数: {fetch_result.get('chunks_added', 0)}")
+        else:
+            _log(f"ChromaDB に {ticker} のデータが存在します。取得をスキップします。")
+
+        # ── Step 2: Multi-HyDE RAG 分析 ────────────────────────────
+        _sep()
+        _log(f"Multi-HyDE RAG 分析を実行中 ({len(queries)} クエリ)...")
+
+        result = _rag_mod.run(
+            company=ticker,
+            queries=queries,
+            persist_dir=persist_dir,
+            top_k=top_k,
+        )
+
+        _sep()
+        for a in result.get("analyses", []):
+            hit  = "✓" if a.get("company_found_in_context") else "△"
+            _log(f"{hit} Q: {a['query'][:62]}")
+            _log(f"   A: {a['analysis'][:150].strip().replace(chr(10), ' ')}...")
+
+        _sep()
+        trend  = result.get("trend", "neutral")
+        t_icon = {"positive": "📈", "negative": "📉", "neutral": "➡️"}.get(trend, "❓")
+        _log(f"ファンダメンタルトレンド判定: {t_icon} {trend.upper()}")
+        _log(f"根拠: {result.get('trend_reason', '')[:80]}")
+
+        self.bbs.write(self.NAME, "fundamental_analysis", result)
+        _phase_footer()
+        return result
+
+
+# =========================================================
+# Stage 3 — ManagerAgent + Gate ヘルパー
+# =========================================================
+
+_STRONG_BUY_LABEL = "STRONG BUY"
+_HOLD_LABEL       = "HOLD"
+
+
+def _extract_news_signal(news_data: dict, ticker: str) -> tuple[float, str]:
+    """ニュース記事からティッカー一致記事を抽出してシグナルを計算する。"""
+    articles = news_data.get("articles", [])
+    target_arts = [
+        a for a in articles
+        if a.get("ticker", "").upper() == ticker.upper()
+        or a.get("company", "").upper() == ticker.upper()
+    ]
+    if not target_arts:
+        target_arts = articles
+    if not target_arts:
+        return 0.0, "ニュースなし"
+
+    scores = [SIGNAL_MAP.get(a.get("sentiment", "neutral"), 0.0) for a in target_arts]
+    avg    = round(sum(scores) / len(scores), 4)
+    parts  = [a.get("sentiment", "?") for a in target_arts[:3]]
+    return avg, " / ".join(parts)
+
+
+def _trend_to_signal(trend_str: str) -> float:
+    return SIGNAL_MAP.get((trend_str or "neutral").lower(), 0.0)
+
+
+def _gate_check(bbs: BBS, ticker: str) -> dict:
+    """
+    Stage 1 の BBS データを読み、FundamentalAgent をスキップするか判定する。
+
+    優先度:
+      1. Macro NEGATIVE → ブレーキ発動（即 HOLD）
+      2. Tech ≤ 0 AND News ≤ 0 → 通常 Gate（コスト節約 HOLD）
+    """
+    tech_data  = bbs.read("technical_analysis") or {}
+    news_data  = bbs.read("news_analysis")       or {}
+    macro_data = bbs.read("macro_analysis")      or {}
+
+    tech_sig             = _trend_to_signal(tech_data.get("trend", "neutral"))
+    news_sig, _news_desc = _extract_news_signal(news_data, ticker)
+    macro_sig            = _trend_to_signal(macro_data.get("trend", "neutral"))
+
+    macro_brake    = macro_sig < 0.0   # NEGATIVE → 強制 HOLD
+    signals_flat   = tech_sig <= 0.0 and news_sig <= 0.0
+
+    skip = macro_brake or signals_flat
+
+    if macro_brake:
+        reason = "マクロ環境 NEGATIVE → 市場全体がリスクオフ（ブレーキ発動）"
+    elif signals_flat:
+        reason = "Tech・News 両シグナルが NEUTRAL 以下 → Fundamental スキップ（コスト節約）"
+    else:
+        reason = "少なくとも 1 シグナルが POSITIVE → Stage 2 (Fundamental) へ進む"
+
+    return {
+        "tech_signal":      tech_sig,
+        "news_signal":      news_sig,
+        "macro_signal":     macro_sig,
+        "macro_brake":      macro_brake,
+        "skip_fundamental": skip,
+        "reason":           reason,
+    }
+
+
+def _gate_display(gate: dict) -> None:
+    """Gate の判定結果と次のルーティングをボックス表示する。"""
+    skip       = gate["skip_fundamental"]
+    tech_sig   = gate["tech_signal"]
+    news_sig   = gate["news_signal"]
+    macro_sig  = gate["macro_signal"]
+    macro_brake = gate["macro_brake"]
+
+    def _icon(v: float) -> str:
+        return "📈" if v > 0 else "📉" if v < 0 else "➡️"
+
+    def _label(v: float) -> str:
+        return "positive" if v > 0 else "negative" if v < 0 else "neutral"
+
+    macro_note = "  ← ⚠ ブレーキ発動！" if macro_brake else ""
+    verdict    = (
+        "⛔ SKIP  → HOLD で終了（Fundamental をスキップ）"
+        if skip else
+        "✅ PASS  → Stage 2 (FundamentalAgent) へ進む"
     )
+
+    print(f"\n┌{'─' * _W}┐")
+    print(f"│  {'◇ Gate チェック':^{_W - 4}}")
+    print(f"│  {'┄' * (_W - 4)}")
+    print(f"│  {_icon(tech_sig)} TechnicalAgent : {tech_sig:+.2f}  ({_label(tech_sig)})")
+    print(f"│  {_icon(news_sig)} NewsAgent      : {news_sig:+.2f}  ({_label(news_sig)})")
+    print(f"│  {_icon(macro_sig)} MacroAgent     : {macro_sig:+.2f}  ({_label(macro_sig)}){macro_note}")
+    print(f"│  {'┄' * (_W - 4)}")
+    print(f"│  判定: {verdict}")
+    print(f"└{'─' * _W}┘")
+
+
+class ManagerAgent:
+    NAME = "ManagerAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs  = bbs
+        self._llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
+
+    def _build_rationale(
+        self,
+        ticker: str,
+        decision: str,
+        score: float,
+        sigs: dict[str, float],
+        reasons: dict[str, str],
+    ) -> str:
+        prompt = (
+            f"スイングトレード分析結果を投資家向けに200文字以内で要約してください。\n\n"
+            f"銘柄: {ticker}\n"
+            f"最終判断: {decision}  (加重スコア: {score:+.3f})\n"
+            f"マクロ環境       ({WEIGHTS['macro']:.0%}): {sigs['macro']:+.2f} — {reasons['macro']}\n"
+            f"ニュース         ({WEIGHTS['news']:.0%}): {sigs['news']:+.2f} — {reasons['news']}\n"
+            f"ファンダメンタル ({WEIGHTS['fundamental']:.0%}): "
+            f"{sigs['fundamental']:+.2f} — {reasons['fundamental']}\n"
+            f"テクニカル       ({WEIGHTS['technical']:.0%}): {sigs['technical']:+.2f} — {reasons['technical']}\n"
+            f"SNSセンチメント  ({WEIGHTS['social']:.0%}): {sigs['social']:+.2f} — {reasons['social']}"
+        )
+        try:
+            return self._llm.invoke(prompt).content.strip()[:200]
+        except Exception as e:
+            return f"LLM要約エラー: {e}"
+
+    def run(
+        self,
+        ticker: str     = TARGET_TICKER,
+        dry_run: bool   = False,
+        phase_tag: str  = "S3",
+        mock_mode: bool = False,
+    ) -> dict:
+        _phase_header(phase_tag, self.NAME)
+        _log("BBS から5エージェントのレポートを読み込み中...")
+        _sep()
+
+        news_data   = self.bbs.read("news_analysis")        or {}
+        tech_data   = self.bbs.read("technical_analysis")   or {}
+        fa_data     = self.bbs.read("fundamental_analysis") or {}
+        macro_data  = self.bbs.read("macro_analysis")       or {}
+        social_data = self.bbs.read("social_analysis")      or {}
+
+        # ── シグナル抽出 ──────────────────────────────────────────
+        news_sig, news_reason   = _extract_news_signal(news_data, ticker)
+        tech_sig                = _trend_to_signal(tech_data.get("trend", "neutral"))
+        tech_reason             = tech_data.get("trend_reason", "データなし")
+        fa_sig                  = _trend_to_signal(fa_data.get("trend", "neutral"))
+        fa_reason               = fa_data.get("trend_reason", "データなし")
+        macro_sig               = _trend_to_signal(macro_data.get("trend", "neutral"))
+        macro_reason            = macro_data.get("trend_reason", "データなし")
+
+        # ── Social シグナル + Hype クロスバリデーション ───────────
+        _SOCIAL_MAP = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}
+        social_raw_sentiment = social_data.get("sentiment", "NEUTRAL").upper()
+        social_hype_score    = float(social_data.get("hype_score", 0.0))
+        social_reason_base   = social_data.get("reason", "データなし")
+
+        raw_social_sig  = _SOCIAL_MAP.get(social_raw_sentiment, 0.0)
+        social_hype_penalty = False
+        social_sig      = raw_social_sig
+
+        # Hypeペナルティ: POSITIVE + 高Hype + FA・Tech 両方の裏付けなし
+        if (social_raw_sentiment == "POSITIVE"
+                and social_hype_score >= SOCIAL_HYPE_THRESHOLD
+                and not (fa_sig > 0.0 and tech_sig >= 0.0)):
+            social_sig = -0.5
+            social_hype_penalty = True
+
+        social_reason = (
+            f"[買い煽りペナルティ hype={social_hype_score:.2f}] {social_reason_base}"
+            if social_hype_penalty else social_reason_base
+        )
+
+        # ── 加重スコア計算（5 要素） ──────────────────────────────
+        score = round(
+            news_sig    * WEIGHTS["news"]
+            + fa_sig    * WEIGHTS["fundamental"]
+            + tech_sig  * WEIGHTS["technical"]
+            + macro_sig * WEIGHTS["macro"]
+            + social_sig * WEIGHTS["social"],
+            4,
+        )
+
+        # ── マクロブレーキ: NEGATIVE なら強制 HOLD（安全弁） ──────
+        macro_forced_hold = macro_sig < 0.0
+
+        # ── Strong Buy 判定 ───────────────────────────────────────
+        is_strong_buy = (
+            not macro_forced_hold          # マクロ NEGATIVE → 強制 HOLD
+            and score >= STRONG_BUY_SCORE
+            and fa_sig   >  0.0            # FA は positive 必須
+            and tech_sig >= 0.0            # テクニカルは negative 不可
+            and news_sig >= 0.0            # ニュースは negative 不可
+        )
+        decision = _STRONG_BUY_LABEL if is_strong_buy else _HOLD_LABEL
+
+        # ── シグナル表示 ──────────────────────────────────────────
+        sigs    = {
+            "news": news_sig, "fundamental": fa_sig,
+            "technical": tech_sig, "macro": macro_sig,
+            "social": social_sig,
+        }
+        reasons = {
+            "news": news_reason, "fundamental": fa_reason,
+            "technical": tech_reason, "macro": macro_reason,
+            "social": social_reason,
+        }
+        icons = {k: ("📈" if v > 0 else "📉" if v < 0 else "➡️") for k, v in sigs.items()}
+
+        _log("シグナル集計:")
+        _log(f"  {icons['macro']}      マクロ環境       "
+             f"({WEIGHTS['macro']:.0%}) : {macro_sig:+.2f}  → {macro_reason[:45]}"
+             + ("  ← ⚠ ブレーキ" if macro_forced_hold else ""))
+        _log(f"  {icons['news']}        ニュース         "
+             f"({WEIGHTS['news']:.0%}) : {news_sig:+.2f}  → {news_reason[:47]}")
+        _log(f"  {icons['fundamental']} ファンダメンタル "
+             f"({WEIGHTS['fundamental']:.0%}) : {fa_sig:+.2f}  → {fa_reason[:47]}")
+        _log(f"  {icons['technical']}   テクニカル       "
+             f"({WEIGHTS['technical']:.0%}) : {tech_sig:+.2f}  → {tech_reason[:47]}")
+        _log(f"  {icons['social']}  📱 SNSセンチメント  "
+             f"({WEIGHTS['social']:.0%}) : {social_sig:+.2f}"
+             f"  [生={raw_social_sig:+.1f} hype={social_hype_score:.2f}]"
+             f"  → {social_reason_base[:30]}")
+        if social_hype_penalty:
+            _log(f"     ⚠️  Hype≥{SOCIAL_HYPE_THRESHOLD} かつ FA/Tech 未確認"
+                 f" → 買い煽りペナルティ適用 ({raw_social_sig:+.1f} → {social_sig:+.2f})")
+        elif (social_raw_sentiment == "POSITIVE"
+              and social_hype_score >= SOCIAL_HYPE_THRESHOLD):
+            _log(f"     ✅ Hype={social_hype_score:.2f}≥{SOCIAL_HYPE_THRESHOLD} だが"
+                 f" FA+Tech 両方確認済 → ペナルティなし")
+        _sep()
+        _log(f"加重スコア: {score:+.4f}  (Strong Buy 閾値: {STRONG_BUY_SCORE:.2f})")
+        if macro_forced_hold:
+            _log("⚠ マクロ NEGATIVE のため強制 HOLD（安全弁）")
+        _sep()
+
+        # ── LLM による根拠テキスト生成 ────────────────────────────
+        if mock_mode:
+            _log("⚠️  [MOCK] LLM スキップ — ダミー根拠テキストを使用")
+            hype_note = (
+                f" Social Hype={social_hype_score:.2f}→ペナルティ適用" if social_hype_penalty
+                else f" Social Hype={social_hype_score:.2f}→FA+Tech確認済・ペナルティなし"
+            )
+            rationale = (
+                f"[MOCK] 5シグナル総合: score={score:+.4f}"
+                f" (FA={fa_sig:+.1f}, Tech={tech_sig:+.1f},"
+                f" Macro={macro_sig:+.1f}, News={news_sig:+.1f},"
+                f" Social={social_sig:+.2f}).{hype_note}"
+            )
+        else:
+            _log("根拠テキスト生成中 (gemini-2.0-flash)...")
+            rationale = self._build_rationale(ticker, decision, score, sigs, reasons)
+
+        # ── 判断通知（発注は RiskAgent 算出後に run_trade_cycle で実行）──
+        if is_strong_buy:
+            _sep()
+            _log("✅ STRONG BUY 確定 → RiskAgent によるポジションサイジング後に発注します...")
+        else:
+            hold_reason = "マクロ NEGATIVE による強制 HOLD" if macro_forced_hold else "Strong Buy 条件未達"
+            _log(f"{hold_reason} → 見送り (HOLD)")
+            if not macro_forced_hold:
+                _log("  条件チェック:")
+                _log(f"    score ≥ {STRONG_BUY_SCORE}  : {score:+.3f} → {'✓' if score >= STRONG_BUY_SCORE else '✗'}")
+                _log(f"    FA > 0             : {fa_sig:+.2f} → {'✓' if fa_sig > 0 else '✗'}")
+                _log(f"    Tech ≥ 0           : {tech_sig:+.2f} → {'✓' if tech_sig >= 0 else '✗'}")
+                _log(f"    News ≥ 0           : {news_sig:+.2f} → {'✓' if news_sig >= 0 else '✗'}")
+                if social_hype_penalty:
+                    _log(f"    Social Hype penalty: {raw_social_sig:+.1f} → {social_sig:+.2f} (スコア押下)")
+
+        # ── BBS 書き込み ──────────────────────────────────────────
+        judgment = {
+            "ticker":               ticker,
+            "decision":             decision,
+            "score":                score,
+            "threshold":            STRONG_BUY_SCORE,
+            "signals":              sigs,
+            "signal_reasons":       reasons,
+            "macro_forced_hold":    macro_forced_hold,
+            "social_hype_penalty":  social_hype_penalty,
+            "social_hype_score":    social_hype_score,
+            "rationale":            rationale,
+            "order":                None,
+            "is_strong_buy":        is_strong_buy,
+            "dry_run":              dry_run,
+        }
+        self.bbs.write(self.NAME, "manager_judgment", judgment)
+        _phase_footer()
+        return judgment
+
+
+# =========================================================
+# Stage 4 — RiskAgent
+# =========================================================
+
+class RiskAgent:
+    NAME = "RiskAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S4") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        cfg             = _load_agent_config("risk_agent")
+        account_balance = float(cfg.get("params", {}).get("account_balance", 100_000.0))
+        _log(f"{ticker} のポジションサイジングを計算中 (口座残高: ${account_balance:,.0f})...")
+        _sep()
+
+        try:
+            result = _risk_mod.calculate_position(ticker, account_balance=account_balance)
+        except Exception as e:
+            result = {
+                "ticker":             ticker,
+                "recommended_shares": 1,
+                "stop_loss_price":    0.0,
+                "stop_loss_pct":      0.0,
+                "reason":             f"計算エラー: {e}",
+                "error":              str(e),
+            }
+            _log(f"エラー: {e}")
+
+        if result.get("error"):
+            _log(f"計算エラー: {result['error']} → デフォルト 1株 で継続")
+        else:
+            _log(f"現在価格     : ${result.get('current_price', 0):.2f}")
+            _log(f"ATR(14日)    : ${result.get('atr', 0):.4f}")
+            _log(f"ストップロス : ${result.get('stop_loss_price', 0):.2f}  "
+                 f"(現在価格より -{result.get('stop_loss_pct', 0):.2f}%)")
+            _sep()
+            _log(f"リスク許容額 : ${result.get('risk_amount', 0):,.2f}  "
+                 f"(口座残高の {_RISK_PCT:.0f}%)")
+            _log(f"Fixed Fractional: {result.get('fixed_fractional_shares', 0)} 株")
+            _log(f"Kelly Criterion : {result.get('kelly_shares', 0)} 株")
+            _sep()
+
+        rec  = result.get("recommended_shares", 1)
+        stop = result.get("stop_loss_price", 0.0)
+        _log(f"✅ 推奨株数     : {rec} 株  (保守的な方を採用)")
+        _log(f"🛑 ストップロス : ${stop:.2f}")
+        _sep()
+        _log(f"根拠: {result.get('reason', '')[:80]}")
+
+        self.bbs.write(self.NAME, "risk_analysis", result)
+        _phase_footer()
+        return result
+
+
+_RISK_PCT = 2  # リスク割合表示用（固定値）
 
 
 # =========================================================
 # オーケストレーション本体
 # =========================================================
 
-def orchestrate(notify_line: bool = True) -> dict:
+def _run_mock_stage1(bbs: BBS, ticker: str) -> None:
+    """Stage 1 の各エージェントをモックデータで代替する（API 呼び出しなし）。"""
+    note = "⚠️  [MOCK] LLM スキップ — ダミーデータを BBS に書き込み"
+
+    _phase_header("S1-1/4", "TechnicalAgent")
+    _log(note)
+    _sep()
+    data: dict = {**MOCK_BBS_DATA["technical_analysis"], "ticker": ticker}
+    _log("テクニカルトレンド判定: 📈 POSITIVE")
+    _log(f"根拠: {data['trend_reason']}")
+    bbs.write("TechnicalAgent", "technical_analysis", data)
+    _phase_footer()
+
+    _phase_header("S1-2/4", "NewsAgent")
+    _log(note)
+    _sep()
+    articles = [
+        {**a, "ticker": ticker, "company": ticker,
+         "title": a.get("title", "").replace("AAPL", ticker),
+         "reason": a.get("reason", "").replace("AAPL", ticker)}
+        for a in MOCK_BBS_DATA["news_analysis"]["articles"]
+    ]
+    data = {**MOCK_BBS_DATA["news_analysis"], "ticker": ticker, "articles": articles}
+    art = articles[0]
+    _log(f"📈 [positive ] {art['title']}")
+    _log(f"           理由: {art['reason'][:60]}")
+    _sep()
+    _log("センチメント平均スコア: +1.00  (強気)")
+    bbs.write("NewsAgent", "news_analysis", data)
+    _phase_footer()
+
+    _phase_header("S1-3/4", "MacroAgent")
+    _log(note)
+    _sep()
+    data = {**MOCK_BBS_DATA["macro_analysis"]}
+    _log("マクロ環境判定: ➡️  NEUTRAL")
+    _log(f"根拠: {data['trend_reason']}")
+    bbs.write("MacroAgent", "macro_analysis", data)
+    _phase_footer()
+
+    _phase_header("S1-4/4", "SocialAgent")
+    _log(note)
+    _sep()
+    social_mock = {**MOCK_BBS_DATA["social_analysis"], "ticker": ticker}
+    hype = social_mock["hype_score"]
+    filled = int(hype * 10)
+    hype_bar = "█" * filled + "░" * (10 - filled)
+    _log(f"データソース   : {social_mock['source']}  (投稿数: {social_mock['post_count']}件)")
+    _log(f"センチメント判定: 📈 {social_mock['sentiment']}")
+    _log(f"買い煽りスコア  : [{hype_bar}] {hype:.2f}  ⚠️  高Hype警戒 (FA/Tech裏付け必要)")
+    _sep()
+    _log(f"判定根拠: {social_mock['reason'][:80]}")
+    bbs.write("SocialAgent", "social_analysis", social_mock)
+    _phase_footer()
+
+
+def _run_mock_stage2(bbs: BBS, ticker: str) -> None:
+    """Stage 2 の FundamentalAgent をモックデータで代替する（API 呼び出しなし）。"""
+    _phase_header("S2", "FundamentalAgent")
+    _log("⚠️  [MOCK] LLM スキップ — ダミーデータを BBS に書き込み")
+    _sep()
+    data: dict = {**MOCK_BBS_DATA["fundamental_analysis"], "ticker": ticker}
+    _log("ファンダメンタルトレンド判定: 📈 POSITIVE")
+    _log(f"根拠: {data['trend_reason']}")
+    bbs.write("FundamentalAgent", "fundamental_analysis", data)
+    _phase_footer()
+
+
+def _run_mock_risk(bbs: BBS, ticker: str) -> None:
+    """RiskAgent をモックデータで代替する（API 呼び出しなし）。"""
+    _phase_header("S4", "RiskAgent")
+    _log("⚠️  [MOCK] LLM スキップ — ダミーデータを BBS に書き込み")
+    _sep()
+    data: dict = {**MOCK_BBS_DATA["risk_analysis"], "ticker": ticker}
+    _log(f"現在価格     : ${data['current_price']:.2f}")
+    _log(f"ATR(14日)    : ${data['atr']:.4f}")
+    _log(f"ストップロス : ${data['stop_loss_price']:.2f}  (-{data['stop_loss_pct']:.2f}%)")
+    _sep()
+    _log(f"リスク許容額 : ${data['risk_amount']:,.2f}")
+    _log(f"Fixed Fractional: {data['fixed_fractional_shares']} 株")
+    _log(f"Kelly Criterion : {data['kelly_shares']} 株")
+    _sep()
+    _log(f"✅ 推奨株数     : {data['recommended_shares']} 株  (保守的な方を採用)")
+    _log(f"🛑 ストップロス : ${data['stop_loss_price']:.2f}")
+    _sep()
+    _log(f"根拠: {data['reason'][:80]}")
+    bbs.write("RiskAgent", "risk_analysis", data)
+    _phase_footer()
+
+
+def run_trade_cycle(
+    ticker: str       = TARGET_TICKER,
+    dry_run: bool     = False,
+    notify_line: bool = False,
+    mock_mode: bool   = False,
+) -> dict:
+    """
+    AAPL スイングトレード分析サイクルをステージゲート方式で実行する。
+
+    Stage 1: TechnicalAgent + NewsAgent + MacroAgent（安価スキャン）
+    Gate   : マクロ NEGATIVE → ブレーキ HOLD / Tech・News 双方 NEUTRAL → HOLD
+    Stage 2: FundamentalAgent（Gate 通過時のみ）
+    Stage 3: ManagerAgent（最終評価 & 発注）
+
+    Args:
+        ticker:      対象ティッカー（デフォルト: AAPL）
+        dry_run:     True の場合 Alpaca 発注をスキップ（テスト用）
+        notify_line: True の場合、最終判断を LINE 通知
+        mock_mode:   True の場合、全 LLM/API 呼び出しをスキップしてダミーデータでフローをテスト
+    """
     session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    print(f"\n{'='*50}")
-    print(f"  スイングトレード AIエージェント起動")
-    print(f"  セッション: {session_id}")
-    print(f"{'='*50}")
+    _main_header(ticker, session_id)
+    if mock_mode:
+        _mock_banner()
 
     bbs = BBS(session_id)
 
-    # --- ポートフォリオ状態を読み込み BBS に書き込む ---
-    portfolio_state = _portfolio_mod.load()
-    portfolio_summary = _portfolio_mod.get_summary(portfolio_state)
-    bbs.write("Orchestrator", "portfolio_state", portfolio_summary)
-    print(f"  [Portfolio] 保有銘柄数: {portfolio_summary['holding_count']}, "
-          f"総ポジション: {portfolio_summary['total_position_pct']}%")
+    # ── Stage 1: 安価シグナルスキャン ────────────────────────────
+    _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
+    if mock_mode:
+        _run_mock_stage1(bbs, ticker)
+    else:
+        TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
+        NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
+        MacroAgent(bbs).run(phase_tag="S1-3/4")
+        SocialAgent(bbs).run(ticker, phase_tag="S1-4/4")
 
-    # --- フェーズ1: 情報収集エージェント（独立実行）---
-    print("\n[ Phase 1 ] 情報収集エージェント群を起動...")
-    NewsAgent(bbs).run()
-    FundamentalAgent(bbs).run()
-    TechnicalAgent(bbs).run()
+    # ── Gate: マクロブレーキ / 双方 NEUTRAL → HOLD 即終了 ────────
+    gate = _gate_check(bbs, ticker)
+    _gate_display(gate)
 
-    # --- フェーズ2: 統合判断 ---
-    print("\n[ Phase 2 ] ManagerAgent が統合判断を実行...")
-    manager_judgment = ManagerAgent(bbs).run()
-
-    # --- フェーズ3: コンプライアンス検閲 ---
-    print("\n[ Phase 3 ] ComplianceAgent が最終検閲を実行...")
-    final_decision = ComplianceAgent(bbs).run()
-
-    # --- ポートフォリオ状態を更新して永続化 ---
-    target_company = manager_judgment.get("target_company", "") if isinstance(manager_judgment, dict) else ""
-    target_ticker = manager_judgment.get("target_ticker", "") if isinstance(manager_judgment, dict) else ""
-    final_action = final_decision.get("final_action", "HOLD")
-    final_position_pct = final_decision.get("final_position_size_pct", 0)
-
-    current_price: float | None = None
-    if target_company and final_action in ("BUY", "SELL"):
-        technical_data = bbs.read("technical_analysis") or {}
-        ticker_data = technical_data.get("tickers", {}).get(target_company, {})
-        current_price = (
-            ticker_data.get("ma25", {}).get("latest_price")
-            if not ticker_data.get("error")
-            else None
+    if gate["skip_fundamental"]:
+        # Gate HOLD でも Social シグナルを反映（既に BBS に書き込み済み）
+        _social_gate     = bbs.read("social_analysis") or {}
+        _sg_sentiment    = _social_gate.get("sentiment", "NEUTRAL").upper()
+        _sg_hype         = float(_social_gate.get("hype_score", 0.0))
+        _sg_sig_gate_raw = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}.get(_sg_sentiment, 0.0)
+        _sg_sig_gate     = _sg_sig_gate_raw  # Hypeペナルティは FA なし前提でも Gate では中立扱い
+        score = round(
+            gate["news_signal"]   * WEIGHTS["news"]
+            + gate["tech_signal"] * WEIGHTS["technical"]
+            + gate["macro_signal"] * WEIGHTS["macro"]
+            + _sg_sig_gate * WEIGHTS["social"],
+            4,
         )
-        _portfolio_mod.apply_decision(
-            portfolio_state,
-            company=target_company,
-            ticker=target_ticker,
-            action=final_action,
-            position_size_pct=final_position_pct,
-            current_price=current_price,
-        )
-        _portfolio_mod.save(portfolio_state)
-        print(f"  [Portfolio] 状態を更新: {target_company} → {final_action} "
-              f"({final_position_pct}%, 価格: {current_price})")
+        brake_label = "マクロブレーキ" if gate["macro_brake"] else "シグナル不足"
+        judgment = {
+            "ticker":    ticker,
+            "decision":  _HOLD_LABEL,
+            "score":     score,
+            "threshold": STRONG_BUY_SCORE,
+            "signals": {
+                "news":        gate["news_signal"],
+                "technical":   gate["tech_signal"],
+                "macro":       gate["macro_signal"],
+                "fundamental": 0.0,
+                "social":      _sg_sig_gate,
+            },
+            "gate_skipped":  True,
+            "gate_reason":   gate["reason"],
+            "macro_brake":   gate["macro_brake"],
+            "rationale":     f"Gate: {gate['reason']}",
+            "order":  None,
+            "dry_run": dry_run,
+        }
+        bbs.write("GateAgent", "manager_judgment", judgment)
 
-    # --- フェーズ3.5: Alpaca Paper Trading 発注 ---
-    # 米国株（ティッカーに "." を含まない）かつ ComplianceAgent 承認済みの場合のみ発注
-    alpaca_order: dict | None = None
-    _is_us_ticker = bool(target_ticker and "." not in target_ticker)
-    _compliance_ok = final_decision.get("compliance_status") in ("APPROVED", "MODIFIED")
+        _decision_box([
+            f"{'─' * (_W - 2)}",
+            f"  Gate 判断: HOLD（{brake_label}）",
+            f"{'─' * (_W - 2)}",
+            f"  銘柄         : {ticker}",
+            "  判断         : ⏸  HOLD",
+            f"  理由         : {gate['reason'][:55]}",
+            "  スキップ     : FundamentalAgent (トークンコスト節約)",
+            f"{'─' * (_W - 2)}",
+            f"  BBS ログ     : {bbs.path}",
+        ])
 
-    if final_action in ("BUY", "SELL") and target_ticker and _compliance_ok:
-        if _is_us_ticker:
-            print(f"\n[ Phase 3.5 ] Alpaca Paper Trading 発注...")
-            try:
-                account_info = _alpaca_mod.get_account_info()
-                buying_power = account_info["buying_power"]
-                if current_price and current_price > 0 and final_position_pct > 0:
-                    qty = max(1.0, round(buying_power * (final_position_pct / 100) / current_price, 4))
-                else:
-                    qty = 1.0
-                alpaca_order = _alpaca_mod.place_market_order(target_ticker, qty, final_action.lower())
-                bbs.write("Orchestrator", "alpaca_order", alpaca_order)
-                print(f"  [Alpaca] 発注完了: {target_ticker} {final_action} {qty}株 "
-                      f"→ OrderID: {alpaca_order['order_id']}")
-            except Exception as e:
-                alpaca_order = {"error": str(e), "ticker": target_ticker}
-                bbs.write("Orchestrator", "alpaca_order", alpaca_order)
-                print(f"  [Alpaca] 発注失敗: {e}")
+        if notify_line:
+            send_line_message(
+                f"【ECC {ticker} 判断】⏸ HOLD\n理由: {gate['reason']}"
+            )
+        if mock_mode:
+            _mock_banner("テスト実行完了（Gate: HOLD）。実際のAPIは一切呼び出されていません。")
+        return judgment
+
+    # ── Stage 2: Fundamental 深層分析 ────────────────────────────
+    _stage_header(2, "ファンダメンタルズ深層分析  [FundamentalAgent]")
+    if mock_mode:
+        _run_mock_stage2(bbs, ticker)
+    else:
+        FundamentalAgent(bbs).run(ticker, phase_tag="S2")
+
+    # ── Stage 3: 最終評価 & 発注判断 ─────────────────────────────
+    _stage_header(3, "最終評価 & 発注判断  [ManagerAgent]")
+    judgment = ManagerAgent(bbs).run(ticker, dry_run=dry_run, phase_tag="S3", mock_mode=mock_mode)
+
+    # ── Stage 4: リスク管理 & ポジションサイジング（STRONG BUY 時のみ）──
+    order_result: dict | None = None
+    if judgment.get("is_strong_buy"):
+        _stage_header(4, "リスク管理 & ポジションサイジング  [RiskAgent]")
+        if mock_mode:
+            _run_mock_risk(bbs, ticker)
         else:
-            print(f"\n[ Phase 3.5 ] Alpaca: {target_ticker} は日本株のためスキップ（portfolio_state のみ更新）")
+            RiskAgent(bbs).run(ticker)
 
-    # --- フェーズ4: BBSダンプ & LINE通知 ---
-    print(f"\n{'='*50}")
-    print("[ BBS最終状態 ]")
-    print(bbs.to_text_summary())
+        risk_data  = bbs.read("risk_analysis") or {}
+        rec_shares = risk_data.get("recommended_shares", 1)
 
+        _sep()
+        _log(f"Alpaca に {ticker} {rec_shares}株 買い注文を送信します...")
+        if dry_run or mock_mode:
+            label = "mock_mode" if mock_mode else "dry_run"
+            _log(f"  ({label}=True のため実際の発注はスキップ)")
+            order_result = {
+                "dry_run": True, "mock": mock_mode,
+                "symbol": ticker, "qty": rec_shares, "side": "buy",
+            }
+        else:
+            try:
+                order_result = _alpaca_mod.place_market_order(ticker, rec_shares, "buy")
+                _log(f"  注文完了: order_id={order_result.get('order_id')}")
+                _log(f"  status  : {order_result.get('status')}")
+                _log(f"  symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
+            except Exception as e:
+                order_result = {"error": str(e)}
+                _log(f"  発注エラー: {e}")
+
+        judgment["order"] = order_result
+        bbs.write("ManagerAgent", "manager_judgment", judgment)
+
+    # ── 最終結果表示 ─────────────────────────────────────────────
+    decision   = judgment.get("decision", _HOLD_LABEL)
+    score      = judgment.get("score", 0.0)
+    order      = judgment.get("order") or {}
+    risk_data  = bbs.read("risk_analysis") or {}
+    rec_shares = risk_data.get("recommended_shares", BUY_QTY)
+    stop_price = risk_data.get("stop_loss_price")
+    stop_pct   = risk_data.get("stop_loss_pct", 0)
+    icon       = "🚀" if decision == _STRONG_BUY_LABEL else "⏸"
+
+    order_line = (
+        f"  Alpaca 注文  : {ticker} × {rec_shares} 株  "
+        f"[{order.get('status', order.get('error', '-'))}]"
+        if order else
+        "  Alpaca 注文  : なし（見送り）"
+    )
+    box_lines = [
+        f"{'─' * (_W - 2)}",
+        "  ManagerAgent 最終決断",
+        f"{'─' * (_W - 2)}",
+        f"  銘柄         : {ticker}",
+        f"  判断         : {icon}  {decision}",
+        f"  加重スコア   : {score:+.4f}  (Strong Buy 閾値: {STRONG_BUY_SCORE:.2f})",
+        f"  根拠         : {judgment.get('rationale', '')[:60]}",
+        f"{'─' * (_W - 2)}",
+        order_line,
+    ]
+    if stop_price:
+        box_lines.append(f"  ストップロス : ${stop_price:.2f}  (-{stop_pct:.2f}%)")
+    box_lines += [
+        f"{'─' * (_W - 2)}",
+        f"  BBS ログ     : {bbs.path}",
+    ]
+    _decision_box(box_lines)
+
+    # ── LINE 通知（オプション）──────────────────────────────────
     if notify_line:
-        report = _build_line_report(bbs, final_decision)
-        print("\n[ LINE通知 ] 送信中...")
-        send_line_message(report)
-        print("  送信完了。")
+        msg = (
+            f"【ECC {ticker} 判断】{icon} {decision}\n"
+            f"スコア: {score:+.4f}\n"
+            f"根拠: {judgment.get('rationale', '')[:100]}"
+        )
+        send_line_message(msg)
+        print("\n[LINE] 通知送信完了。")
 
-    print(f"\n  BBSログ保存先: {bbs.path}")
-    print(f"{'='*50}\n")
-    return final_decision
+    if mock_mode:
+        _mock_banner("テスト実行完了。実際のAPIは一切呼び出されていません。")
 
+    return judgment
+
+
+# =========================================================
+# CLI エントリポイント
+# =========================================================
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="スイングトレード AIエージェントシステム")
-    parser.add_argument("--no-line", action="store_true", help="LINE通知を送らない")
+
+    parser = argparse.ArgumentParser(
+        description="ECC スイングトレード自律エンジン",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--ticker", default=TARGET_TICKER, help="分析対象ティッカー"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Alpaca 発注をスキップしてログのみ出力"
+    )
+    parser.add_argument(
+        "--notify-line", action="store_true",
+        help="最終判断を LINE に通知"
+    )
+    parser.add_argument(
+        "--mock", action="store_true",
+        help="モックモード: LLM/API 呼び出しをスキップしてシステムフローをテスト (トークン消費ゼロ)"
+    )
     args = parser.parse_args()
 
-    result = orchestrate(notify_line=not args.no_line)
-    print(f"\n最終判断: {result.get('final_action')} ({result.get('compliance_status')})")
+    run_trade_cycle(
+        ticker=args.ticker,
+        dry_run=args.dry_run,
+        notify_line=args.notify_line,
+        mock_mode=args.mock,
+    )

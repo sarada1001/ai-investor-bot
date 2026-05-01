@@ -26,7 +26,7 @@ _llm = None
 def _get_llm() -> ChatGoogleGenerativeAI:
     global _llm
     if _llm is None:
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+        _llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
     return _llm
 
 

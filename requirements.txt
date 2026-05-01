@@ -36,6 +36,11 @@ requests==2.32.5
 # --- Alpaca 株式取引 ---
 alpaca-py==0.40.0
 
+# --- SEC EDGAR ファイリング取得 ---
+sec-edgar-downloader>=5.0.0    # CIK resolution & EDGAR API helper
+beautifulsoup4>=4.12.0          # HTML parsing for SEC filing extraction
+lxml>=5.0.0                     # Fast HTML/XML parser (beautifulsoup4 backend)
+
 # --- 設定・ユーティリティ ---
 python-dotenv==1.2.2
 PyYAML==6.0.3
