@@ -171,6 +171,16 @@ def run_screener():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="ECC トレードパイプライン")
+    parser.add_argument("--hybrid", action="store_true", help="ハイブリッドモードで実行")
+    parser.add_argument(
+        "--exclude", nargs="+", default=[], metavar="AGENT",
+        help="除外するエージェント名（アブレーション実験用）",
+    )
+    args = parser.parse_args()
+
     # フェーズ0: 保有ポジションの監視と Exit 判断
     print("\n==============================================================")
     print(" フェーズ0: 保有ポジションの監視と Exit 判断 [ExitAgent]")
@@ -190,8 +200,12 @@ if __name__ == "__main__":
             print(f"🚀 候補銘柄 [{ticker}] のAI投資会議を開始します...")
             time.sleep(2)
 
-            # ハイブリッドモード: リアル市場データ (yfinance + Gemini) で分析、発注はスキップ
-            subprocess.run(["python3", "main.py", "--hybrid", "--ticker", ticker])
+            cmd = [sys.executable, "main.py", "--ticker", ticker]
+            if args.hybrid:
+                cmd.append("--hybrid")
+            for agent in args.exclude:
+                cmd += ["--exclude", agent]
+            subprocess.run(cmd)
 
             print(f"✅ [{ticker}] の分析サイクル完了。\n")
             time.sleep(3)

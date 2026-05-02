@@ -41,6 +41,10 @@ sec-edgar-downloader>=5.0.0    # CIK resolution & EDGAR API helper
 beautifulsoup4>=4.12.0          # HTML parsing for SEC filing extraction
 lxml>=5.0.0                     # Fast HTML/XML parser (beautifulsoup4 backend)
 
+# --- ダッシュボード ---
+streamlit>=1.35.0
+plotly>=5.22.0
+
 # --- 設定・ユーティリティ ---
 python-dotenv==1.2.2
 PyYAML==6.0.3

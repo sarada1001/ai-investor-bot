@@ -6,5 +6,55 @@
       "entry_date": "2026-05-01",
       "entry_price": null
     }
+  ],
+  "AAPL": [
+    {
+      "record_id": "9e31fc40-7791-4830-956d-59c9bc4e4352",
+      "session_id": "20260502_093227",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "b0ddec43-5acf-4877-871b-b68b4e84fff0",
+      "session_id": "20260502_093254",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "a6e3e197-1aa7-4263-aa7e-eb647980f155",
+      "session_id": "20260502_093427",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "4af7e445-36cb-4859-b211-98c5ab3d46c4",
+      "session_id": "20260502_093427",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "333744f4-daab-4a64-a295-7b1d077b2d78",
+      "session_id": "20260502_093428",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "3812eb13-4487-4ce1-8454-816067b4c421",
+      "session_id": "20260502_093428",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "ebba82cd-2f90-44d6-aeb6-95ca3812a264",
+      "session_id": "20260502_093428",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    },
+    {
+      "record_id": "eb003e24-494d-4fe6-abae-4e9964b0dbfb",
+      "session_id": "20260502_093428",
+      "entry_date": "2026-05-02",
+      "entry_price": null
+    }
   ]
 }

@@ -52,13 +52,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import skills.news_monitor            as _news_mod
 import skills.technical_calc          as _tech_mod
-import skills.rag_search               as _rag_mod
-import skills.edgar_fetcher            as _edgar_mod
 import skills.alpaca_trade             as _alpaca_mod
 import skills.macro_monitor            as _macro_mod
 import skills.social_monitor           as _social_mod
 import skills.risk_calculator          as _risk_mod
 import skills.training_data_collector  as _training_mod
+from agents.fundamental_agent import FundamentalAgent as _FundamentalAgentImpl
 
 # =========================================================
 # 定数
@@ -499,70 +498,68 @@ class SocialAgent:
 # =========================================================
 
 class FundamentalAgent:
+    """
+    Stage 2 オーケストレーター。
+    agents/fundamental_agent.py の FundamentalAgentImpl に処理を委譲し、
+    結果を BBS に書き込む。
+
+    allow_edgar_fetch フラグ
+    -------------------------
+    True  (default) : EDGAR 自律取得を許可。ChromaDB に該当銘柄のデータが
+                      なければ 10-Q/10-K を自動ダウンロードして DB に格納し、
+                      再度 RAG 検索を実行する（自己修復フロー）。
+    False           : EDGAR 呼び出しをスキップ。ChromaDB ヒット時は RAG 分析、
+                      ヒットなし時は yfinance フォールバック（mock_mode 用）。
+    """
+
     NAME = "FundamentalAgent"
 
     def __init__(self, bbs: BBS):
         self.bbs = bbs
-        self._cfg = _load_agent_config("fundamental_agent")
 
-    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S2") -> dict:
+    def run(
+        self,
+        ticker: str            = TARGET_TICKER,
+        phase_tag: str         = "S2",
+        allow_edgar_fetch: bool = True,
+    ) -> dict:
         _phase_header(phase_tag, self.NAME)
-        params      = self._cfg.get("params", {})
-        persist_dir = params.get("persist_dir", "chroma_db_saved")
-        top_k       = params.get("top_k", 4)
-        queries     = params.get("aapl_queries", [])
-
-        # ── Step 1: ChromaDB にデータがあるか確認 ──────────────────
-        _log(f"ChromaDB にデータが存在するか確認中 (persist_dir={persist_dir})...")
-        probe = _rag_mod.run(
-            company=ticker,
-            queries=[queries[0]] if queries else ["Apple revenue"],
-            persist_dir=persist_dir,
-            top_k=2,
-        )
-        data_available = probe.get("data_available", False)
-
-        if not data_available:
-            _sep()
-            _log(f"DBに {ticker} の資料なし → edgar_fetcher で最新 10-Q を取得します...")
-            fetch_result = _edgar_mod.run(
-                ticker=ticker,
-                prefer_quarterly=True,
-                persist_dir=persist_dir,
-            )
-            if fetch_result.get("error"):
-                _log(f"EDGAR 取得エラー: {fetch_result['error']}")
-                result = {
-                    "ticker": ticker, "trend": "neutral",
-                    "trend_reason": f"EDGAR 取得失敗: {fetch_result['error']}",
-                    "data_available": False, "analyses": [],
-                }
-                self.bbs.write(self.NAME, "fundamental_analysis", result)
-                _phase_footer()
-                return result
-            _log(f"取得完了: {fetch_result.get('form')} / {fetch_result.get('date')}")
-            _log(f"  保存先: {fetch_result.get('output_path')}")
-            _log(f"  追加チャンク数: {fetch_result.get('chunks_added', 0)}")
-        else:
-            _log(f"ChromaDB に {ticker} のデータが存在します。取得をスキップします。")
-
-        # ── Step 2: Multi-HyDE RAG 分析 ────────────────────────────
+        _log(f"{ticker} のファンダメンタルズ分析を開始 (RAG + 自己修復フロー)...")
+        if not allow_edgar_fetch:
+            _log("  ⚠ EDGAR 自律取得は無効化されています (mock_mode=True)")
         _sep()
-        _log(f"Multi-HyDE RAG 分析を実行中 ({len(queries)} クエリ)...")
 
-        result = _rag_mod.run(
-            company=ticker,
-            queries=queries,
-            persist_dir=persist_dir,
-            top_k=top_k,
+        fa = _FundamentalAgentImpl(
+            persist_dir="chroma_db_saved",
+            collection_name="financial_filings",
+            top_k=5,
         )
 
-        _sep()
-        for a in result.get("analyses", []):
-            hit  = "✓" if a.get("company_found_in_context") else "△"
-            _log(f"{hit} Q: {a['query'][:62]}")
-            _log(f"   A: {a['analysis'][:150].strip().replace(chr(10), ' ')}...")
+        # mock_mode では EDGAR 呼び出しを禁止し、ChromaDB ヒットなし時は
+        # そのまま yfinance フォールバックへ流す
+        if not allow_edgar_fetch:
+            fa._fetch_from_edgar = lambda t: {          # type: ignore[method-assign]
+                "ticker": t, "form": "", "chunks_added": 0,
+                "error": "EDGAR fetch disabled (allow_edgar_fetch=False)",
+            }
 
+        result = fa.analyze(ticker)
+
+        # ── 結果を表示 ────────────────────────────────────────────
+        _sep()
+        edgar_note = "  ✓ EDGAR 自律取得済" if result.get("edgar_auto_fetch") else ""
+        _log(f"データソース : {result.get('data_source', '不明')}{edgar_note}")
+        _log(f"使用チャンク : {result.get('chunks_used', 0)} 件  "
+             f"({'yfinance FB' if result.get('fallback_used') else 'RAG 一次情報'})")
+        _sep()
+        for label, key in [
+            ("売上/成長性", "revenue_growth"),
+            ("収益性    ", "profitability"),
+            ("リスク要因", "risks"),
+            ("今後の展望", "outlook"),
+        ]:
+            val = str(result.get(key, "N/A"))[:90].replace("\n", " ")
+            _log(f"{label}: {val}")
         _sep()
         trend  = result.get("trend", "neutral")
         t_icon = {"positive": "📈", "negative": "📉", "neutral": "➡️"}.get(trend, "❓")
@@ -708,13 +705,19 @@ class ManagerAgent:
 
     def run(
         self,
-        ticker: str     = TARGET_TICKER,
-        dry_run: bool   = False,
-        phase_tag: str  = "S3",
-        mock_mode: bool = False,
+        ticker: str                       = TARGET_TICKER,
+        dry_run: bool                     = False,
+        phase_tag: str                    = "S3",
+        mock_mode: bool                   = False,
+        effective_weights: dict | None    = None,
+        excluded_keys: list[str] | None   = None,
     ) -> dict:
         _phase_header(phase_tag, self.NAME)
+        excluded_keys = excluded_keys or []
+        w = effective_weights if effective_weights else WEIGHTS
         _log("BBS から5エージェントのレポートを読み込み中...")
+        if excluded_keys:
+            _log(f"  [アブレーション] 除外: {excluded_keys}  有効ウェイト: { {k: f'{v:.3f}' for k, v in w.items()} }")
         _sep()
 
         news_data   = self.bbs.read("news_analysis")        or {}
@@ -754,18 +757,18 @@ class ManagerAgent:
             if social_hype_penalty else social_reason_base
         )
 
-        # ── 加重スコア計算（5 要素） ──────────────────────────────
+        # ── 加重スコア計算（5 要素、除外エージェント分は再正規化済み） ──
         score = round(
-            news_sig    * WEIGHTS["news"]
-            + fa_sig    * WEIGHTS["fundamental"]
-            + tech_sig  * WEIGHTS["technical"]
-            + macro_sig * WEIGHTS["macro"]
-            + social_sig * WEIGHTS["social"],
+            news_sig    * w["news"]
+            + fa_sig    * w["fundamental"]
+            + tech_sig  * w["technical"]
+            + macro_sig * w["macro"]
+            + social_sig * w["social"],
             4,
         )
 
-        # ── マクロブレーキ: NEGATIVE なら強制 HOLD（安全弁） ──────
-        macro_forced_hold = macro_sig < 0.0
+        # ── マクロブレーキ: NEGATIVE かつ MacroAgent が有効な場合のみ発動 ─
+        macro_forced_hold = macro_sig < 0.0 and "macro" not in excluded_keys
 
         # ── Strong Buy 判定 ───────────────────────────────────────
         is_strong_buy = (
@@ -792,16 +795,20 @@ class ManagerAgent:
 
         _log("シグナル集計:")
         _log(f"  {icons['macro']}      マクロ環境       "
-             f"({WEIGHTS['macro']:.0%}) : {macro_sig:+.2f}  → {macro_reason[:45]}"
-             + ("  ← ⚠ ブレーキ" if macro_forced_hold else ""))
+             f"({w['macro']:.0%}) : {macro_sig:+.2f}  → {macro_reason[:45]}"
+             + ("  ← ⚠ ブレーキ" if macro_forced_hold else "")
+             + ("  [除外]" if "macro" in excluded_keys else ""))
         _log(f"  {icons['news']}        ニュース         "
-             f"({WEIGHTS['news']:.0%}) : {news_sig:+.2f}  → {news_reason[:47]}")
+             f"({w['news']:.0%}) : {news_sig:+.2f}  → {news_reason[:47]}"
+             + ("  [除外]" if "news" in excluded_keys else ""))
         _log(f"  {icons['fundamental']} ファンダメンタル "
-             f"({WEIGHTS['fundamental']:.0%}) : {fa_sig:+.2f}  → {fa_reason[:47]}")
+             f"({w['fundamental']:.0%}) : {fa_sig:+.2f}  → {fa_reason[:47]}"
+             + ("  [除外]" if "fundamental" in excluded_keys else ""))
         _log(f"  {icons['technical']}   テクニカル       "
-             f"({WEIGHTS['technical']:.0%}) : {tech_sig:+.2f}  → {tech_reason[:47]}")
+             f"({w['technical']:.0%}) : {tech_sig:+.2f}  → {tech_reason[:47]}"
+             + ("  [除外]" if "technical" in excluded_keys else ""))
         _log(f"  {icons['social']}  📱 SNSセンチメント  "
-             f"({WEIGHTS['social']:.0%}) : {social_sig:+.2f}"
+             f"({w['social']:.0%}) : {social_sig:+.2f}"
              f"  [生={raw_social_sig:+.1f} hype={social_hype_score:.2f}]"
              f"  → {social_reason_base[:30]}")
         if social_hype_penalty:
@@ -934,59 +941,85 @@ _RISK_PCT = 2  # リスク割合表示用（固定値）
 # オーケストレーション本体
 # =========================================================
 
-def _run_mock_stage1(bbs: BBS, ticker: str) -> None:
+def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = None) -> None:
     """Stage 1 の各エージェントをモックデータで代替する（API 呼び出しなし）。"""
+    excluded_keys = excluded_keys or []
     note = "⚠️  [MOCK] LLM スキップ — ダミーデータを BBS に書き込み"
+
+    def _excl_note(key: str) -> str:
+        return "  [アブレーション: 除外済]" if key in excluded_keys else ""
 
     _phase_header("S1-1/4", "TechnicalAgent")
     _log(note)
     _sep()
-    data: dict = {**MOCK_BBS_DATA["technical_analysis"], "ticker": ticker}
-    _log("テクニカルトレンド判定: 📈 POSITIVE")
-    _log(f"根拠: {data['trend_reason']}")
-    bbs.write("TechnicalAgent", "technical_analysis", data)
+    if "technical" in excluded_keys:
+        _log("  ⚠️  [アブレーション] TechnicalAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("TechnicalAgent", "technical_analysis",
+                  {"trend": "neutral", "excluded": True, "trend_reason": "TechnicalAgent 除外済"})
+    else:
+        data: dict = {**MOCK_BBS_DATA["technical_analysis"], "ticker": ticker}
+        _log("テクニカルトレンド判定: 📈 POSITIVE")
+        _log(f"根拠: {data['trend_reason']}")
+        bbs.write("TechnicalAgent", "technical_analysis", data)
     _phase_footer()
 
     _phase_header("S1-2/4", "NewsAgent")
     _log(note)
     _sep()
-    articles = [
-        {**a, "ticker": ticker, "company": ticker,
-         "title": a.get("title", "").replace("AAPL", ticker),
-         "reason": a.get("reason", "").replace("AAPL", ticker)}
-        for a in MOCK_BBS_DATA["news_analysis"]["articles"]
-    ]
-    data = {**MOCK_BBS_DATA["news_analysis"], "ticker": ticker, "articles": articles}
-    art = articles[0]
-    _log(f"📈 [positive ] {art['title']}")
-    _log(f"           理由: {art['reason'][:60]}")
-    _sep()
-    _log("センチメント平均スコア: +1.00  (強気)")
-    bbs.write("NewsAgent", "news_analysis", data)
+    if "news" in excluded_keys:
+        _log("  ⚠️  [アブレーション] NewsAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("NewsAgent", "news_analysis",
+                  {"articles": [], "avg_sentiment_score": 0.0, "excluded": True,
+                   "trend": "neutral", "trend_reason": "NewsAgent 除外済"})
+    else:
+        articles = [
+            {**a, "ticker": ticker, "company": ticker,
+             "title": a.get("title", "").replace("AAPL", ticker),
+             "reason": a.get("reason", "").replace("AAPL", ticker)}
+            for a in MOCK_BBS_DATA["news_analysis"]["articles"]
+        ]
+        data = {**MOCK_BBS_DATA["news_analysis"], "ticker": ticker, "articles": articles}
+        art = articles[0]
+        _log(f"📈 [positive ] {art['title']}")
+        _log(f"           理由: {art['reason'][:60]}")
+        _sep()
+        _log("センチメント平均スコア: +1.00  (強気)")
+        bbs.write("NewsAgent", "news_analysis", data)
     _phase_footer()
 
     _phase_header("S1-3/4", "MacroAgent")
     _log(note)
     _sep()
-    data = {**MOCK_BBS_DATA["macro_analysis"]}
-    _log("マクロ環境判定: ➡️  NEUTRAL")
-    _log(f"根拠: {data['trend_reason']}")
-    bbs.write("MacroAgent", "macro_analysis", data)
+    if "macro" in excluded_keys:
+        _log("  ⚠️  [アブレーション] MacroAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("MacroAgent", "macro_analysis",
+                  {"trend": "neutral", "excluded": True, "trend_reason": "MacroAgent 除外済"})
+    else:
+        data = {**MOCK_BBS_DATA["macro_analysis"]}
+        _log("マクロ環境判定: ➡️  NEUTRAL")
+        _log(f"根拠: {data['trend_reason']}")
+        bbs.write("MacroAgent", "macro_analysis", data)
     _phase_footer()
 
     _phase_header("S1-4/4", "SocialAgent")
     _log(note)
     _sep()
-    social_mock = {**MOCK_BBS_DATA["social_analysis"], "ticker": ticker}
-    hype = social_mock["hype_score"]
-    filled = int(hype * 10)
-    hype_bar = "█" * filled + "░" * (10 - filled)
-    _log(f"データソース   : {social_mock['source']}  (投稿数: {social_mock['post_count']}件)")
-    _log(f"センチメント判定: 📈 {social_mock['sentiment']}")
-    _log(f"買い煽りスコア  : [{hype_bar}] {hype:.2f}  ⚠️  高Hype警戒 (FA/Tech裏付け必要)")
-    _sep()
-    _log(f"判定根拠: {social_mock['reason'][:80]}")
-    bbs.write("SocialAgent", "social_analysis", social_mock)
+    if "social" in excluded_keys:
+        _log("  ⚠️  [アブレーション] SocialAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("SocialAgent", "social_analysis",
+                  {"sentiment": "NEUTRAL", "hype_score": 0.0, "excluded": True,
+                   "reason": "SocialAgent 除外済", "post_count": 0})
+    else:
+        social_mock = {**MOCK_BBS_DATA["social_analysis"], "ticker": ticker}
+        hype = social_mock["hype_score"]
+        filled = int(hype * 10)
+        hype_bar = "█" * filled + "░" * (10 - filled)
+        _log(f"データソース   : {social_mock['source']}  (投稿数: {social_mock['post_count']}件)")
+        _log(f"センチメント判定: 📈 {social_mock['sentiment']}")
+        _log(f"買い煽りスコア  : [{hype_bar}] {hype:.2f}  ⚠️  高Hype警戒 (FA/Tech裏付け必要)")
+        _sep()
+        _log(f"判定根拠: {social_mock['reason'][:80]}")
+        bbs.write("SocialAgent", "social_analysis", social_mock)
     _phase_footer()
 
 
@@ -1024,12 +1057,39 @@ def _run_mock_risk(bbs: BBS, ticker: str) -> None:
     _phase_footer()
 
 
+def _agent_to_weight_key(agent_name: str) -> str | None:
+    """エージェント名をウェイトキーに変換する。"""
+    mapping = {
+        "technicalagent": "technical",
+        "technical":      "technical",
+        "newsagent":      "news",
+        "news":           "news",
+        "macroagent":     "macro",
+        "macro":          "macro",
+        "socialagent":    "social",
+        "social":         "social",
+        "fundamentalagent": "fundamental",
+        "fundamental":    "fundamental",
+    }
+    return mapping.get(agent_name.lower())
+
+
+def _compute_effective_weights(excluded_keys: list[str]) -> dict[str, float]:
+    """除外エージェントのウェイトを残存エージェントに比例配分して再正規化する。"""
+    excluded_weight = sum(WEIGHTS[k] for k in excluded_keys if k in WEIGHTS)
+    if excluded_weight >= 1.0:
+        return {k: 0.0 for k in WEIGHTS}
+    scale = 1.0 / (1.0 - excluded_weight)
+    return {k: (0.0 if k in excluded_keys else round(WEIGHTS[k] * scale, 6)) for k in WEIGHTS}
+
+
 def run_trade_cycle(
-    ticker: str        = TARGET_TICKER,
-    dry_run: bool      = False,
-    notify_line: bool  = False,
-    mock_mode: bool    = False,
-    hybrid_mode: bool  = False,
+    ticker: str             = TARGET_TICKER,
+    dry_run: bool           = False,
+    notify_line: bool       = False,
+    mock_mode: bool         = False,
+    hybrid_mode: bool       = False,
+    excluded_agents: list[str] | None = None,
 ) -> dict:
     """
     AAPL スイングトレード分析サイクルをステージゲート方式で実行する。
@@ -1044,12 +1104,23 @@ def run_trade_cycle(
         dry_run:      True の場合 Alpaca 発注をスキップ（テスト用）
         notify_line:  True の場合、最終判断を LINE 通知
         mock_mode:    True の場合、全 LLM/API 呼び出しをスキップしてダミーデータでフローをテスト
-        hybrid_mode:  True の場合、Stage 1/3/4 はリアル市場データ取得、
-                      Stage 2 (Fundamental/EDGAR) はモック、発注はスキップ。
-                      学習データ品質向上のためのモード。
+                      (EDGAR 自律取得も無効化)
+        hybrid_mode:  True の場合、Stage 1〜4 すべてリアル市場データ・リアル分析を実行し、
+                      発注のみスキップ。EDGAR 自律取得（allow_edgar_fetch=True）も有効。
+                      学習データ品質向上・本番前検証に推奨。
     """
+    excluded_agents = excluded_agents or []
+    excluded_keys: list[str] = list({
+        k for a in excluded_agents
+        if (k := _agent_to_weight_key(a)) is not None
+    })
+    eff_weights = _compute_effective_weights(excluded_keys)
+
     session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     _main_header(ticker, session_id)
+    if excluded_keys:
+        _log(f"[アブレーション] 除外エージェント: {excluded_agents}  "
+             f"→ 有効ウェイト: {eff_weights}")
     if mock_mode:
         _mock_banner()
     elif hybrid_mode:
@@ -1057,16 +1128,34 @@ def run_trade_cycle(
 
     bbs = BBS(session_id)
 
+    def _write_excluded(agent_name: str, bbs_key: str) -> None:
+        bbs.write(agent_name, bbs_key, {"trend": "neutral", "excluded": True,
+                                        "trend_reason": f"{agent_name} 除外済"})
+
     # ── Stage 1: 安価シグナルスキャン ────────────────────────────
     _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
     if mock_mode:
-        _run_mock_stage1(bbs, ticker)
+        _run_mock_stage1(bbs, ticker, excluded_keys=excluded_keys)
     else:
-        # hybrid_mode=True の場合もリアル API を使用（yfinance + Gemini）
-        TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
-        NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
-        MacroAgent(bbs).run(phase_tag="S1-3/4")
-        SocialAgent(bbs).run(ticker, phase_tag="S1-4/4")
+        if "technical" in excluded_keys:
+            _write_excluded("TechnicalAgent", "technical_analysis")
+        else:
+            TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
+
+        if "news" in excluded_keys:
+            _write_excluded("NewsAgent", "news_analysis")
+        else:
+            NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
+
+        if "macro" in excluded_keys:
+            _write_excluded("MacroAgent", "macro_analysis")
+        else:
+            MacroAgent(bbs).run(phase_tag="S1-3/4")
+
+        if "social" in excluded_keys:
+            _write_excluded("SocialAgent", "social_analysis")
+        else:
+            SocialAgent(bbs).run(ticker, phase_tag="S1-4/4")
 
     # ── Gate: マクロブレーキ / 双方 NEUTRAL → HOLD 即終了 ────────
     gate = _gate_check(bbs, ticker)
@@ -1080,10 +1169,10 @@ def run_trade_cycle(
         _sg_sig_gate_raw = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}.get(_sg_sentiment, 0.0)
         _sg_sig_gate     = _sg_sig_gate_raw  # Hypeペナルティは FA なし前提でも Gate では中立扱い
         score = round(
-            gate["news_signal"]   * WEIGHTS["news"]
-            + gate["tech_signal"] * WEIGHTS["technical"]
-            + gate["macro_signal"] * WEIGHTS["macro"]
-            + _sg_sig_gate * WEIGHTS["social"],
+            gate["news_signal"]   * eff_weights["news"]
+            + gate["tech_signal"] * eff_weights["technical"]
+            + gate["macro_signal"] * eff_weights["macro"]
+            + _sg_sig_gate * eff_weights["social"],
             4,
         )
         brake_label = "マクロブレーキ" if gate["macro_brake"] else "シグナル不足"
@@ -1141,15 +1230,28 @@ def run_trade_cycle(
 
     # ── Stage 2: Fundamental 深層分析 ────────────────────────────
     _stage_header(2, "ファンダメンタルズ深層分析  [FundamentalAgent]")
-    if mock_mode or hybrid_mode:
-        # hybrid_mode ではコスト節約のため EDGAR/ChromaDB 呼び出しをスキップし neutral シグナルを使用
+    if "fundamental" in excluded_keys:
+        _log("  ⚠️  [アブレーション] FundamentalAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("FundamentalAgent", "fundamental_analysis",
+                  {"trend": "neutral", "excluded": True, "trend_reason": "FundamentalAgent 除外済"})
+    elif mock_mode:
+        # mock_mode: 完全モック（API/EDGAR 呼び出しゼロ）
         _run_mock_stage2(bbs, ticker)
     else:
-        FundamentalAgent(bbs).run(ticker, phase_tag="S2")
+        # hybrid_mode / 通常モード: 新 FundamentalAgent で RAG + EDGAR 自律取得
+        # hybrid_mode でも EDGAR 自律取得を有効にし学習データの品質を確保する
+        FundamentalAgent(bbs).run(
+            ticker,
+            phase_tag="S2",
+            allow_edgar_fetch=True,   # mock_mode=False の場合は常に有効
+        )
 
     # ── Stage 3: 最終評価 & 発注判断 ─────────────────────────────
     _stage_header(3, "最終評価 & 発注判断  [ManagerAgent]")
-    judgment = ManagerAgent(bbs).run(ticker, dry_run=dry_run, phase_tag="S3", mock_mode=mock_mode)
+    judgment = ManagerAgent(bbs).run(
+        ticker, dry_run=dry_run, phase_tag="S3", mock_mode=mock_mode,
+        effective_weights=eff_weights, excluded_keys=excluded_keys,
+    )
 
     # ── Stage 4: リスク管理 & ポジションサイジング（STRONG BUY 時のみ）──
     order_result: dict | None = None
@@ -1281,9 +1383,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hybrid", action="store_true",
         help=(
-            "ハイブリッドモード: Stage1/3/4 でリアル市場データ (yfinance + Gemini) を取得し、"
-            "Stage2 (Fundamental/EDGAR) はモック、発注はスキップ。学習データ品質向上用。"
+            "ハイブリッドモード: 全 Stage でリアル市場データ・リアル分析を実行し発注のみスキップ。"
+            "Stage2 FundamentalAgent は EDGAR 自律取得 (allow_edgar_fetch=True) を含むフル RAG 分析を実行。"
+            "学習データ品質向上・本番前検証に推奨。"
         ),
+    )
+    parser.add_argument(
+        "--exclude", nargs="+", default=[], metavar="AGENT",
+        help="除外するエージェント名（例: SocialAgent TechnicalAgent）。"
+             "指定したエージェントはスキップされ、ウェイトは残存エージェントに再配分される。"
+             "アブレーション実験用。",
     )
     args = parser.parse_args()
 
@@ -1293,4 +1402,5 @@ if __name__ == "__main__":
         notify_line=args.notify_line,
         mock_mode=args.mock,
         hybrid_mode=args.hybrid,
+        excluded_agents=args.exclude,
     )

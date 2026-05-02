@@ -1,0 +1,7 @@
+run_at,ticker,pattern,excluded_agents,decision,score,sig_fundamental,sig_technical,sig_macro,sig_news,sig_social
+2026-05-02T09:34:27,AAPL,Baseline (全エージェント),none,STRONG BUY,0.8,1.0,1.0,0.0,1.0,1.0
+2026-05-02T09:34:28,AAPL,w/o SocialAgent,SocialAgent,STRONG BUY,0.7778,1.0,1.0,0.0,1.0,0.0
+2026-05-02T09:34:28,AAPL,w/o NewsAgent,NewsAgent,STRONG BUY,0.7778,1.0,1.0,0.0,0.0,1.0
+2026-05-02T09:34:28,AAPL,w/o TechnicalAgent,TechnicalAgent,STRONG BUY,0.75,1.0,0.0,0.0,1.0,1.0
+2026-05-02T09:34:28,AAPL,w/o MacroAgent,MacroAgent,STRONG BUY,1.0,1.0,1.0,0.0,1.0,1.0
+2026-05-02T09:34:28,AAPL,w/o FundamentalAgent,FundamentalAgent,STRONG BUY,0.6667,1.0,1.0,0.0,1.0,1.0

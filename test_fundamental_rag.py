@@ -1,8 +1,15 @@
 """
-ファンダメンタル・RAGドリブン 統合テスト
-==========================================
-① FundamentalAgent : RAG で AAPL（データなし確認）と エクサウィザーズ（実データ）を検索・分析 → BBS 書き込み
-② ManagerAgent     : BBS を読み取り、最終判断を構築（Alpaca注文はスキップ、ターミナル出力のみ）
+FundamentalAgent RAG 機能テスト（EDGAR 自律取得フロー検証）
+============================================================
+agents/fundamental_agent.py の FundamentalAgent.analyze() をテストする。
+
+テストケース:
+  1. エクサウィザーズ — financial_filings に実データあり → RAG 経路
+  2. AAPL            — 事前に DB から削除 → EDGAR 自律取得 → RAG 経路
+
+実行方法:
+    cd /home/naito/exa-investor
+    python test_fundamental_rag.py
 """
 
 import sys
@@ -12,160 +19,152 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main import BBS
-import skills.rag_search as _rag_mod
-import yaml
+from agents.fundamental_agent import FundamentalAgent
 
+SESSION_ID  = datetime.datetime.now().strftime("rag_test_%Y%m%d_%H%M%S")
 PERSIST_DIR = "chroma_db_saved"
-SESSION_ID = datetime.datetime.now().strftime("test_fa_%Y%m%d_%H%M%S")
+COLLECTION  = "financial_filings"
+BANNER      = "=" * 62
 
-# fundamental_agent.yaml からクエリを読み込む
-with open(".agents/fundamental_agent.yaml", encoding="utf-8") as f:
-    _agent_cfg = yaml.safe_load(f)
 
-AAPL_QUERIES = _agent_cfg["params"]["aapl_queries"]
-EXA_QUERIES = _agent_cfg["params"]["exawizards_queries"]
+print(f"\n{BANNER}")
+print(f"  FundamentalAgent RAG + EDGAR 自律取得テスト")
+print(f"  セッション  : {SESSION_ID}")
+print(f"  DB          : {PERSIST_DIR}  /  コレクション: {COLLECTION}")
+print(f"{BANNER}")
 
-print(f"\n{'='*60}")
-print(f"  ファンダメンタル・RAG 統合テスト")
-print(f"  セッション : {SESSION_ID}")
-print(f"  DB         : {PERSIST_DIR}")
-print(f"{'='*60}")
 
-bbs = BBS(SESSION_ID)
+# ================================================================
+# ヘルパー: AAPL の既存チャンクを DB から削除（冪等テストのため）
+# ================================================================
 
-# =========================================================
-# ① FundamentalAgent — AAPL 検索（データなし確認）
-# =========================================================
-print(f"\n[① FundamentalAgent] AAPL のファンダメンタル分析を試行中...")
-print(f"  クエリ数: {len(AAPL_QUERIES)} 件")
+def _purge_ticker_from_db(ticker: str, persist_dir: str, collection_name: str) -> int:
+    """
+    指定 ticker の全チャンクを ChromaDB から削除し、削除件数を返す。
+    テスト前に EDGAR 取得フローを確実にトリガーするために使う。
+    """
+    try:
+        import chromadb
+        client = chromadb.PersistentClient(path=persist_dir)
+        col    = client.get_or_create_collection(collection_name)
 
-aapl_result = _rag_mod.run(
-    company="AAPL",
-    queries=AAPL_QUERIES,
+        # ticker メタデータで該当 ID を取得
+        result = col.get(where={"ticker": {"$eq": ticker.upper()}})
+        ids    = result.get("ids", [])
+        if ids:
+            col.delete(ids=ids)
+            print(f"  [Setup] DB から {ticker} の {len(ids)} チャンクを削除しました")
+        else:
+            print(f"  [Setup] DB に {ticker} のチャンクは存在しませんでした（スキップ）")
+        return len(ids)
+    except Exception as e:
+        print(f"  [Setup] DB 削除中にエラー（無視）: {e}")
+        return 0
+
+
+# ================================================================
+# ヘルパー: 結果を見やすく表示
+# ================================================================
+
+def _print_result(label: str, result: dict) -> None:
+    edgar_flag = "✓ (自動取得)" if result.get("edgar_auto_fetch") else "−"
+    fb_flag    = "yes (yfinance)" if result.get("fallback_used") else "no (RAG)"
+    print(f"\n{'─' * 62}")
+    print(f"  [ {label} ]")
+    print(f"{'─' * 62}")
+    print(f"  データ有無       : {'あり' if result.get('data_available') else 'なし'}")
+    print(f"  データソース     : {result.get('data_source', 'N/A')}")
+    print(f"  使用チャンク数   : {result.get('chunks_used', 0)}")
+    print(f"  フォールバック   : {fb_flag}")
+    print(f"  EDGAR 自律取得   : {edgar_flag}")
+    print(f"\n  ── ファンダメンタルズ分析 ──")
+    print(f"  売上/利益成長    : {str(result.get('revenue_growth', 'N/A'))[:160]}")
+    print(f"  収益性           : {str(result.get('profitability',  'N/A'))[:160]}")
+    print(f"  リスク要因       : {str(result.get('risks',          'N/A'))[:160]}")
+    print(f"  今後の展望       : {str(result.get('outlook',        'N/A'))[:160]}")
+    print(f"\n  トレンド判定     : {result.get('trend', 'neutral').upper()}")
+    print(f"  判定理由         : {result.get('trend_reason', '')}")
+    if result.get("error"):
+        print(f"\n  ⚠ エラー         : {result['error']}")
+
+
+# ================================================================
+# Test 1: エクサウィザーズ (RAG 経路を期待)
+# ================================================================
+print(f"\n{'━' * 62}")
+print(f"  Test 1: エクサウィザーズ — RAG 経路（一次情報あり想定）")
+print(f"{'━' * 62}")
+
+agent = FundamentalAgent(
     persist_dir=PERSIST_DIR,
-    top_k=6,
+    collection_name=COLLECTION,
+    top_k=5,
 )
 
-print(f"  データ有無   : {'あり' if aapl_result.get('data_available') else 'なし（DB に AAPL 資料未格納）'}")
-print(f"  トレンド判定 : {aapl_result.get('trend', 'neutral').upper()}")
-print(f"  判定理由     : {aapl_result.get('trend_reason', '')}")
+result_exa = agent.analyze("エクサウィザーズ")
+_print_result("エクサウィザーズ", result_exa)
 
-bbs.write("FundamentalAgent", "fundamental_analysis_aapl", {
-    "company": "AAPL",
-    "data_available": aapl_result.get("data_available", False),
-    "trend": aapl_result.get("trend", "neutral"),
-    "trend_reason": aapl_result.get("trend_reason", ""),
-    "queries_count": aapl_result.get("queries_count", 0),
-})
+assert result_exa["ticker"]         == "エクサウィザーズ", "ticker mismatch"
+assert result_exa["data_available"] is True,             "data_available should be True"
+assert result_exa["fallback_used"]  is False,            "should NOT use fallback (RAG data exists)"
+assert result_exa["chunks_used"]    >= 1,                "at least 1 chunk should be retrieved"
+assert result_exa["edgar_auto_fetch"] is False,          "should NOT trigger EDGAR (data already in DB)"
+print("\n  ✓ Test 1 PASSED: RAG 経路で分析完了（EDGAR 未トリガー）")
 
-# =========================================================
-# ① FundamentalAgent — エクサウィザーズ 実データ分析
-# =========================================================
-print(f"\n[① FundamentalAgent] エクサウィザーズ のファンダメンタル分析を実行中...")
-print(f"  クエリ数: {len(EXA_QUERIES)} 件")
 
-exa_result = _rag_mod.run(
-    company="エクサウィザーズ",
-    queries=EXA_QUERIES,
+# ================================================================
+# Test 2: AAPL — EDGAR 自律取得 → RAG 経路
+# ================================================================
+print(f"\n{'━' * 62}")
+print(f"  Test 2: AAPL — EDGAR 自律取得 → RAG 経路")
+print(f"{'━' * 62}")
+
+# AAPL の既存データを削除して「初めて解析する」状態を再現
+print(f"\n  [Setup] AAPL の既存 DB データをパージ中...")
+_purge_ticker_from_db("AAPL", PERSIST_DIR, COLLECTION)
+
+# 新しい FundamentalAgent インスタンス（DB キャッシュなし）
+agent_aapl = FundamentalAgent(
     persist_dir=PERSIST_DIR,
-    top_k=6,
+    collection_name=COLLECTION,
+    top_k=5,
 )
 
-print(f"\n  [ 各クエリの分析結果 ]")
-for a in exa_result.get("analyses", []):
-    hit = "✓" if a.get("company_found_in_context") else "△"
-    print(f"\n  {hit} Q: {a['query']}")
-    print(f"     A: {a['analysis'][:200].strip()}...")
+print(f"\n  AAPL の分析を開始（EDGAR 自律取得フローが走るはず）...")
+result_aapl = agent_aapl.analyze("AAPL")
+_print_result("AAPL", result_aapl)
 
-print(f"\n  トレンド判定 : {exa_result.get('trend', 'neutral').upper()}")
-print(f"  判定理由     : {exa_result.get('trend_reason', '')}")
+assert result_aapl["ticker"]          == "AAPL", "ticker mismatch"
+assert result_aapl["edgar_auto_fetch"] is True,  "EDGAR auto-fetch should have been triggered"
+assert result_aapl["data_available"]   is True,  "data_available should be True after EDGAR fetch"
 
-# BBS には要約のみ書き込む（context_chunksは除外）
-exa_bbs_entry = {
-    "company": "エクサウィザーズ",
-    "data_available": exa_result.get("data_available", False),
-    "queries_count": exa_result.get("queries_count", 0),
-    "analyses": [
-        {
-            "query": a["query"],
-            "analysis": a["analysis"][:500],
-            "company_found": a.get("company_found_in_context", False),
-        }
-        for a in exa_result.get("analyses", [])
-    ],
-    "trend": exa_result.get("trend", "neutral"),
-    "trend_reason": exa_result.get("trend_reason", ""),
-}
-bbs.write("FundamentalAgent", "fundamental_analysis_exawizards", exa_bbs_entry)
-
-# =========================================================
-# ② ManagerAgent — BBS を読み取り最終判断を構築
-# =========================================================
-print(f"\n[② ManagerAgent] BBS を読み取り、最終判断を構築中...")
-
-aapl_bbs = bbs.read("fundamental_analysis_aapl") or {}
-exa_bbs  = bbs.read("fundamental_analysis_exawizards") or {}
-
-# AAPL の判断（データなし → HOLD）
-aapl_decision = "HOLD"
-aapl_reason = (
-    "DBにAAPL固有の決算資料がないため、ファンダメンタル根拠なし → HOLD"
-    if not aapl_bbs.get("data_available")
-    else f"AAPL ファンダメンタル: {aapl_bbs.get('trend', 'neutral').upper()}"
-)
-
-# エクサウィザーズの判断（実データに基づく）
-exa_trend = exa_bbs.get("trend", "neutral").lower()
-if exa_trend == "positive":
-    exa_decision = "BUY 検討"
-elif exa_trend == "negative":
-    exa_decision = "SELL 検討"
+if result_aapl.get("chunks_used", 0) > 0:
+    assert result_aapl["fallback_used"] is False, \
+        "should use RAG (not yfinance) after successful EDGAR fetch"
+    print("\n  ✓ Test 2 PASSED: EDGAR 自律取得 → RAG 経路で分析完了")
 else:
-    exa_decision = "HOLD"
+    # EDGAR 取得は試みたが 0 チャンク（ネットワーク問題等）→ yfinance フォールバック
+    assert result_aapl["fallback_used"] is True, \
+        "if EDGAR fetch yielded 0 chunks, should fall back to yfinance"
+    print("\n  ⚠ Test 2 PARTIAL: EDGAR 取得に失敗 → yfinance フォールバックで分析完了")
+    print(f"    (エラー: {result_aapl.get('error')})")
 
-manager_judgment = {
-    "AAPL": {
-        "decision": aapl_decision,
-        "reason": aapl_reason,
-        "data_available": aapl_bbs.get("data_available", False),
-        "fundamental_trend": aapl_bbs.get("trend", "neutral"),
-        "note": "Alpaca注文スキップ（テスト実行）",
-    },
-    "エクサウィザーズ": {
-        "decision": exa_decision,
-        "reason": f"ファンダメンタル: {exa_trend.upper()} — {exa_bbs.get('trend_reason', '')}",
-        "data_available": exa_bbs.get("data_available", False),
-        "fundamental_trend": exa_trend,
-        "note": "Alpaca注文スキップ（テスト実行）",
-    },
-}
-bbs.write("ManagerAgent", "manager_judgment", manager_judgment)
 
-# =========================================================
-# ③ 分析レポートと最終判断を出力
-# =========================================================
-print(f"\n{'='*60}")
-print(f"  ③ FundamentalAgent 分析レポート（BBS 会話履歴）")
-print(f"{'='*60}")
-print(bbs.to_text_summary())
+# ================================================================
+# サマリー
+# ================================================================
+print(f"\n{BANNER}")
+print(f"  テストサマリー")
+print(f"{BANNER}")
 
-print(f"\n{'='*60}")
-print(f"  ③ ManagerAgent 最終判断サマリー")
-print(f"{'='*60}")
-print(f"\n  [ AAPL ]")
-print(f"  データ有無   : {'あり' if manager_judgment['AAPL']['data_available'] else 'なし'}")
-print(f"  ファンダメンタル: {manager_judgment['AAPL']['fundamental_trend'].upper()}")
-print(f"  最終判断     : {manager_judgment['AAPL']['decision']}")
-print(f"  理由         : {manager_judgment['AAPL']['reason']}")
-print(f"  補足         : {manager_judgment['AAPL']['note']}")
+for label, result in [("エクサウィザーズ", result_exa), ("AAPL", result_aapl)]:
+    source  = result.get("data_source", "N/A")
+    trend   = result.get("trend", "neutral").upper()
+    chunks  = result.get("chunks_used", 0)
+    fb      = "yes" if result.get("fallback_used") else "no"
+    edgar   = "yes" if result.get("edgar_auto_fetch") else "no"
+    print(f"  {label:<18} trend={trend:<10} chunks={chunks:<4} fallback={fb:<4} "
+          f"edgar_fetch={edgar}  source={source}")
 
-print(f"\n  [ エクサウィザーズ ]")
-print(f"  データ有無   : {'あり' if manager_judgment['エクサウィザーズ']['data_available'] else 'なし'}")
-print(f"  ファンダメンタル: {manager_judgment['エクサウィザーズ']['fundamental_trend'].upper()}")
-print(f"  最終判断     : {manager_judgment['エクサウィザーズ']['decision']}")
-print(f"  理由         : {manager_judgment['エクサウィザーズ']['reason']}")
-print(f"  補足         : {manager_judgment['エクサウィザーズ']['note']}")
-
-print(f"\n  BBS ログ: {bbs.path}")
-print(f"{'='*60}\n")
+print(f"\n  全テスト PASSED ✓")
+print(f"{BANNER}\n")

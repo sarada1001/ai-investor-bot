@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_API_KEY = os.getenv("ALPACA_API_KEY", "")
-_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+_API_KEY = os.getenv("APCA_API_KEY_ID", "")
+_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY", "")
 _PAPER = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
 
 
