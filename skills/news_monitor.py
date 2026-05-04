@@ -5,11 +5,13 @@ Permission: NewsAgent only
 Two fetch modes:
   1. ticker mode  — yf.Ticker(symbol).news  (US stocks)
   2. company mode — Google News RSS          (Japanese stocks)
+
+API cost optimization: multiple articles are analyzed in a single batch
+LLM call instead of one call per article.
 """
 
 import json
 import re
-import time
 import warnings
 import urllib.parse
 import feedparser
@@ -30,29 +32,73 @@ def _get_llm() -> ChatGoogleGenerativeAI:
     return _llm
 
 
-def _analyze_sentiment(title: str, summary: str, subject: str) -> tuple[str, str]:
-    """Call LLM once to classify sentiment for a single news item."""
-    text = title
-    if summary:
-        text += f"\n概要: {summary[:200]}"
+def _analyze_sentiment_batch(
+    articles: list[dict],
+    subject: str,
+) -> list[dict]:
+    """
+    Classify sentiment for multiple news articles in a single LLM call.
+
+    Args:
+        articles: list of {"title": str, "summary": str, "subject": str (optional)}
+                  "subject" per article overrides the top-level subject (RSS multi-company mode).
+        subject:  default target ticker / company name used when article has no "subject".
+
+    Returns:
+        list of {"sentiment": str, "reason": str} aligned 1-to-1 with input.
+        Falls back to neutral for any entry that cannot be parsed.
+    """
+    if not articles:
+        return []
+
+    blocks = []
+    for i, a in enumerate(articles, 1):
+        target = a.get("subject") or subject
+        text = a["title"]
+        if a.get("summary"):
+            text += f"\n概要: {a['summary'][:200]}"
+        blocks.append(f"【記事{i}】対象銘柄/企業: {target}\n{text}")
+
+    articles_block = "\n\n".join(blocks)
+    n = len(articles)
 
     prompt = (
-        f"あなたはプロの株式投資アナリストです。\n"
-        f"対象【{subject}】に関する以下のニュースを読み、"
-        f"株価への短期的な影響を判定してください。\n\n"
-        f"【ニュース】\n{text}\n\n"
-        f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
-        f'{{"sentiment": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の理由"}}'
+        "あなたはプロの株式投資アナリストです。\n"
+        f"以下の{n}件のニュースをそれぞれ読み、各記事の「対象銘柄/企業」の"
+        "株価への短期的な影響を判定してください。\n\n"
+        f"{articles_block}\n\n"
+        "必ず以下のJSON配列形式のみで出力してください（余分なテキスト不要）:\n"
+        "[\n"
+        '  {"index": 1, "sentiment": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の理由"},\n'
+        "  ...\n"
+        "]"
     )
+
+    default = [{"sentiment": "neutral", "reason": "解析失敗"} for _ in articles]
+
     try:
         raw = _get_llm().invoke(prompt).content.strip()
-        m = re.search(r'\{.*\}', raw, re.DOTALL)
-        if m:
-            parsed = json.loads(m.group())
-            return str(parsed.get("sentiment", "neutral")), str(parsed.get("reason", ""))
+        m = re.search(r'\[.*\]', raw, re.DOTALL)
+        if not m:
+            return default
+        parsed = json.loads(m.group())
+        if not isinstance(parsed, list):
+            return default
+
+        result = list(default)
+        for item in parsed:
+            try:
+                idx = int(item.get("index", 0)) - 1
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < n:
+                result[idx] = {
+                    "sentiment": str(item.get("sentiment", "neutral")),
+                    "reason":    str(item.get("reason", "")),
+                }
+        return result
     except Exception as e:
-        return "neutral", f"LLM解析エラー: {e}"
-    return "neutral", "パース失敗"
+        return [{"sentiment": "neutral", "reason": f"LLM解析エラー: {e}"} for _ in articles]
 
 
 # ------------------------------------------------------------------ #
@@ -80,6 +126,9 @@ def fetch_ticker_news(ticker: str, max_articles: int = 3) -> dict:
     """
     Fetch news for a US ticker via yfinance and classify sentiment with LLM.
 
+    All articles are analyzed in a single batch API call (1 request regardless
+    of max_articles, vs. the previous 1 request per article).
+
     Returns:
         {
             "ticker": str,
@@ -97,23 +146,34 @@ def fetch_ticker_news(ticker: str, max_articles: int = 3) -> dict:
         }
     """
     raw_news = yf.Ticker(ticker).news or []
-    articles = []
 
+    # Extract fields for all candidate articles first
+    extracted = []
     for item in raw_news[:max_articles]:
         title, summary, link = _extract_news_fields(item)
-        if not title:
-            continue
+        if title:
+            extracted.append({"title": title, "summary": summary, "link": link})
 
-        sentiment, reason = _analyze_sentiment(title, summary, ticker)
-        articles.append({
-            "ticker": ticker,
-            "title": title,
-            "summary": summary[:200] if summary else "",
-            "link": link,
-            "sentiment": sentiment,
-            "reason": reason,
-        })
-        time.sleep(2)  # API rate limit
+    if not extracted:
+        return {"ticker": ticker, "articles": [], "new_count": 0}
+
+    # Single batch call for all articles
+    sentiments = _analyze_sentiment_batch(
+        [{"title": a["title"], "summary": a["summary"]} for a in extracted],
+        subject=ticker,
+    )
+
+    articles = [
+        {
+            "ticker":    ticker,
+            "title":     a["title"],
+            "summary":   a["summary"][:200] if a["summary"] else "",
+            "link":      a["link"],
+            "sentiment": s["sentiment"],
+            "reason":    s["reason"],
+        }
+        for a, s in zip(extracted, sentiments)
+    ]
 
     return {"ticker": ticker, "articles": articles, "new_count": len(articles)}
 
@@ -125,6 +185,7 @@ def fetch_ticker_news(ticker: str, max_articles: int = 3) -> dict:
 def _fetch_rss_news(companies: list[str], seen_urls: set) -> dict:
     """Fetch from Google News RSS for Japanese company names."""
     articles = []
+    new_pending: list[dict] = []  # collects new articles for batch analysis
 
     for company in companies:
         query = urllib.parse.quote(company)
@@ -140,20 +201,41 @@ def _fetch_rss_news(companies: list[str], seen_urls: set) -> dict:
         is_new = link not in seen_urls
 
         if is_new:
-            sentiment, reason = _analyze_sentiment(title, "", company)
             seen_urls.add(link)
-            time.sleep(2)
+            new_pending.append({
+                "article_idx": len(articles),
+                "title":       title,
+                "subject":     company,
+            })
+            articles.append({
+                "company":   company,
+                "title":     title,
+                "link":      link,
+                "sentiment": "neutral",
+                "reason":    "分析待ち",
+                "is_new":    True,
+            })
         else:
-            sentiment, reason = "neutral", "分析スキップ（既出記事）"
+            articles.append({
+                "company":   company,
+                "title":     title,
+                "link":      link,
+                "sentiment": "neutral",
+                "reason":    "分析スキップ（既出記事）",
+                "is_new":    False,
+            })
 
-        articles.append({
-            "company": company,
-            "title": title,
-            "link": link,
-            "sentiment": sentiment,
-            "reason": reason,
-            "is_new": is_new,
-        })
+    # Single batch call for all new articles across companies
+    if new_pending:
+        batch_input = [
+            {"title": p["title"], "summary": "", "subject": p["subject"]}
+            for p in new_pending
+        ]
+        sentiments = _analyze_sentiment_batch(batch_input, subject="各記事の対象銘柄")
+        for p, s in zip(new_pending, sentiments):
+            idx = p["article_idx"]
+            articles[idx]["sentiment"] = s["sentiment"]
+            articles[idx]["reason"]    = s["reason"]
 
     new_count = sum(1 for a in articles if a.get("is_new", True))
     return {"articles": articles, "new_count": new_count}
@@ -173,10 +255,10 @@ def run(
     Dispatch to yfinance (ticker) or RSS (companies) mode.
 
     Args:
-        ticker:      US stock ticker, e.g. "AAPL" — uses yfinance
-        companies:   Japanese company names        — uses Google News RSS
+        ticker:       US stock ticker, e.g. "AAPL" — uses yfinance
+        companies:    Japanese company names        — uses Google News RSS
         max_articles: max articles to fetch in ticker mode
-        seen_urls:   deduplicate set for RSS mode
+        seen_urls:    deduplicate set for RSS mode
     """
     if ticker:
         return fetch_ticker_news(ticker, max_articles)

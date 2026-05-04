@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "ticker": "VRSN",
+    "name": "VeriSign, Inc.",
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "exchange": "NMS",
+    "market_cap": 24792039424,
+    "currency": "USD"
+  },
+  "content": {
+    "long_business_summary": "VeriSign, Inc., together with its subsidiaries, provides internet infrastructure and domain name registry services that enables internet navigation for various recognized domain names worldwide. The company provides root zone maintainer services, operating two of thirteen internet root servers; and offering registration services and authoritative resolution for the .com and .net domains, which supports global e-commerce. It operates directory for .name and .cc; and back-end systems for .edu, domain names. The company was incorporated in 1995 and is headquartered in Reston, Virginia."
+  }
+}

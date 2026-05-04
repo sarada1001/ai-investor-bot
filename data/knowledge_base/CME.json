@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "ticker": "CME",
+    "name": "CME Group Inc.",
+    "sector": "Financial Services",
+    "industry": "Financial Data & Stock Exchanges",
+    "exchange": "NMS",
+    "market_cap": 104917532672,
+    "currency": "USD"
+  },
+  "content": {
+    "long_business_summary": "CME Group Inc., together with its subsidiaries, operates contract markets for the trading of futures and options on futures contracts worldwide. It offers futures and options products based on interest rates, equity indexes, and foreign exchange; and agricultural, energy, and metals commodities, as well as fixed income and foreign currency trading services. The company provides clearing house services, including clearing, settling, and guaranteeing futures and options contracts, and cleared swaps products traded through its exchanges. In addition, the company offers a range of market data services, including real-time and historical data services. It serves professional traders, financial institutions, institutional and individual investors, corporations, manufacturers, producers, governments, and central banks. The company was formerly known as Chicago Mercantile Exchange Holdings Inc. and changed its name to CME Group Inc. in July 2007. The company was founded in 1898 and is headquartered in Chicago, Illinois."
+  }
+}

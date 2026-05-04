@@ -25,8 +25,12 @@ if [ -n "$(git status -s)" ]; then
 
     git add "${README}"
     git commit -m "docs: development history を更新 [${DATETIME}]"
-    git push origin main
-    echo "[${DATETIME}] Push完了"
+    if git push origin main; then
+        echo "[${DATETIME}] Push完了"
+    else
+        echo "[${DATETIME}] ERROR: git push 失敗（認証・ネットワークを確認してください）"
+        exit 1
+    fi
 else
     echo "[${DATETIME}] 変更なし、スキップ"
 fi

@@ -48,3 +48,4 @@ plotly>=5.22.0
 # --- 設定・ユーティリティ ---
 python-dotenv==1.2.2
 PyYAML==6.0.3
+tqdm>=4.66.0                    # プログレスバー（build_corpus.py）
