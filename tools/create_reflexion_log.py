@@ -121,11 +121,11 @@ tags: [{tags_yaml}]
 
 {chr(10).join("- " + line for line in data["actual_outcome"].splitlines() if line.strip())}
 
-## 3. Root Cause Analysis（なぜ間違えたのか？）
+## 3. 根本原因分析（なぜ間違えたのか？）
 
 {chr(10).join("- " + line for line in data["root_cause"].splitlines() if line.strip())}
 
-## 4. Rule for Future（次回への教訓）
+## 4. 次回への教訓・ルール
 
 {chr(10).join("- " + line for line in data["rule"].splitlines() if line.strip())}
 """

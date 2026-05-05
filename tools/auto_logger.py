@@ -28,11 +28,11 @@ SAVE_DIR = Path(__file__).parent.parent / "data" / "knowledge_base" / "obsidian_
 
 REQUIRED_KEYS = {"ticker", "action", "context"}
 DEFAULTS = {
-    "outcome":        "PENDING",
-    "profit_loss":    "N/A",
-    "root_cause":     "決済後に追記",
+    "outcome":         "決済待ち",
+    "profit_loss":     "未確定",
+    "root_cause":      "決済後に追記",
     "rule_for_future": "決済後に追記",
-    "tags":           [],
+    "tags":            [],
 }
 
 
@@ -111,9 +111,10 @@ class ObsidianLogger:
         tags_yaml = ", ".join(f'"{t}"' for t in data["tags"])
 
         pl = str(data["profit_loss"])
-        if pl not in ("N/A", "PENDING") and not pl.startswith("-"):
+        non_numeric = ("未確定", "決済待ち", "N/A", "PENDING")
+        if pl not in non_numeric and not pl.startswith("-"):
             pl = f"+{pl}" if pl else pl
-        pl_display = pl if pl.endswith("%") or pl in ("N/A", "PENDING") else f"{pl}%"
+        pl_display = pl if pl.endswith("%") or pl in non_numeric else f"{pl}%"
 
         def to_bullets(text: str) -> str:
             lines = [l.strip() for l in str(text).splitlines() if l.strip()]
@@ -139,11 +140,11 @@ tags: [{tags_yaml}]
 
 {to_bullets(data.get("actual_outcome", data["outcome"]))}
 
-## 3. Root Cause Analysis（なぜ間違えたのか？）
+## 3. 根本原因分析（なぜ間違えたのか？）
 
 {to_bullets(data["root_cause"])}
 
-## 4. Rule for Future（次回への教訓）
+## 4. 次回への教訓・ルール
 
 {to_bullets(data["rule_for_future"])}
 """
@@ -162,16 +163,16 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
-    # ManagerAgent が決済前（PENDING状態）に出力する推論結果を想定
+    # ManagerAgent が決済前（決済待ち状態）に出力する推論結果を想定
     dummy_trade = {
         "ticker":  "NVDA",
         "action":  "BUY",
         "context": (
-            "VIX was at 17.2 (low fear). NVDA broke above the 200-day MA "
-            "on 1.8x average volume after a positive earnings surprise (EPS beat +12%). "
-            "Semiconductor sector ETF (SOXX) confirmed relative strength."
+            "VIX が 17.2 と低水準（恐怖感薄い）。\n"
+            "NVDA が平均出来高の 1.8 倍を伴い 200 日移動平均線を上抜け。\n"
+            "決算 EPS が市場予想を 12% 上回り、半導体セクター ETF（SOXX）も相対強度を確認。"
         ),
-        "tags": ["reflexion", "breakout", "earnings_beat", "low_vix"],
+        "tags": ["reflexion", "ブレイクアウト", "決算上振れ", "低VIX"],
         # outcome / profit_loss / root_cause / rule_for_future は省略 → デフォルト値が入る
     }
 
