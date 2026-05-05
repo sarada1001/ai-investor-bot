@@ -55,6 +55,30 @@
       "session_id": "20260502_093428",
       "entry_date": "2026-05-02",
       "entry_price": null
+    },
+    {
+      "record_id": "d52cf59e-cf4f-4728-9826-ffcb6c071d69",
+      "session_id": "20260505_102723",
+      "entry_date": "2026-05-05",
+      "entry_price": null
+    },
+    {
+      "record_id": "dd6f67d1-95be-4666-bc82-69246c242b5f",
+      "session_id": "20260505_102838",
+      "entry_date": "2026-05-05",
+      "entry_price": null
+    },
+    {
+      "record_id": "0ec2d587-3fd2-4a03-9132-7406e2b7e435",
+      "session_id": "20260505_103952",
+      "entry_date": "2026-05-05",
+      "entry_price": null
+    },
+    {
+      "record_id": "bbda6565-6ba3-4979-b30a-58ed8d02acfa",
+      "session_id": "20260505_104147",
+      "entry_date": "2026-05-05",
+      "entry_price": null
     }
   ]
 }

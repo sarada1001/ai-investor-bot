@@ -58,6 +58,10 @@ import skills.social_monitor           as _social_mod
 import skills.risk_calculator          as _risk_mod
 import skills.training_data_collector  as _training_mod
 from agents.fundamental_agent import FundamentalAgent as _FundamentalAgentImpl
+from agents.exit_agent import ExitAgent as _ExitAgentImpl, add_position as _portfolio_add
+from tools.auto_logger import ObsidianLogger as _ObsidianLogger
+from tools.alpaca_client import AlpacaClient as _AlpacaClient, PORTFOLIO_PATH as _PORTFOLIO_PATH
+from tools.critic_agent import CriticAgent as _CriticAgentImpl
 
 # =========================================================
 # 定数
@@ -491,6 +495,58 @@ class SocialAgent:
         self.bbs.write(self.NAME, "social_analysis", result)
         _phase_footer()
         return result
+
+
+# =========================================================
+# Stage 0 — ExitAgent（Selling Loop）
+# =========================================================
+
+class ExitAgent:
+    """
+    Stage 0 ラッパー: agents/exit_agent.py の _ExitAgentImpl に処理を委譲し、
+    結果を BBS に書き込んで画面表示する。
+    """
+
+    NAME = "ExitAgent"
+
+    def __init__(self, bbs: BBS) -> None:
+        self.bbs = bbs
+
+    def run(
+        self,
+        mock_mode: bool    = False,
+        alpaca_client      = None,
+        phase_tag: str     = "S0",
+    ) -> list[dict]:
+        _phase_header(phase_tag, self.NAME)
+        _log("portfolio.json を読み込み、保有銘柄の売却判断を実行中...")
+        if mock_mode:
+            _log("  ⚠ mock_mode=True: LLM による thesis 判定をスキップ / Alpaca 注文なし")
+        elif alpaca_client is None:
+            _log("  ⚠ dry_run: Alpaca 注文なし（評価のみ）")
+        _sep()
+
+        impl    = _ExitAgentImpl(self.bbs)
+        results = impl.run(mock_mode=mock_mode, alpaca_client=alpaca_client)
+
+        if not results:
+            _log("保有ポジションなし — Selling Loop をスキップ")
+        else:
+            sell_cnt = sum(1 for r in results if r["action"] == "SELL")
+            hold_cnt = sum(1 for r in results if r["action"] == "HOLD")
+            _log(f"評価完了: {len(results)} 件  売却判定: {sell_cnt} 件  継続保有: {hold_cnt} 件")
+            _sep()
+            for r in results:
+                icon = {"SELL": "🔴", "HOLD": "🟡"}.get(r["action"], "❓")
+                _log(f"  {icon} {r['action']:4s} | {r['ticker']:6s} | "
+                     f"P&L: {r['pnl_pct']:+.2f}%  [{r['exit_type']}]")
+                _log(f"       理由: {r['reason'][:65]}")
+                if r["action"] == "SELL":
+                    _log(f"       買値: ${float(r['entry_price']):.2f} → "
+                         f"現在: ${r['current_price']:.2f}")
+
+        _phase_footer()
+        return results
 
 
 # =========================================================
@@ -1083,6 +1139,37 @@ def _compute_effective_weights(excluded_keys: list[str]) -> dict[str, float]:
     return {k: (0.0 if k in excluded_keys else round(WEIGHTS[k] * scale, 6)) for k in WEIGHTS}
 
 
+def _fetch_past_lessons(ticker: str, max_rules: int = 5) -> str:
+    """
+    Obsidian ログから過去の失敗・成功教訓を抽出し、CriticAgent 用テキストを返す。
+    対象: outcome=CLOSED かつ action=SELL のログ（負の損益を優先）
+    """
+    import re
+    logs_dir = Path("data/knowledge_base/obsidian_logs")
+    if not logs_dir.exists():
+        return "（過去ログなし）"
+
+    lessons: list[str] = []
+    for log_file in sorted(logs_dir.glob(f"*_{ticker.upper()}_SELL.md"), reverse=True):
+        try:
+            text = log_file.read_text(encoding="utf-8")
+            if "outcome: CLOSED" not in text:
+                continue
+            pl_match = re.search(r"profit_loss:\s*([^\n]+)", text)
+            pl_str   = pl_match.group(1).strip() if pl_match else "?"
+            rule_start = text.find("## 4.")
+            if rule_start != -1:
+                rule_end = text.find("\n## 5.", rule_start)
+                rule_sec = text[rule_start: rule_end if rule_end != -1 else rule_start + 400]
+                lessons.append(f"損益 {pl_str}: {rule_sec.strip()}")
+        except Exception:
+            continue
+
+    if not lessons:
+        return "（対象銘柄の過去教訓なし）"
+    return "\n\n".join(lessons[:max_rules])
+
+
 def run_trade_cycle(
     ticker: str             = TARGET_TICKER,
     dry_run: bool           = False,
@@ -1131,6 +1218,42 @@ def run_trade_cycle(
     def _write_excluded(agent_name: str, bbs_key: str) -> None:
         bbs.write(agent_name, bbs_key, {"trend": "neutral", "excluded": True,
                                         "trend_reason": f"{agent_name} 除外済"})
+
+    # ── Alpaca クライアント初期化 & portfolio 同期 ──────────────────
+    _alpaca: _AlpacaClient | None = None
+    if not mock_mode:
+        try:
+            _alpaca = _AlpacaClient()
+            _log("[Portfolio] Alpaca ポジションと portfolio.json を同期中...")
+            _sync = _alpaca.sync_portfolio(_PORTFOLIO_PATH)
+            _log(f"[Portfolio] 同期完了: Alpaca={_sync['alpaca_positions']} 件  "
+                 f"追加={_sync['added']}  除去={_sync['removed']}")
+            is_open, market_msg = _alpaca.is_market_open()
+            market_icon = "🟢" if is_open else "🔴"
+            _log(f"[Market] {market_icon} {market_msg}")
+        except Exception as _e:
+            _log(f"[Alpaca] 初期化エラー: {_e} — dry_run モードで継続")
+            _alpaca = None
+
+    # ── Stage 0: Selling Loop（保有ポジション売却チェック）─────────
+    _stage_header(0, "Selling Loop  [ExitAgent]")
+    exit_results = ExitAgent(bbs).run(
+        mock_mode=mock_mode,
+        alpaca_client=_alpaca if not dry_run else None,
+        phase_tag="S0",
+    )
+    if exit_results:
+        sell_tickers = [r["ticker"] for r in exit_results if r["action"] == "SELL"]
+        if sell_tickers and notify_line:
+            for r in [r for r in exit_results if r["action"] == "SELL"]:
+                order = r.get("order_result", {})
+                send_line_message(
+                    f"【ECC 売却実行】{r['ticker']}\n"
+                    f"種別: {r['exit_type']}\n"
+                    f"理由: {r['reason']}\n"
+                    f"損益: {r['pnl_pct']:+.2f}%\n"
+                    + (f"注文ID: {order.get('order_id')}" if order.get("order_id") else "")
+                )
 
     # ── Stage 1: 安価シグナルスキャン ────────────────────────────
     _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
@@ -1260,38 +1383,116 @@ def run_trade_cycle(
         if mock_mode:
             _run_mock_risk(bbs, ticker)
         else:
-            # hybrid_mode=True の場合もリアル yfinance で ATR・価格を取得
             RiskAgent(bbs).run(ticker)
 
         risk_data  = bbs.read("risk_analysis") or {}
         rec_shares = risk_data.get("recommended_shares", 1)
 
+        # ── CriticAgent による監査（Ollama 到達可能時のみ有効）──────
+        proceed_with_buy = True
+        if not mock_mode and not dry_run and not hybrid_mode:
+            _phase_header("S4.5", "CriticAgent")
+            _log("ManagerAgent の判断を過去教訓で監査中...")
+            _sep()
+            _critic_rules = _fetch_past_lessons(ticker)
+            _critic       = _CriticAgentImpl()
+            _critic_res   = _critic.evaluate_trade(
+                ticker          = ticker,
+                manager_action  = judgment.get("decision", "HOLD"),
+                manager_context = judgment.get("rationale", ""),
+                retrieved_rules = _critic_rules,
+            )
+            _is_fallback = "API障害" in _critic_res.get("critique_reason", "") or \
+                           "フォールバック" in _critic_res.get("critique_reason", "")
+            _cd = _critic_res.get("critic_decision", "HOLD")
+            _icon_c = "✅" if _cd == "APPROVE" else ("⚠️" if _is_fallback else "❌")
+            _log(f"{_icon_c} 判定: {_cd}  理由: {_critic_res.get('critique_reason','')[:65]}")
+
+            if _cd == "OVERRIDE":
+                _log("❌ CriticAgent OVERRIDE → 発注キャンセル")
+                proceed_with_buy = False
+                judgment["critic_override"]   = True
+                judgment["critic_reason"]     = _critic_res.get("critique_reason")
+            elif _is_fallback:
+                _log("⚠️  Ollama 未接続（フォールバック） → BUY 継続")
+            else:
+                _log(f"✅ {_cd} → BUY 継続")
+            bbs.write("CriticAgent", "critic_judgment", _critic_res)
+            _phase_footer()
+
+        # ── 発注 ────────────────────────────────────────────────
         _sep()
         _log(f"Alpaca に {ticker} {rec_shares}株 買い注文を送信します...")
-        if dry_run or mock_mode or hybrid_mode:
-            if hybrid_mode:
-                label = "hybrid_mode"
-            elif mock_mode:
-                label = "mock_mode"
-            else:
-                label = "dry_run"
+        if not proceed_with_buy:
+            _log("  CriticAgent OVERRIDE のため発注スキップ")
+            order_result = {"skipped": True, "skip_reason": "CriticAgent OVERRIDE"}
+        elif dry_run or mock_mode or hybrid_mode:
+            label = "hybrid_mode" if hybrid_mode else ("mock_mode" if mock_mode else "dry_run")
             _log(f"  ({label}=True のため実際の発注はスキップ)")
             order_result = {
                 "dry_run": True, "mock": mock_mode or hybrid_mode,
                 "symbol": ticker, "qty": rec_shares, "side": "buy",
             }
+        elif _alpaca is not None:
+            order_result = _alpaca.place_buy(ticker, rec_shares)
+            if order_result.get("success"):
+                _log(f"  ✅ 注文完了: order_id={order_result.get('order_id')}")
+                _log(f"     status  : {order_result.get('status')}")
+                _log(f"     symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
+            elif order_result.get("skipped"):
+                _log(f"  ⏭  注文スキップ: {order_result.get('skip_reason')}")
+            else:
+                _log(f"  ❌ 発注エラー: {order_result.get('error')}")
         else:
+            # Alpaca 初期化失敗時のフォールバック
             try:
                 order_result = _alpaca_mod.place_market_order(ticker, rec_shares, "buy")
-                _log(f"  注文完了: order_id={order_result.get('order_id')}")
-                _log(f"  status  : {order_result.get('status')}")
-                _log(f"  symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
+                _log(f"  注文完了 (fallback): order_id={order_result.get('order_id')}")
             except Exception as e:
                 order_result = {"error": str(e)}
                 _log(f"  発注エラー: {e}")
 
         judgment["order"] = order_result
         bbs.write("ManagerAgent", "manager_judgment", judgment)
+
+        # ── ポートフォリオ登録（注文成功 or dry_run/mock 時のみ）──
+        _order_ok = (
+            order_result.get("success")                   # live 成功
+            or order_result.get("dry_run")                # dry_run / mock
+        )
+        if _order_ok:
+            try:
+                _entry_price = risk_data.get("current_price", 0.0)
+                _stop_price  = risk_data.get("stop_loss_price")
+                _fill_price  = order_result.get("fill_price")  # Alpaca 約定価格
+                _actual_entry = _fill_price or _entry_price
+                _buy_log = _ObsidianLogger().save_log({
+                    "ticker":  ticker,
+                    "action":  "BUY",
+                    "context": (
+                        f"{judgment.get('rationale', '(根拠なし)')}\n"
+                        + (
+                            f"--- Alpaca 注文 ---\n"
+                            f"注文ID: {order_result.get('order_id', 'N/A')}\n"
+                            f"ステータス: {order_result.get('status', 'N/A')}\n"
+                            f"約定価格: ${_fill_price:.2f}" if _fill_price else ""
+                        )
+                    ),
+                    "tags": ["entry", ticker.lower(), session_id],
+                })
+                _log(f"  [Obsidian] 購入ログ保存: {_buy_log.name}")
+                _portfolio_add(
+                    ticker          = ticker,
+                    entry_price     = _actual_entry,
+                    shares          = rec_shares,
+                    target_price    = round(_actual_entry * 1.10, 2) if _actual_entry else None,
+                    stop_loss_price = _stop_price,
+                    buy_log_file    = _buy_log.name,
+                    thesis          = judgment.get("rationale", ""),
+                )
+                _log(f"  [Portfolio] {ticker} ×{rec_shares} を portfolio.json に登録しました")
+            except Exception as e:
+                _log(f"  [Portfolio] 登録エラー（ログは保存済）: {e}")
 
     # ── 最終結果表示 ─────────────────────────────────────────────
     decision   = judgment.get("decision", _HOLD_LABEL)

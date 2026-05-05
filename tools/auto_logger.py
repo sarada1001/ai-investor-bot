@@ -47,6 +47,73 @@ class ObsidianLogger:
     # Public API
     # ----------------------------------------------------------
 
+    def close_log(
+        self,
+        log_path: "Path | str",
+        outcome: str,
+        profit_loss: str,
+        sell_log_name: str = "",
+        exit_type: str = "",
+        exit_reason: str = "",
+        sell_price: float = 0.0,
+        sell_date: str = "",
+    ) -> None:
+        """
+        既存の PENDING BUY ログを CLOSED に更新し、売却情報セクションを追記する。
+
+        Args:
+            log_path:      更新対象の Markdown ファイルパス
+            outcome:       新しい outcome 値（例: "CLOSED"）
+            profit_loss:   損益文字列（例: "+12.50%", "-4.80%"）
+            sell_log_name: 売却ログのファイル名（Obsidian [[リンク]] 用）
+            exit_type:     売却種別（TAKE_PROFIT / STOP_LOSS / THESIS_BROKEN）
+            exit_reason:   売却理由の詳細テキスト
+            sell_price:    売却時の株価
+            sell_date:     売却日（YYYY-MM-DD）
+        """
+        path = Path(log_path)
+        if not path.exists():
+            logger.warning("close_log: ファイルが見つかりません: %s", path)
+            return
+        try:
+            text = path.read_text(encoding="utf-8")
+
+            # YAML フロントマターの outcome を更新（英語・日本語デフォルト両対応）
+            for old_oc in ("outcome: PENDING", "outcome: 決済待ち"):
+                if old_oc in text:
+                    text = text.replace(old_oc, f"outcome: {outcome}", 1)
+                    break
+
+            # profit_loss フィールド（複数の初期値に対応）
+            for old_pl in ("profit_loss: N/A", "profit_loss: 未確定", "profit_loss: 決済待ち"):
+                if old_pl in text:
+                    text = text.replace(old_pl, f"profit_loss: {profit_loss}", 1)
+                    break
+
+            # H1 タイトル行を更新（英語・日本語デフォルト両対応）
+            for old_title in ("[PENDING]", "[決済待ち]"):
+                if old_title in text:
+                    text = text.replace(old_title, f"[{outcome}]", 1)
+                    break
+
+            # 売却情報セクションを末尾に追記（二重追記防止）
+            if "## 5. 売却記録" not in text:
+                sell_link = f"[[{sell_log_name}]]" if sell_log_name else "(なし)"
+                text += (
+                    f"\n\n## 5. 売却記録\n\n"
+                    f"- **売却日**: {sell_date or date.today().isoformat()}\n"
+                    f"- **売却価格**: ${sell_price:.2f}\n"
+                    f"- **損益**: {profit_loss}\n"
+                    f"- **売却種別**: {exit_type}\n"
+                    f"- **売却理由**: {exit_reason}\n"
+                    f"- **売却ログ**: {sell_link}\n"
+                )
+
+            path.write_text(text, encoding="utf-8")
+            logger.info("close_log: %s を %s に更新しました", path.name, outcome)
+        except Exception as e:
+            logger.error("close_log: 更新エラー (%s): %s", path.name, e)
+
     def save_log(self, trade_data: dict) -> Path:
         """
         trade_data を受け取り、Markdown ログを生成・保存する。
