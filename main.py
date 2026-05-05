@@ -1556,6 +1556,97 @@ def run_trade_cycle(
 
 
 # =========================================================
+# デーモンモード（24時間自動取引ループ）
+# =========================================================
+
+DAEMON_INTERVAL_SECS = 3_600  # 開場中の次回評価までのデフォルト間隔（1時間）
+
+
+def _daemon_header(ticker: str, interval_secs: int) -> None:
+    bar = "◆" * (_W + 2)
+    h   = interval_secs // 3600
+    m   = (interval_secs % 3600) // 60
+    print(f"\n{bar}")
+    print(f"  🤖  [DAEMON MODE]  24時間自動取引ボット起動  🤖")
+    print(f"  対象ティッカー      : {ticker}")
+    print(f"  開場中インターバル  : {h}h {m:02d}m  ({interval_secs}秒)")
+    print(f"  停止方法            : Ctrl+C")
+    print(f"{bar}\n")
+
+
+def run_daemon(
+    ticker: str        = TARGET_TICKER,
+    notify_line: bool  = False,
+    mock_mode: bool    = False,
+    hybrid_mode: bool  = False,
+    excluded_agents: list[str] | None = None,
+    interval_secs: int = DAEMON_INTERVAL_SECS,
+) -> None:
+    """
+    デーモンモード: 市場開閉に合わせて自動でスリープ/実行を繰り返す無限ループ。
+
+    - 開場中  : Stage 0〜4 のフルパイプラインを実行 → interval_secs 後に再評価
+    - 閉場中  : Alpaca から next_open を取得 → その時刻まで冬眠
+    - エラー時: 60 秒後にリトライ
+    """
+    _daemon_header(ticker, interval_secs)
+
+    while True:
+        # ── 市場状態チェック ─────────────────────────────────────
+        try:
+            _alpaca_chk = _AlpacaClient()
+            is_open, market_msg = _alpaca_chk.is_market_open()
+        except Exception as e:
+            _log(f"[Daemon] Alpaca 接続エラー: {e} → 60秒後にリトライ")
+            time.sleep(60)
+            continue
+
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\n{'━' * (_W + 2)}")
+        print(f"  [Daemon] {now_str}  市場状態: {market_msg}")
+        print(f"{'━' * (_W + 2)}")
+
+        if is_open:
+            # ── 開場中: フルパイプライン実行 ─────────────────────
+            try:
+                run_trade_cycle(
+                    ticker=ticker,
+                    dry_run=False,
+                    notify_line=notify_line,
+                    mock_mode=mock_mode,
+                    hybrid_mode=hybrid_mode,
+                    excluded_agents=excluded_agents,
+                )
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                _log(f"[Daemon] パイプライン実行エラー: {e}")
+
+            next_check = datetime.datetime.now() + datetime.timedelta(seconds=interval_secs)
+            h = interval_secs // 3600
+            m = (interval_secs % 3600) // 60
+            _log(
+                f"[Daemon] 次回評価まで {h}h {m:02d}m スリープします "
+                f"(再開: {next_check.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            time.sleep(interval_secs)
+
+        else:
+            # ── 閉場中: 次回開場まで冬眠 ─────────────────────────
+            sleep_secs = _alpaca_chk.get_next_open_seconds()
+            wake_dt    = datetime.datetime.now() + datetime.timedelta(seconds=sleep_secs)
+            wake_str   = wake_dt.strftime("%Y-%m-%d %H:%M:%S")
+            h = sleep_secs // 3600
+            m = (sleep_secs % 3600) // 60
+            print(f"\n╔{'═' * _W}╗")
+            print(f"║  [Daemon] 市場閉場中。".ljust(_W + 1) + "║")
+            print(f"║  次回開場時刻の {wake_str} までスリープします。".ljust(_W + 1) + "║")
+            print(f"║  ({h}h {m:02d}m 後に自動起動)".ljust(_W + 1) + "║")
+            print(f"╚{'═' * _W}╝\n")
+            time.sleep(sleep_secs)
+
+
+# =========================================================
 # CLI エントリポイント
 # =========================================================
 
@@ -1595,13 +1686,35 @@ if __name__ == "__main__":
              "指定したエージェントはスキップされ、ウェイトは残存エージェントに再配分される。"
              "アブレーション実験用。",
     )
+    parser.add_argument(
+        "--daemon", "--auto", action="store_true", dest="daemon",
+        help=(
+            "デーモンモード: 24時間稼働の自動取引ループ。"
+            "開場中はフルパイプラインを実行し --interval 秒後に再評価。"
+            "閉場中は Alpaca の next_open まで冬眠する。"
+        ),
+    )
+    parser.add_argument(
+        "--interval", type=int, default=DAEMON_INTERVAL_SECS, metavar="SECONDS",
+        help="デーモンモード: 市場開場中の評価間隔（秒, デフォルト: 3600=1時間）",
+    )
     args = parser.parse_args()
 
-    run_trade_cycle(
-        ticker=args.ticker,
-        dry_run=args.dry_run,
-        notify_line=args.notify_line,
-        mock_mode=args.mock,
-        hybrid_mode=args.hybrid,
-        excluded_agents=args.exclude,
-    )
+    if args.daemon:
+        run_daemon(
+            ticker=args.ticker,
+            notify_line=args.notify_line,
+            mock_mode=args.mock,
+            hybrid_mode=args.hybrid,
+            excluded_agents=args.exclude,
+            interval_secs=args.interval,
+        )
+    else:
+        run_trade_cycle(
+            ticker=args.ticker,
+            dry_run=args.dry_run,
+            notify_line=args.notify_line,
+            mock_mode=args.mock,
+            hybrid_mode=args.hybrid,
+            excluded_agents=args.exclude,
+        )
