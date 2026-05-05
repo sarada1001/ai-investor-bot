@@ -6,9 +6,24 @@ DATETIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMIT_MSG="auto-backup: ${DATETIME} (定期バックアップ)"
 
 if [ -n "$(git status -s)" ]; then
-    git add .
-    git commit -m "${COMMIT_MSG}"
-    COMMIT_HASH=$(git rev-parse HEAD)
+    # Obsidian ログ（reflexion logs）を専用メッセージで先にコミット
+    OBSIDIAN_DIR="data/knowledge_base/obsidian_logs"
+    if [ -n "$(git status -s "${OBSIDIAN_DIR}" 2>/dev/null)" ]; then
+        git add "${OBSIDIAN_DIR}"
+        LOG_COUNT=$(git diff --cached --name-only | grep -c "\.md$" || true)
+        git commit -m "logs: add reflexion log(s) [${DATETIME}] (${LOG_COUNT} file(s))"
+        echo "[${DATETIME}] Obsidian ログをコミット (${LOG_COUNT} ファイル)"
+    fi
+
+    # 残りの変更を一括バックアップ
+    if [ -z "$(git status -s)" ]; then
+        echo "[${DATETIME}] ログのみ変更 — バックアップコミットをスキップ"
+        COMMIT_HASH=$(git rev-parse HEAD)
+    else
+        git add .
+        git commit -m "${COMMIT_MSG}"
+        COMMIT_HASH=$(git rev-parse HEAD)
+    fi
 
     README="README.md"
     SECTION="## 🔄 Development History"

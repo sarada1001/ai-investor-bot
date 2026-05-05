@@ -1,0 +1,50 @@
+{
+  "date": "2026-05-04",
+  "top3": [
+    {
+      "ticker": "NCLH",
+      "score": 0.6717,
+      "price": 17.200000762939453,
+      "rsi": 26.2,
+      "rsi_score": 0.126,
+      "rsi_label": "RSI=26.2（売られすぎ）",
+      "vol_ratio": 2.89,
+      "vol_score": 0.944,
+      "vol_label": "出来高2.9倍スパイク",
+      "ma_dev_pct": -10.83,
+      "ma_score": 1.0,
+      "ma_label": "MA20から10.8%下方乖離",
+      "reason": "RSI=26.2（売られすぎ） / 出来高2.9倍スパイク / MA20から10.8%下方乖離"
+    },
+    {
+      "ticker": "FDX",
+      "score": 0.65,
+      "price": 357.79998779296875,
+      "rsi": 36.1,
+      "rsi_score": 0.0,
+      "rsi_label": "RSI=36.1（中立域）",
+      "vol_ratio": 3.8,
+      "vol_score": 1.0,
+      "vol_label": "出来高3.8倍スパイク",
+      "ma_dev_pct": -6.31,
+      "ma_score": 1.0,
+      "ma_label": "MA20から6.3%下方乖離",
+      "reason": "出来高3.8倍スパイク / MA20から6.3%下方乖離"
+    },
+    {
+      "ticker": "TSCO",
+      "score": 0.6234,
+      "price": 32.310001373291016,
+      "rsi": 6.9,
+      "rsi_score": 0.77,
+      "rsi_label": "RSI=6.9（売られすぎ）",
+      "vol_ratio": 1.52,
+      "vol_score": 0.26,
+      "vol_label": "出来高1.5倍スパイク",
+      "ma_dev_pct": -20.22,
+      "ma_score": 1.0,
+      "ma_label": "MA20から20.2%下方乖離",
+      "reason": "RSI=6.9（売られすぎ） / 出来高1.5倍スパイク / MA20から20.2%下方乖離"
+    }
+  ]
+}
