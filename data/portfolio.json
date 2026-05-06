@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "updated_at": "2026-05-05T10:41:48.439112",
+  "updated_at": "2026-05-05T22:35:46.118412",
   "_doc": {
     "positions[].id": "pos_{YYYYMMDD}_{TICKER} — 一意識別子",
     "positions[].ticker": "銘柄コード（大文字）",
@@ -18,12 +18,12 @@
       "id": "pos_20260505_AAPL",
       "ticker": "AAPL",
       "entry_date": "2026-05-05",
-      "entry_price": 268.49,
-      "shares": 3,
-      "target_price": 203.5,
-      "stop_loss_price": 172.5,
-      "buy_log_file": "Log_20260505_AAPL_BUY_3.md",
-      "thesis": "[MOCK] 5シグナル総合: score=+0.8000 (FA=+1.0, Tech=+1.0, Macro=+0.0, News=+1.0, Social=+1.00). Social Hype=0.80→FA+Tech確認済・ペナルティなし",
+      "entry_price": 280.8449,
+      "shares": 89,
+      "target_price": 308.26,
+      "stop_loss_price": 266.84,
+      "buy_log_file": "Log_20260505_AAPL_BUY_5.md",
+      "thesis": "AAPLはSTRONG BUY。市場リスクオン環境、好調なファンダメンタルズ（売上・利益成長、収益性改善）、テクニカル指標（MACDゴールデンクロス、SMA上方乖離）が強気判断を裏付け。SNSセンチメントはデータ不足で判断保留。短期的な上昇トレンドに期待。",
       "status": "OPEN"
     }
   ]

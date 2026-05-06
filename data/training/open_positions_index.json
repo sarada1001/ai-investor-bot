@@ -79,6 +79,18 @@
       "session_id": "20260505_104147",
       "entry_date": "2026-05-05",
       "entry_price": null
+    },
+    {
+      "record_id": "0fb7726f-bca2-42a7-bfeb-b7a83ef1d935",
+      "session_id": "20260505_155728",
+      "entry_date": "2026-05-05",
+      "entry_price": null
+    },
+    {
+      "record_id": "e8906feb-0df0-4c12-8e4a-7805400f55c3",
+      "session_id": "20260505_161424",
+      "entry_date": "2026-05-05",
+      "entry_price": null
     }
   ]
 }

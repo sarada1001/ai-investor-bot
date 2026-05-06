@@ -1,0 +1,50 @@
+{
+  "date": "2026-05-05",
+  "top3": [
+    {
+      "ticker": "HII",
+      "score": 0.8527,
+      "price": 326.1300048828125,
+      "rsi": 12.6,
+      "rsi_score": 0.579,
+      "rsi_label": "RSI=12.6（売られすぎ）",
+      "vol_ratio": 3.09,
+      "vol_score": 1.0,
+      "vol_label": "出来高3.1倍スパイク",
+      "ma_dev_pct": -13.65,
+      "ma_score": 1.0,
+      "ma_label": "MA20から13.7%下方乖離",
+      "reason": "RSI=12.6（売られすぎ） / 出来高3.1倍スパイク / MA20から13.7%下方乖離"
+    },
+    {
+      "ticker": "APTV",
+      "score": 0.7668,
+      "price": 54.83000183105469,
+      "rsi": 20.0,
+      "rsi_score": 0.334,
+      "rsi_label": "RSI=20.0（売られすぎ）",
+      "vol_ratio": 3.76,
+      "vol_score": 1.0,
+      "vol_label": "出来高3.8倍スパイク",
+      "ma_dev_pct": -7.86,
+      "ma_score": 1.0,
+      "ma_label": "MA20から7.9%下方乖離",
+      "reason": "RSI=20.0（売られすぎ） / 出来高3.8倍スパイク / MA20から7.9%下方乖離"
+    },
+    {
+      "ticker": "POOL",
+      "score": 0.729,
+      "price": 187.0399932861328,
+      "rsi": 23.2,
+      "rsi_score": 0.226,
+      "rsi_label": "RSI=23.2（売られすぎ）",
+      "vol_ratio": 3.45,
+      "vol_score": 1.0,
+      "vol_label": "出来高3.5倍スパイク",
+      "ma_dev_pct": -14.53,
+      "ma_score": 1.0,
+      "ma_label": "MA20から14.5%下方乖離",
+      "reason": "RSI=23.2（売られすぎ） / 出来高3.5倍スパイク / MA20から14.5%下方乖離"
+    }
+  ]
+}
