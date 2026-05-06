@@ -9,7 +9,7 @@ DESKTOP_IP = "100.105.163.75"
 OLLAMA_URL = f"http://{DESKTOP_IP}:11434/api/generate"
 
 # クラウド環境でのプロジェクトルート
-PROJECT_ROOT = "/home/naito/exa-investor"
+PROJECT_ROOT = "/home/naito/ai-investor-bot"
 
 # 保存先: Obsidian用フォルダ (後で手元のPCと同期)
 VAULT_PATH = os.path.join(PROJECT_ROOT, "docs")

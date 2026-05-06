@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd /home/naito/exa-investor || { echo "ERROR: ディレクトリ移動失敗"; exit 1; }
+cd /home/naito/ai-investor-bot || { echo "ERROR: ディレクトリ移動失敗"; exit 1; }
 
 DATETIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMIT_MSG="auto-backup: ${DATETIME} (定期バックアップ)"

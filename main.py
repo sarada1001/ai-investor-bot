@@ -278,6 +278,7 @@ LINE_USER_ID      = os.getenv("LINE_USER_ID", "")
 
 def send_line_message(text: str) -> None:
     if not LINE_ACCESS_TOKEN or not LINE_USER_ID:
+        _log("[LINE] スキップ: LINE_ACCESS_TOKEN または LINE_USER_ID が未設定 (.env を確認)")
         return
     try:
         requests.post(

@@ -1,0 +1,4395 @@
+{
+  "date": "2026-05-06",
+  "results": [
+    {
+      "ticker": "NKE",
+      "score": 8,
+      "rsi": 29.16,
+      "macd_hist": 0.2402,
+      "sma25_diff_pct": -3.87,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -33.93,
+      "reason": "RSI売られすぎ(29.2)+3 / MACDゴールデン+2 / SMA25押し目(-3.9%)+2 / 52w押し目(-33.9%)+1"
+    },
+    {
+      "ticker": "GEHC",
+      "score": 7,
+      "rsi": 28.98,
+      "macd_hist": -1.1106,
+      "sma25_diff_pct": -12.41,
+      "volume_ratio": 2.18,
+      "drawdown_52w_pct": -27.53,
+      "reason": "RSI売られすぎ(29.0)+3 / MACD加速+1 / 出来高急増(2.2x)+2 / 52w押し目(-27.5%)+1"
+    },
+    {
+      "ticker": "RMD",
+      "score": 7,
+      "rsi": 33.38,
+      "macd_hist": -1.062,
+      "sma25_diff_pct": -6.34,
+      "volume_ratio": 1.62,
+      "drawdown_52w_pct": -24.5,
+      "reason": "RSI売られすぎ(33.4)+3 / MACD加速+1 / 出来高急増(1.6x)+2 / 52w押し目(-24.5%)+1"
+    },
+    {
+      "ticker": "UHS",
+      "score": 7,
+      "rsi": 34.2,
+      "macd_hist": -0.6985,
+      "sma25_diff_pct": -6.63,
+      "volume_ratio": 1.52,
+      "drawdown_52w_pct": -29.64,
+      "reason": "RSI売られすぎ(34.2)+3 / MACD加速+1 / 出来高急増(1.5x)+2 / 52w押し目(-29.6%)+1"
+    },
+    {
+      "ticker": "HSY",
+      "score": 7,
+      "rsi": 33.3,
+      "macd_hist": 0.0129,
+      "sma25_diff_pct": -5.2,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -21.74,
+      "reason": "RSI売られすぎ(33.3)+3 / MACDゴールデン+2 / MACD加速+1 / 52w押し目(-21.7%)+1"
+    },
+    {
+      "ticker": "CAG",
+      "score": 7,
+      "rsi": 39.53,
+      "macd_hist": 0.0796,
+      "sma25_diff_pct": -2.99,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -28.31,
+      "reason": "RSI弱め(39.5)+1 / MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-3.0%)+2 / 52w押し目(-28.3%)+1"
+    },
+    {
+      "ticker": "TKO",
+      "score": 7,
+      "rsi": 42.71,
+      "macd_hist": 0.4463,
+      "sma25_diff_pct": -2.0,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -16.57,
+      "reason": "RSI弱め(42.7)+1 / MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-2.0%)+2 / 52w押し目(-16.6%)+1"
+    },
+    {
+      "ticker": "CLX",
+      "score": 6,
+      "rsi": 25.4,
+      "macd_hist": -1.0731,
+      "sma25_diff_pct": -12.94,
+      "volume_ratio": 1.91,
+      "drawdown_52w_pct": -31.42,
+      "reason": "RSI売られすぎ(25.4)+3 / 出来高急増(1.9x)+2 / 52w押し目(-31.4%)+1"
+    },
+    {
+      "ticker": "PODD",
+      "score": 6,
+      "rsi": 29.24,
+      "macd_hist": -1.4603,
+      "sma25_diff_pct": -13.11,
+      "volume_ratio": 1.89,
+      "drawdown_52w_pct": -35.08,
+      "reason": "RSI売られすぎ(29.2)+3 / MACD加速+1 / 出来高急増(1.9x)+2"
+    },
+    {
+      "ticker": "WTW",
+      "score": 6,
+      "rsi": 26.54,
+      "macd_hist": -3.7752,
+      "sma25_diff_pct": -9.03,
+      "volume_ratio": 1.64,
+      "drawdown_52w_pct": -21.12,
+      "reason": "RSI売られすぎ(26.5)+3 / 出来高急増(1.6x)+2 / 52w押し目(-21.1%)+1"
+    },
+    {
+      "ticker": "BAX",
+      "score": 6,
+      "rsi": 41.11,
+      "macd_hist": -0.1366,
+      "sma25_diff_pct": -4.52,
+      "volume_ratio": 1.56,
+      "drawdown_52w_pct": -24.75,
+      "reason": "RSI弱め(41.1)+1 / SMA25押し目(-4.5%)+2 / 出来高急増(1.6x)+2 / 52w押し目(-24.8%)+1"
+    },
+    {
+      "ticker": "HSIC",
+      "score": 6,
+      "rsi": 44.87,
+      "macd_hist": -0.4729,
+      "sma25_diff_pct": -1.96,
+      "volume_ratio": 1.54,
+      "drawdown_52w_pct": -10.77,
+      "reason": "RSI弱め(44.9)+1 / MACD加速+1 / SMA25押し目(-2.0%)+2 / 出来高急増(1.5x)+2"
+    },
+    {
+      "ticker": "HII",
+      "score": 6,
+      "rsi": 23.95,
+      "macd_hist": -3.0636,
+      "sma25_diff_pct": -14.48,
+      "volume_ratio": 1.51,
+      "drawdown_52w_pct": -28.12,
+      "reason": "RSI売られすぎ(23.9)+3 / 出来高急増(1.5x)+2 / 52w押し目(-28.1%)+1"
+    },
+    {
+      "ticker": "IDXX",
+      "score": 6,
+      "rsi": 44.81,
+      "macd_hist": 0.0551,
+      "sma25_diff_pct": -1.54,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -14.79,
+      "reason": "RSI弱め(44.8)+1 / MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-1.5%)+2"
+    },
+    {
+      "ticker": "RCL",
+      "score": 6,
+      "rsi": 46.01,
+      "macd_hist": 0.0375,
+      "sma25_diff_pct": -2.54,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -23.75,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-2.5%)+2 / 52w押し目(-23.8%)+1"
+    },
+    {
+      "ticker": "GILD",
+      "score": 6,
+      "rsi": 44.53,
+      "macd_hist": 0.1848,
+      "sma25_diff_pct": -1.77,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -13.84,
+      "reason": "RSI弱め(44.5)+1 / MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-1.8%)+2"
+    },
+    {
+      "ticker": "HRL",
+      "score": 6,
+      "rsi": 41.75,
+      "macd_hist": 0.0408,
+      "sma25_diff_pct": -1.39,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -17.72,
+      "reason": "RSI弱め(41.8)+1 / MACDゴールデン+2 / SMA25押し目(-1.4%)+2 / 52w押し目(-17.7%)+1"
+    },
+    {
+      "ticker": "GIS",
+      "score": 6,
+      "rsi": 37.53,
+      "macd_hist": 0.158,
+      "sma25_diff_pct": -2.34,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": -28.31,
+      "reason": "RSI弱め(37.5)+1 / MACDゴールデン+2 / SMA25押し目(-2.3%)+2 / 52w押し目(-28.3%)+1"
+    },
+    {
+      "ticker": "AXON",
+      "score": 6,
+      "rsi": 39.8,
+      "macd_hist": 2.5441,
+      "sma25_diff_pct": -3.54,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -34.28,
+      "reason": "RSI弱め(39.8)+1 / MACDゴールデン+2 / SMA25押し目(-3.5%)+2 / 52w押し目(-34.3%)+1"
+    },
+    {
+      "ticker": "CME",
+      "score": 6,
+      "rsi": 42.95,
+      "macd_hist": 0.4608,
+      "sma25_diff_pct": -2.15,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -10.04,
+      "reason": "RSI弱め(43.0)+1 / MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-2.1%)+2"
+    },
+    {
+      "ticker": "SYY",
+      "score": 6,
+      "rsi": 39.44,
+      "macd_hist": 0.1055,
+      "sma25_diff_pct": -1.6,
+      "volume_ratio": 0.77,
+      "drawdown_52w_pct": -19.49,
+      "reason": "RSI弱め(39.4)+1 / MACDゴールデン+2 / SMA25押し目(-1.6%)+2 / 52w押し目(-19.5%)+1"
+    },
+    {
+      "ticker": "NOW",
+      "score": 6,
+      "rsi": 45.99,
+      "macd_hist": 0.3496,
+      "sma25_diff_pct": -2.5,
+      "volume_ratio": 0.71,
+      "drawdown_52w_pct": -26.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-2.5%)+2 / 52w押し目(-26.0%)+1"
+    },
+    {
+      "ticker": "QCOM",
+      "score": 5,
+      "rsi": 78.79,
+      "macd_hist": 4.8684,
+      "sma25_diff_pct": 31.61,
+      "volume_ratio": 1.84,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 出来高急増(1.8x)+2"
+    },
+    {
+      "ticker": "FE",
+      "score": 5,
+      "rsi": 24.73,
+      "macd_hist": -0.4163,
+      "sma25_diff_pct": -7.76,
+      "volume_ratio": 1.78,
+      "drawdown_52w_pct": -11.62,
+      "reason": "RSI売られすぎ(24.7)+3 / 出来高急増(1.8x)+2"
+    },
+    {
+      "ticker": "PH",
+      "score": 5,
+      "rsi": 33.82,
+      "macd_hist": -12.7474,
+      "sma25_diff_pct": -7.77,
+      "volume_ratio": 1.73,
+      "drawdown_52w_pct": -14.69,
+      "reason": "RSI売られすぎ(33.8)+3 / 出来高急増(1.7x)+2"
+    },
+    {
+      "ticker": "BLDR",
+      "score": 5,
+      "rsi": 31.09,
+      "macd_hist": -1.2934,
+      "sma25_diff_pct": -11.5,
+      "volume_ratio": 1.69,
+      "drawdown_52w_pct": -41.94,
+      "reason": "RSI売られすぎ(31.1)+3 / 出来高急増(1.7x)+2"
+    },
+    {
+      "ticker": "STX",
+      "score": 5,
+      "rsi": 86.33,
+      "macd_hist": 17.9376,
+      "sma25_diff_pct": 38.73,
+      "volume_ratio": 1.65,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "DTE",
+      "score": 5,
+      "rsi": 42.75,
+      "macd_hist": -0.2314,
+      "sma25_diff_pct": -2.59,
+      "volume_ratio": 1.64,
+      "drawdown_52w_pct": -5.4,
+      "reason": "RSI弱め(42.8)+1 / SMA25押し目(-2.6%)+2 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "GPN",
+      "score": 5,
+      "rsi": 48.35,
+      "macd_hist": 0.2679,
+      "sma25_diff_pct": 1.24,
+      "volume_ratio": 1.56,
+      "drawdown_52w_pct": -15.49,
+      "reason": "MACDゴールデン+2 / 出来高急増(1.6x)+2 / 52w押し目(-15.5%)+1"
+    },
+    {
+      "ticker": "SWKS",
+      "score": 5,
+      "rsi": 77.86,
+      "macd_hist": 1.2124,
+      "sma25_diff_pct": 20.53,
+      "volume_ratio": 1.56,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "ADM",
+      "score": 5,
+      "rsi": 73.88,
+      "macd_hist": 0.9313,
+      "sma25_diff_pct": 10.79,
+      "volume_ratio": 1.53,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 出来高急増(1.5x)+2"
+    },
+    {
+      "ticker": "TAP",
+      "score": 5,
+      "rsi": 42.57,
+      "macd_hist": -0.1177,
+      "sma25_diff_pct": -2.86,
+      "volume_ratio": 1.39,
+      "drawdown_52w_pct": -21.62,
+      "reason": "RSI弱め(42.6)+1 / MACD加速+1 / SMA25押し目(-2.9%)+2 / 52w押し目(-21.6%)+1"
+    },
+    {
+      "ticker": "APTV",
+      "score": 5,
+      "rsi": 29.61,
+      "macd_hist": 0.2055,
+      "sma25_diff_pct": -8.69,
+      "volume_ratio": 1.37,
+      "drawdown_52w_pct": -35.65,
+      "reason": "RSI売られすぎ(29.6)+3 / MACDゴールデン+2"
+    },
+    {
+      "ticker": "DXCM",
+      "score": 5,
+      "rsi": 40.43,
+      "macd_hist": -0.0814,
+      "sma25_diff_pct": -4.41,
+      "volume_ratio": 1.37,
+      "drawdown_52w_pct": -20.03,
+      "reason": "RSI弱め(40.4)+1 / MACD加速+1 / SMA25押し目(-4.4%)+2 / 52w押し目(-20.0%)+1"
+    },
+    {
+      "ticker": "CHD",
+      "score": 5,
+      "rsi": 42.67,
+      "macd_hist": 0.005,
+      "sma25_diff_pct": -1.24,
+      "volume_ratio": 1.33,
+      "drawdown_52w_pct": -11.14,
+      "reason": "RSI弱め(42.7)+1 / MACDゴールデン+2 / SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "CSGP",
+      "score": 5,
+      "rsi": 33.93,
+      "macd_hist": -0.084,
+      "sma25_diff_pct": -7.62,
+      "volume_ratio": 1.28,
+      "drawdown_52w_pct": -31.51,
+      "reason": "RSI売られすぎ(33.9)+3 / MACD加速+1 / 52w押し目(-31.5%)+1"
+    },
+    {
+      "ticker": "AMGN",
+      "score": 5,
+      "rsi": 36.63,
+      "macd_hist": -1.4666,
+      "sma25_diff_pct": -4.49,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -15.09,
+      "reason": "RSI弱め(36.6)+1 / MACD加速+1 / SMA25押し目(-4.5%)+2 / 52w押し目(-15.1%)+1"
+    },
+    {
+      "ticker": "LULU",
+      "score": 5,
+      "rsi": 29.15,
+      "macd_hist": -2.6897,
+      "sma25_diff_pct": -14.86,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -30.48,
+      "reason": "RSI売られすぎ(29.1)+3 / MACD加速+1 / 52w押し目(-30.5%)+1"
+    },
+    {
+      "ticker": "ZBH",
+      "score": 5,
+      "rsi": 34.48,
+      "macd_hist": -1.1466,
+      "sma25_diff_pct": -8.21,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": -17.58,
+      "reason": "RSI売られすぎ(34.5)+3 / MACD加速+1 / 52w押し目(-17.6%)+1"
+    },
+    {
+      "ticker": "COO",
+      "score": 5,
+      "rsi": 24.46,
+      "macd_hist": -0.3798,
+      "sma25_diff_pct": -9.41,
+      "volume_ratio": 1.17,
+      "drawdown_52w_pct": -27.14,
+      "reason": "RSI売られすぎ(24.5)+3 / MACD加速+1 / 52w押し目(-27.1%)+1"
+    },
+    {
+      "ticker": "AVY",
+      "score": 5,
+      "rsi": 38.1,
+      "macd_hist": -0.4149,
+      "sma25_diff_pct": -3.81,
+      "volume_ratio": 1.16,
+      "drawdown_52w_pct": -17.56,
+      "reason": "RSI弱め(38.1)+1 / MACD加速+1 / SMA25押し目(-3.8%)+2 / 52w押し目(-17.6%)+1"
+    },
+    {
+      "ticker": "MCD",
+      "score": 5,
+      "rsi": 31.19,
+      "macd_hist": -1.242,
+      "sma25_diff_pct": -5.29,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -15.92,
+      "reason": "RSI売られすぎ(31.2)+3 / MACD加速+1 / 52w押し目(-15.9%)+1"
+    },
+    {
+      "ticker": "VRTX",
+      "score": 5,
+      "rsi": 39.52,
+      "macd_hist": 0.0295,
+      "sma25_diff_pct": -2.6,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -14.99,
+      "reason": "RSI弱め(39.5)+1 / MACDゴールデン+2 / SMA25押し目(-2.6%)+2"
+    },
+    {
+      "ticker": "CTSH",
+      "score": 5,
+      "rsi": 23.71,
+      "macd_hist": -0.5268,
+      "sma25_diff_pct": -10.76,
+      "volume_ratio": 1.13,
+      "drawdown_52w_pct": -32.36,
+      "reason": "RSI売られすぎ(23.7)+3 / MACD加速+1 / 52w押し目(-32.4%)+1"
+    },
+    {
+      "ticker": "DUK",
+      "score": 5,
+      "rsi": 46.64,
+      "macd_hist": 0.0032,
+      "sma25_diff_pct": -1.17,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -4.41,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "JKHY",
+      "score": 5,
+      "rsi": 36.41,
+      "macd_hist": 0.1875,
+      "sma25_diff_pct": -2.89,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -13.54,
+      "reason": "RSI弱め(36.4)+1 / MACDゴールデン+2 / SMA25押し目(-2.9%)+2"
+    },
+    {
+      "ticker": "COR",
+      "score": 5,
+      "rsi": 37.95,
+      "macd_hist": -0.0897,
+      "sma25_diff_pct": -3.09,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -17.91,
+      "reason": "RSI弱め(38.0)+1 / MACD加速+1 / SMA25押し目(-3.1%)+2 / 52w押し目(-17.9%)+1"
+    },
+    {
+      "ticker": "WSM",
+      "score": 5,
+      "rsi": 40.77,
+      "macd_hist": -1.7321,
+      "sma25_diff_pct": -4.05,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -17.98,
+      "reason": "RSI弱め(40.8)+1 / MACD加速+1 / SMA25押し目(-4.0%)+2 / 52w押し目(-18.0%)+1"
+    },
+    {
+      "ticker": "DG",
+      "score": 5,
+      "rsi": 42.18,
+      "macd_hist": -0.0529,
+      "sma25_diff_pct": -2.31,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": -24.75,
+      "reason": "RSI弱め(42.2)+1 / MACD加速+1 / SMA25押し目(-2.3%)+2 / 52w押し目(-24.8%)+1"
+    },
+    {
+      "ticker": "ULTA",
+      "score": 5,
+      "rsi": 44.06,
+      "macd_hist": -0.3482,
+      "sma25_diff_pct": -1.43,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": -24.66,
+      "reason": "RSI弱め(44.1)+1 / MACD加速+1 / SMA25押し目(-1.4%)+2 / 52w押し目(-24.7%)+1"
+    },
+    {
+      "ticker": "BRK-B",
+      "score": 5,
+      "rsi": 35.46,
+      "macd_hist": 0.0304,
+      "sma25_diff_pct": -1.94,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -8.38,
+      "reason": "RSI弱め(35.5)+1 / MACDゴールデン+2 / SMA25押し目(-1.9%)+2"
+    },
+    {
+      "ticker": "ACN",
+      "score": 5,
+      "rsi": 37.38,
+      "macd_hist": -0.2327,
+      "sma25_diff_pct": -4.77,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -25.05,
+      "reason": "RSI弱め(37.4)+1 / MACD加速+1 / SMA25押し目(-4.8%)+2 / 52w押し目(-25.1%)+1"
+    },
+    {
+      "ticker": "DPZ",
+      "score": 5,
+      "rsi": 33.5,
+      "macd_hist": -2.8961,
+      "sma25_diff_pct": -7.8,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -19.81,
+      "reason": "RSI売られすぎ(33.5)+3 / MACD加速+1 / 52w押し目(-19.8%)+1"
+    },
+    {
+      "ticker": "WM",
+      "score": 5,
+      "rsi": 44.02,
+      "macd_hist": 0.1341,
+      "sma25_diff_pct": -1.88,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -8.57,
+      "reason": "RSI弱め(44.0)+1 / MACDゴールデン+2 / SMA25押し目(-1.9%)+2"
+    },
+    {
+      "ticker": "MMM",
+      "score": 5,
+      "rsi": 39.65,
+      "macd_hist": -0.4177,
+      "sma25_diff_pct": -3.0,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -17.84,
+      "reason": "RSI弱め(39.6)+1 / MACD加速+1 / SMA25押し目(-3.0%)+2 / 52w押し目(-17.8%)+1"
+    },
+    {
+      "ticker": "ECL",
+      "score": 5,
+      "rsi": 37.93,
+      "macd_hist": -1.1681,
+      "sma25_diff_pct": -3.75,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -16.22,
+      "reason": "RSI弱め(37.9)+1 / MACD加速+1 / SMA25押し目(-3.8%)+2 / 52w押し目(-16.2%)+1"
+    },
+    {
+      "ticker": "PTC",
+      "score": 5,
+      "rsi": 44.89,
+      "macd_hist": 0.5244,
+      "sma25_diff_pct": -0.91,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -16.26,
+      "reason": "RSI弱め(44.9)+1 / MACDゴールデン+2 / MACD加速+1 / 52w押し目(-16.3%)+1"
+    },
+    {
+      "ticker": "DHR",
+      "score": 5,
+      "rsi": 32.34,
+      "macd_hist": -1.1867,
+      "sma25_diff_pct": -6.83,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -20.45,
+      "reason": "RSI売られすぎ(32.3)+3 / MACD加速+1 / 52w押し目(-20.4%)+1"
+    },
+    {
+      "ticker": "HCA",
+      "score": 5,
+      "rsi": 29.75,
+      "macd_hist": -3.3123,
+      "sma25_diff_pct": -8.53,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -21.22,
+      "reason": "RSI売られすぎ(29.8)+3 / MACD加速+1 / 52w押し目(-21.2%)+1"
+    },
+    {
+      "ticker": "RTX",
+      "score": 5,
+      "rsi": 29.02,
+      "macd_hist": -1.2141,
+      "sma25_diff_pct": -8.41,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -18.52,
+      "reason": "RSI売られすぎ(29.0)+3 / MACD加速+1 / 52w押し目(-18.5%)+1"
+    },
+    {
+      "ticker": "LMT",
+      "score": 5,
+      "rsi": 25.42,
+      "macd_hist": -3.6291,
+      "sma25_diff_pct": -11.42,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -24.79,
+      "reason": "RSI売られすぎ(25.4)+3 / MACD加速+1 / 52w押し目(-24.8%)+1"
+    },
+    {
+      "ticker": "KR",
+      "score": 5,
+      "rsi": 44.17,
+      "macd_hist": 0.0289,
+      "sma25_diff_pct": -2.7,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -11.48,
+      "reason": "RSI弱め(44.2)+1 / MACDゴールデン+2 / SMA25押し目(-2.7%)+2"
+    },
+    {
+      "ticker": "HON",
+      "score": 5,
+      "rsi": 32.29,
+      "macd_hist": -1.1327,
+      "sma25_diff_pct": -6.36,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -15.72,
+      "reason": "RSI売られすぎ(32.3)+3 / MACD加速+1 / 52w押し目(-15.7%)+1"
+    },
+    {
+      "ticker": "NOC",
+      "score": 5,
+      "rsi": 18.73,
+      "macd_hist": -4.1133,
+      "sma25_diff_pct": -12.26,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -27.27,
+      "reason": "RSI売られすぎ(18.7)+3 / MACD加速+1 / 52w押し目(-27.3%)+1"
+    },
+    {
+      "ticker": "GPC",
+      "score": 5,
+      "rsi": 41.25,
+      "macd_hist": -0.4786,
+      "sma25_diff_pct": -3.26,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -29.49,
+      "reason": "RSI弱め(41.2)+1 / MACD加速+1 / SMA25押し目(-3.3%)+2 / 52w押し目(-29.5%)+1"
+    },
+    {
+      "ticker": "XYL",
+      "score": 5,
+      "rsi": 39.69,
+      "macd_hist": -0.7068,
+      "sma25_diff_pct": -4.73,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -17.83,
+      "reason": "RSI弱め(39.7)+1 / MACD加速+1 / SMA25押し目(-4.7%)+2 / 52w押し目(-17.8%)+1"
+    },
+    {
+      "ticker": "T",
+      "score": 5,
+      "rsi": 42.61,
+      "macd_hist": 0.0412,
+      "sma25_diff_pct": -2.28,
+      "volume_ratio": 0.8,
+      "drawdown_52w_pct": -10.07,
+      "reason": "RSI弱め(42.6)+1 / MACDゴールデン+2 / SMA25押し目(-2.3%)+2"
+    },
+    {
+      "ticker": "IBM",
+      "score": 5,
+      "rsi": 39.88,
+      "macd_hist": -0.9978,
+      "sma25_diff_pct": -4.52,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -22.95,
+      "reason": "RSI弱め(39.9)+1 / MACD加速+1 / SMA25押し目(-4.5%)+2 / 52w押し目(-22.9%)+1"
+    },
+    {
+      "ticker": "EBAY",
+      "score": 4,
+      "rsi": 59.57,
+      "macd_hist": 0.0633,
+      "sma25_diff_pct": 4.8,
+      "volume_ratio": 1.79,
+      "drawdown_52w_pct": -3.72,
+      "reason": "MACDゴールデン+2 / 出来高急増(1.8x)+2"
+    },
+    {
+      "ticker": "TXT",
+      "score": 4,
+      "rsi": 51.37,
+      "macd_hist": 0.3598,
+      "sma25_diff_pct": 1.24,
+      "volume_ratio": 1.62,
+      "drawdown_52w_pct": -9.05,
+      "reason": "MACDゴールデン+2 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "LNT",
+      "score": 4,
+      "rsi": 57.48,
+      "macd_hist": 0.1414,
+      "sma25_diff_pct": 1.3,
+      "volume_ratio": 1.53,
+      "drawdown_52w_pct": -1.34,
+      "reason": "MACDゴールデン+2 / 出来高急増(1.5x)+2"
+    },
+    {
+      "ticker": "GNRC",
+      "score": 4,
+      "rsi": 76.85,
+      "macd_hist": 5.3723,
+      "sma25_diff_pct": 21.02,
+      "volume_ratio": 1.52,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / 出来高急増(1.5x)+2"
+    },
+    {
+      "ticker": "BRO",
+      "score": 4,
+      "rsi": 24.12,
+      "macd_hist": -1.0344,
+      "sma25_diff_pct": -11.7,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": -22.05,
+      "reason": "RSI売られすぎ(24.1)+3 / 52w押し目(-22.1%)+1"
+    },
+    {
+      "ticker": "SYK",
+      "score": 4,
+      "rsi": 25.25,
+      "macd_hist": -3.9018,
+      "sma25_diff_pct": -10.01,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": -23.59,
+      "reason": "RSI売られすぎ(25.2)+3 / 52w押し目(-23.6%)+1"
+    },
+    {
+      "ticker": "AOS",
+      "score": 4,
+      "rsi": 27.84,
+      "macd_hist": -0.413,
+      "sma25_diff_pct": -7.95,
+      "volume_ratio": 1.49,
+      "drawdown_52w_pct": -26.41,
+      "reason": "RSI売られすぎ(27.8)+3 / 52w押し目(-26.4%)+1"
+    },
+    {
+      "ticker": "CMG",
+      "score": 4,
+      "rsi": 40.26,
+      "macd_hist": -0.2462,
+      "sma25_diff_pct": -4.75,
+      "volume_ratio": 1.48,
+      "drawdown_52w_pct": -18.39,
+      "reason": "RSI弱め(40.3)+1 / SMA25押し目(-4.8%)+2 / 52w押し目(-18.4%)+1"
+    },
+    {
+      "ticker": "LH",
+      "score": 4,
+      "rsi": 39.78,
+      "macd_hist": -1.1688,
+      "sma25_diff_pct": -3.32,
+      "volume_ratio": 1.47,
+      "drawdown_52w_pct": -11.07,
+      "reason": "RSI弱め(39.8)+1 / MACD加速+1 / SMA25押し目(-3.3%)+2"
+    },
+    {
+      "ticker": "LDOS",
+      "score": 4,
+      "rsi": 26.43,
+      "macd_hist": -0.309,
+      "sma25_diff_pct": -10.11,
+      "volume_ratio": 1.45,
+      "drawdown_52w_pct": -29.37,
+      "reason": "RSI売られすぎ(26.4)+3 / 52w押し目(-29.4%)+1"
+    },
+    {
+      "ticker": "UPS",
+      "score": 4,
+      "rsi": 40.32,
+      "macd_hist": -0.7443,
+      "sma25_diff_pct": -4.83,
+      "volume_ratio": 1.4,
+      "drawdown_52w_pct": -17.14,
+      "reason": "RSI弱め(40.3)+1 / SMA25押し目(-4.8%)+2 / 52w押し目(-17.1%)+1"
+    },
+    {
+      "ticker": "SW",
+      "score": 4,
+      "rsi": 46.21,
+      "macd_hist": -0.1792,
+      "sma25_diff_pct": -2.57,
+      "volume_ratio": 1.37,
+      "drawdown_52w_pct": -23.78,
+      "reason": "MACD加速+1 / SMA25押し目(-2.6%)+2 / 52w押し目(-23.8%)+1"
+    },
+    {
+      "ticker": "CCL",
+      "score": 4,
+      "rsi": 43.05,
+      "macd_hist": -0.1716,
+      "sma25_diff_pct": -4.6,
+      "volume_ratio": 1.36,
+      "drawdown_52w_pct": -23.83,
+      "reason": "RSI弱め(43.0)+1 / SMA25押し目(-4.6%)+2 / 52w押し目(-23.8%)+1"
+    },
+    {
+      "ticker": "F",
+      "score": 4,
+      "rsi": 38.58,
+      "macd_hist": -0.0991,
+      "sma25_diff_pct": -4.12,
+      "volume_ratio": 1.33,
+      "drawdown_52w_pct": -18.99,
+      "reason": "RSI弱め(38.6)+1 / SMA25押し目(-4.1%)+2 / 52w押し目(-19.0%)+1"
+    },
+    {
+      "ticker": "TSCO",
+      "score": 4,
+      "rsi": 17.13,
+      "macd_hist": -0.6323,
+      "sma25_diff_pct": -20.03,
+      "volume_ratio": 1.33,
+      "drawdown_52w_pct": -40.97,
+      "reason": "RSI売られすぎ(17.1)+3 / MACD加速+1"
+    },
+    {
+      "ticker": "ICE",
+      "score": 4,
+      "rsi": 42.17,
+      "macd_hist": -0.5216,
+      "sma25_diff_pct": -3.09,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -8.08,
+      "reason": "RSI弱め(42.2)+1 / MACD加速+1 / SMA25押し目(-3.1%)+2"
+    },
+    {
+      "ticker": "SOLV",
+      "score": 4,
+      "rsi": 54.66,
+      "macd_hist": 0.0135,
+      "sma25_diff_pct": 2.68,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -15.28,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-15.3%)+1"
+    },
+    {
+      "ticker": "CHRW",
+      "score": 4,
+      "rsi": 41.06,
+      "macd_hist": -1.6202,
+      "sma25_diff_pct": -4.52,
+      "volume_ratio": 1.29,
+      "drawdown_52w_pct": -16.4,
+      "reason": "RSI弱め(41.1)+1 / SMA25押し目(-4.5%)+2 / 52w押し目(-16.4%)+1"
+    },
+    {
+      "ticker": "ACGL",
+      "score": 4,
+      "rsi": 41.61,
+      "macd_hist": -0.4027,
+      "sma25_diff_pct": -2.36,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -6.85,
+      "reason": "RSI弱め(41.6)+1 / MACD加速+1 / SMA25押し目(-2.4%)+2"
+    },
+    {
+      "ticker": "AES",
+      "score": 4,
+      "rsi": 57.36,
+      "macd_hist": 0.0207,
+      "sma25_diff_pct": 0.89,
+      "volume_ratio": 1.26,
+      "drawdown_52w_pct": -15.81,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-15.8%)+1"
+    },
+    {
+      "ticker": "CHTR",
+      "score": 4,
+      "rsi": 29.16,
+      "macd_hist": -6.4869,
+      "sma25_diff_pct": -24.1,
+      "volume_ratio": 1.25,
+      "drawdown_52w_pct": -36.25,
+      "reason": "RSI売られすぎ(29.2)+3 / MACD加速+1"
+    },
+    {
+      "ticker": "EL",
+      "score": 4,
+      "rsi": 60.83,
+      "macd_hist": 1.2913,
+      "sma25_diff_pct": 9.99,
+      "volume_ratio": 1.25,
+      "drawdown_52w_pct": -27.91,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-27.9%)+1"
+    },
+    {
+      "ticker": "BR",
+      "score": 4,
+      "rsi": 36.9,
+      "macd_hist": -0.038,
+      "sma25_diff_pct": -3.97,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -22.3,
+      "reason": "RSI弱め(36.9)+1 / SMA25押し目(-4.0%)+2 / 52w押し目(-22.3%)+1"
+    },
+    {
+      "ticker": "PNR",
+      "score": 4,
+      "rsi": 28.69,
+      "macd_hist": -1.2872,
+      "sma25_diff_pct": -10.5,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -24.14,
+      "reason": "RSI売られすぎ(28.7)+3 / 52w押し目(-24.1%)+1"
+    },
+    {
+      "ticker": "BALL",
+      "score": 4,
+      "rsi": 32.48,
+      "macd_hist": -0.4262,
+      "sma25_diff_pct": -7.36,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -15.47,
+      "reason": "RSI売られすぎ(32.5)+3 / 52w押し目(-15.5%)+1"
+    },
+    {
+      "ticker": "LHX",
+      "score": 4,
+      "rsi": 24.12,
+      "macd_hist": -3.3106,
+      "sma25_diff_pct": -10.93,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -19.76,
+      "reason": "RSI売られすぎ(24.1)+3 / 52w押し目(-19.8%)+1"
+    },
+    {
+      "ticker": "PEG",
+      "score": 4,
+      "rsi": 45.37,
+      "macd_hist": 0.0075,
+      "sma25_diff_pct": -1.59,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -7.57,
+      "reason": "MACDゴールデン+2 / SMA25押し目(-1.6%)+2"
+    },
+    {
+      "ticker": "AON",
+      "score": 4,
+      "rsi": 39.46,
+      "macd_hist": -1.4032,
+      "sma25_diff_pct": -2.53,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": -7.79,
+      "reason": "RSI弱め(39.5)+1 / MACD加速+1 / SMA25押し目(-2.5%)+2"
+    },
+    {
+      "ticker": "MDT",
+      "score": 4,
+      "rsi": 27.27,
+      "macd_hist": -0.4616,
+      "sma25_diff_pct": -7.81,
+      "volume_ratio": 1.18,
+      "drawdown_52w_pct": -23.79,
+      "reason": "RSI売られすぎ(27.3)+3 / 52w押し目(-23.8%)+1"
+    },
+    {
+      "ticker": "EIX",
+      "score": 4,
+      "rsi": 42.51,
+      "macd_hist": -0.1805,
+      "sma25_diff_pct": -3.16,
+      "volume_ratio": 1.16,
+      "drawdown_52w_pct": -9.17,
+      "reason": "RSI弱め(42.5)+1 / MACD加速+1 / SMA25押し目(-3.2%)+2"
+    },
+    {
+      "ticker": "ALLE",
+      "score": 4,
+      "rsi": 30.81,
+      "macd_hist": -1.0026,
+      "sma25_diff_pct": -6.99,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -26.13,
+      "reason": "RSI売られすぎ(30.8)+3 / 52w押し目(-26.1%)+1"
+    },
+    {
+      "ticker": "MCK",
+      "score": 4,
+      "rsi": 26.19,
+      "macd_hist": -1.9615,
+      "sma25_diff_pct": -5.49,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -19.55,
+      "reason": "RSI売られすぎ(26.2)+3 / 52w押し目(-19.6%)+1"
+    },
+    {
+      "ticker": "POOL",
+      "score": 4,
+      "rsi": 28.18,
+      "macd_hist": -3.7688,
+      "sma25_diff_pct": -13.22,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -30.69,
+      "reason": "RSI売られすぎ(28.2)+3 / 52w押し目(-30.7%)+1"
+    },
+    {
+      "ticker": "MRK",
+      "score": 4,
+      "rsi": 43.83,
+      "macd_hist": -0.1723,
+      "sma25_diff_pct": -2.79,
+      "volume_ratio": 1.12,
+      "drawdown_52w_pct": -8.14,
+      "reason": "RSI弱め(43.8)+1 / MACD加速+1 / SMA25押し目(-2.8%)+2"
+    },
+    {
+      "ticker": "STE",
+      "score": 4,
+      "rsi": 37.22,
+      "macd_hist": -0.7463,
+      "sma25_diff_pct": -3.43,
+      "volume_ratio": 1.11,
+      "drawdown_52w_pct": -16.38,
+      "reason": "RSI弱め(37.2)+1 / SMA25押し目(-3.4%)+2 / 52w押し目(-16.4%)+1"
+    },
+    {
+      "ticker": "PFE",
+      "score": 4,
+      "rsi": 42.87,
+      "macd_hist": -0.0781,
+      "sma25_diff_pct": -2.55,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -7.36,
+      "reason": "RSI弱め(42.9)+1 / MACD加速+1 / SMA25押し目(-2.5%)+2"
+    },
+    {
+      "ticker": "ABT",
+      "score": 4,
+      "rsi": 25.32,
+      "macd_hist": -0.3882,
+      "sma25_diff_pct": -9.38,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -24.61,
+      "reason": "RSI売られすぎ(25.3)+3 / 52w押し目(-24.6%)+1"
+    },
+    {
+      "ticker": "ARE",
+      "score": 4,
+      "rsi": 46.55,
+      "macd_hist": -0.278,
+      "sma25_diff_pct": -1.88,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -21.75,
+      "reason": "MACD加速+1 / SMA25押し目(-1.9%)+2 / 52w押し目(-21.8%)+1"
+    },
+    {
+      "ticker": "SHW",
+      "score": 4,
+      "rsi": 37.46,
+      "macd_hist": -2.5939,
+      "sma25_diff_pct": -4.83,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -15.96,
+      "reason": "RSI弱め(37.5)+1 / SMA25押し目(-4.8%)+2 / 52w押し目(-16.0%)+1"
+    },
+    {
+      "ticker": "HOOD",
+      "score": 4,
+      "rsi": 49.31,
+      "macd_hist": -1.1403,
+      "sma25_diff_pct": -1.06,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -15.61,
+      "reason": "MACD加速+1 / SMA25押し目(-1.1%)+2 / 52w押し目(-15.6%)+1"
+    },
+    {
+      "ticker": "BDX",
+      "score": 4,
+      "rsi": 29.81,
+      "macd_hist": -0.6775,
+      "sma25_diff_pct": -6.07,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -21.74,
+      "reason": "RSI売られすぎ(29.8)+3 / 52w押し目(-21.7%)+1"
+    },
+    {
+      "ticker": "TTD",
+      "score": 4,
+      "rsi": 57.02,
+      "macd_hist": 0.2877,
+      "sma25_diff_pct": 8.87,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -17.39,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-17.4%)+1"
+    },
+    {
+      "ticker": "TPR",
+      "score": 4,
+      "rsi": 43.57,
+      "macd_hist": -0.9408,
+      "sma25_diff_pct": -3.59,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -11.66,
+      "reason": "RSI弱め(43.6)+1 / MACD加速+1 / SMA25押し目(-3.6%)+2"
+    },
+    {
+      "ticker": "BSX",
+      "score": 4,
+      "rsi": 32.67,
+      "macd_hist": -0.3621,
+      "sma25_diff_pct": -8.68,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": -27.16,
+      "reason": "RSI売られすぎ(32.7)+3 / 52w押し目(-27.2%)+1"
+    },
+    {
+      "ticker": "CTAS",
+      "score": 4,
+      "rsi": 37.02,
+      "macd_hist": -0.3017,
+      "sma25_diff_pct": -2.77,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": -17.25,
+      "reason": "RSI弱め(37.0)+1 / SMA25押し目(-2.8%)+2 / 52w押し目(-17.2%)+1"
+    },
+    {
+      "ticker": "GE",
+      "score": 4,
+      "rsi": 45.42,
+      "macd_hist": -0.3161,
+      "sma25_diff_pct": -2.42,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -16.96,
+      "reason": "MACD加速+1 / SMA25押し目(-2.4%)+2 / 52w押し目(-17.0%)+1"
+    },
+    {
+      "ticker": "PLTR",
+      "score": 4,
+      "rsi": 44.3,
+      "macd_hist": -0.1945,
+      "sma25_diff_pct": -4.41,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -15.5,
+      "reason": "RSI弱め(44.3)+1 / SMA25押し目(-4.4%)+2 / 52w押し目(-15.5%)+1"
+    },
+    {
+      "ticker": "PPG",
+      "score": 4,
+      "rsi": 46.3,
+      "macd_hist": -0.4929,
+      "sma25_diff_pct": -2.03,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -18.65,
+      "reason": "MACD加速+1 / SMA25押し目(-2.0%)+2 / 52w押し目(-18.6%)+1"
+    },
+    {
+      "ticker": "DLTR",
+      "score": 4,
+      "rsi": 33.13,
+      "macd_hist": -0.4707,
+      "sma25_diff_pct": -8.23,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -30.35,
+      "reason": "RSI売られすぎ(33.1)+3 / 52w押し目(-30.4%)+1"
+    },
+    {
+      "ticker": "EPAM",
+      "score": 4,
+      "rsi": 25.82,
+      "macd_hist": -0.9625,
+      "sma25_diff_pct": -12.08,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -42.78,
+      "reason": "RSI売られすぎ(25.8)+3 / MACD加速+1"
+    },
+    {
+      "ticker": "BBY",
+      "score": 4,
+      "rsi": 33.02,
+      "macd_hist": -0.5711,
+      "sma25_diff_pct": -8.27,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -17.42,
+      "reason": "RSI売られすぎ(33.0)+3 / 52w押し目(-17.4%)+1"
+    },
+    {
+      "ticker": "OTIS",
+      "score": 4,
+      "rsi": 35.71,
+      "macd_hist": -0.1713,
+      "sma25_diff_pct": -3.97,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -19.23,
+      "reason": "RSI弱め(35.7)+1 / SMA25押し目(-4.0%)+2 / 52w押し目(-19.2%)+1"
+    },
+    {
+      "ticker": "CBRE",
+      "score": 4,
+      "rsi": 47.78,
+      "macd_hist": -0.9853,
+      "sma25_diff_pct": -1.08,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -16.62,
+      "reason": "MACD加速+1 / SMA25押し目(-1.1%)+2 / 52w押し目(-16.6%)+1"
+    },
+    {
+      "ticker": "GEN",
+      "score": 4,
+      "rsi": 52.08,
+      "macd_hist": 0.113,
+      "sma25_diff_pct": 2.42,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -21.27,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-21.3%)+1"
+    },
+    {
+      "ticker": "NVR",
+      "score": 4,
+      "rsi": 32.62,
+      "macd_hist": -72.2402,
+      "sma25_diff_pct": -8.96,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -25.85,
+      "reason": "RSI売られすぎ(32.6)+3 / 52w押し目(-25.9%)+1"
+    },
+    {
+      "ticker": "LUV",
+      "score": 4,
+      "rsi": 49.32,
+      "macd_hist": 0.1028,
+      "sma25_diff_pct": 1.01,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -27.22,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-27.2%)+1"
+    },
+    {
+      "ticker": "JNJ",
+      "score": 4,
+      "rsi": 37.55,
+      "macd_hist": -0.3568,
+      "sma25_diff_pct": -3.54,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -9.26,
+      "reason": "RSI弱め(37.5)+1 / MACD加速+1 / SMA25押し目(-3.5%)+2"
+    },
+    {
+      "ticker": "LEN",
+      "score": 4,
+      "rsi": 38.53,
+      "macd_hist": -0.3156,
+      "sma25_diff_pct": -3.63,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -29.13,
+      "reason": "RSI弱め(38.5)+1 / SMA25押し目(-3.6%)+2 / 52w押し目(-29.1%)+1"
+    },
+    {
+      "ticker": "MRSH",
+      "score": 4,
+      "rsi": 38.94,
+      "macd_hist": -0.7262,
+      "sma25_diff_pct": -3.04,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -9.97,
+      "reason": "RSI弱め(38.9)+1 / MACD加速+1 / SMA25押し目(-3.0%)+2"
+    },
+    {
+      "ticker": "PHM",
+      "score": 4,
+      "rsi": 42.21,
+      "macd_hist": -0.9329,
+      "sma25_diff_pct": -3.39,
+      "volume_ratio": 0.88,
+      "drawdown_52w_pct": -17.07,
+      "reason": "RSI弱め(42.2)+1 / SMA25押し目(-3.4%)+2 / 52w押し目(-17.1%)+1"
+    },
+    {
+      "ticker": "ROL",
+      "score": 4,
+      "rsi": 41.52,
+      "macd_hist": -0.044,
+      "sma25_diff_pct": -1.33,
+      "volume_ratio": 0.88,
+      "drawdown_52w_pct": -17.27,
+      "reason": "RSI弱め(41.5)+1 / SMA25押し目(-1.3%)+2 / 52w押し目(-17.3%)+1"
+    },
+    {
+      "ticker": "FICO",
+      "score": 4,
+      "rsi": 50.6,
+      "macd_hist": 13.0532,
+      "sma25_diff_pct": 2.63,
+      "volume_ratio": 0.87,
+      "drawdown_52w_pct": -27.76,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-27.8%)+1"
+    },
+    {
+      "ticker": "CPB",
+      "score": 4,
+      "rsi": 46.91,
+      "macd_hist": 0.1216,
+      "sma25_diff_pct": 0.08,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -27.84,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-27.8%)+1"
+    },
+    {
+      "ticker": "MKC",
+      "score": 4,
+      "rsi": 34.3,
+      "macd_hist": -0.061,
+      "sma25_diff_pct": -5.11,
+      "volume_ratio": 0.84,
+      "drawdown_52w_pct": -31.72,
+      "reason": "RSI売られすぎ(34.3)+3 / 52w押し目(-31.7%)+1"
+    },
+    {
+      "ticker": "NEM",
+      "score": 4,
+      "rsi": 47.22,
+      "macd_hist": -0.7035,
+      "sma25_diff_pct": -4.0,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -15.98,
+      "reason": "MACD加速+1 / SMA25押し目(-4.0%)+2 / 52w押し目(-16.0%)+1"
+    },
+    {
+      "ticker": "WDAY",
+      "score": 4,
+      "rsi": 52.42,
+      "macd_hist": 1.3979,
+      "sma25_diff_pct": 4.29,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -20.89,
+      "reason": "MACDゴールデン+2 / MACD加速+1 / 52w押し目(-20.9%)+1"
+    },
+    {
+      "ticker": "NFLX",
+      "score": 4,
+      "rsi": 33.98,
+      "macd_hist": -1.0764,
+      "sma25_diff_pct": -9.24,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -18.46,
+      "reason": "RSI売られすぎ(34.0)+3 / 52w押し目(-18.5%)+1"
+    },
+    {
+      "ticker": "CPRT",
+      "score": 4,
+      "rsi": 43.07,
+      "macd_hist": 0.0687,
+      "sma25_diff_pct": -0.38,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -17.86,
+      "reason": "RSI弱め(43.1)+1 / MACDゴールデン+2 / 52w押し目(-17.9%)+1"
+    },
+    {
+      "ticker": "TPL",
+      "score": 4,
+      "rsi": 43.78,
+      "macd_hist": 2.4508,
+      "sma25_diff_pct": -0.6,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -20.26,
+      "reason": "RSI弱め(43.8)+1 / MACDゴールデン+2 / 52w押し目(-20.3%)+1"
+    },
+    {
+      "ticker": "TER",
+      "score": 3,
+      "rsi": 51.72,
+      "macd_hist": -6.4742,
+      "sma25_diff_pct": 0.05,
+      "volume_ratio": 1.61,
+      "drawdown_52w_pct": -14.59,
+      "reason": "MACD加速+1 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "ODFL",
+      "score": 3,
+      "rsi": 40.14,
+      "macd_hist": -3.3522,
+      "sma25_diff_pct": -6.5,
+      "volume_ratio": 1.55,
+      "drawdown_52w_pct": -12.63,
+      "reason": "RSI弱め(40.1)+1 / 出来高急増(1.6x)+2"
+    },
+    {
+      "ticker": "AME",
+      "score": 3,
+      "rsi": 56.97,
+      "macd_hist": -0.2912,
+      "sma25_diff_pct": 2.13,
+      "volume_ratio": 1.54,
+      "drawdown_52w_pct": -2.71,
+      "reason": "MACD加速+1 / 出来高急増(1.5x)+2"
+    },
+    {
+      "ticker": "HUBB",
+      "score": 3,
+      "rsi": 43.18,
+      "macd_hist": -5.8456,
+      "sma25_diff_pct": -3.78,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": -8.97,
+      "reason": "RSI弱め(43.2)+1 / SMA25押し目(-3.8%)+2"
+    },
+    {
+      "ticker": "IRM",
+      "score": 3,
+      "rsi": 78.27,
+      "macd_hist": 1.3812,
+      "sma25_diff_pct": 15.26,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "META",
+      "score": 3,
+      "rsi": 40.73,
+      "macd_hist": -8.2231,
+      "sma25_diff_pct": -4.77,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": -12.14,
+      "reason": "RSI弱め(40.7)+1 / SMA25押し目(-4.8%)+2"
+    },
+    {
+      "ticker": "WDC",
+      "score": 3,
+      "rsi": 81.57,
+      "macd_hist": 5.2665,
+      "sma25_diff_pct": 25.78,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "DVA",
+      "score": 3,
+      "rsi": 58.56,
+      "macd_hist": 0.5914,
+      "sma25_diff_pct": 4.17,
+      "volume_ratio": 1.48,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PPL",
+      "score": 3,
+      "rsi": 39.07,
+      "macd_hist": -0.2069,
+      "sma25_diff_pct": -3.42,
+      "volume_ratio": 1.47,
+      "drawdown_52w_pct": -6.18,
+      "reason": "RSI弱め(39.1)+1 / SMA25押し目(-3.4%)+2"
+    },
+    {
+      "ticker": "BMY",
+      "score": 3,
+      "rsi": 42.19,
+      "macd_hist": -0.1393,
+      "sma25_diff_pct": -3.15,
+      "volume_ratio": 1.46,
+      "drawdown_52w_pct": -7.75,
+      "reason": "RSI弱め(42.2)+1 / SMA25押し目(-3.1%)+2"
+    },
+    {
+      "ticker": "PWR",
+      "score": 3,
+      "rsi": 86.3,
+      "macd_hist": 16.3866,
+      "sma25_diff_pct": 24.67,
+      "volume_ratio": 1.46,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "SO",
+      "score": 3,
+      "rsi": 53.29,
+      "macd_hist": 0.2723,
+      "sma25_diff_pct": 0.56,
+      "volume_ratio": 1.45,
+      "drawdown_52w_pct": -3.24,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AIZ",
+      "score": 3,
+      "rsi": 61.16,
+      "macd_hist": 0.5603,
+      "sma25_diff_pct": 4.82,
+      "volume_ratio": 1.44,
+      "drawdown_52w_pct": -2.14,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "L",
+      "score": 3,
+      "rsi": 39.7,
+      "macd_hist": -0.57,
+      "sma25_diff_pct": -3.3,
+      "volume_ratio": 1.44,
+      "drawdown_52w_pct": -5.7,
+      "reason": "RSI弱め(39.7)+1 / SMA25押し目(-3.3%)+2"
+    },
+    {
+      "ticker": "TSN",
+      "score": 3,
+      "rsi": 66.49,
+      "macd_hist": 0.3305,
+      "sma25_diff_pct": 5.79,
+      "volume_ratio": 1.44,
+      "drawdown_52w_pct": -0.45,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AIG",
+      "score": 3,
+      "rsi": 56.54,
+      "macd_hist": 0.1972,
+      "sma25_diff_pct": 2.42,
+      "volume_ratio": 1.43,
+      "drawdown_52w_pct": -2.7,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "LLY",
+      "score": 3,
+      "rsi": 61.44,
+      "macd_hist": 11.3614,
+      "sma25_diff_pct": 7.03,
+      "volume_ratio": 1.43,
+      "drawdown_52w_pct": -6.58,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "J",
+      "score": 3,
+      "rsi": 66.6,
+      "macd_hist": 1.0388,
+      "sma25_diff_pct": 6.78,
+      "volume_ratio": 1.42,
+      "drawdown_52w_pct": -9.43,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "MA",
+      "score": 3,
+      "rsi": 43.78,
+      "macd_hist": -1.2625,
+      "sma25_diff_pct": -1.8,
+      "volume_ratio": 1.42,
+      "drawdown_52w_pct": -9.26,
+      "reason": "RSI弱め(43.8)+1 / SMA25押し目(-1.8%)+2"
+    },
+    {
+      "ticker": "IP",
+      "score": 3,
+      "rsi": 38.74,
+      "macd_hist": -0.2027,
+      "sma25_diff_pct": -8.06,
+      "volume_ratio": 1.41,
+      "drawdown_52w_pct": -34.58,
+      "reason": "RSI弱め(38.7)+1 / MACD加速+1 / 52w押し目(-34.6%)+1"
+    },
+    {
+      "ticker": "ITW",
+      "score": 3,
+      "rsi": 37.2,
+      "macd_hist": -1.6778,
+      "sma25_diff_pct": -4.1,
+      "volume_ratio": 1.4,
+      "drawdown_52w_pct": -14.5,
+      "reason": "RSI弱め(37.2)+1 / SMA25押し目(-4.1%)+2"
+    },
+    {
+      "ticker": "FSLR",
+      "score": 3,
+      "rsi": 66.44,
+      "macd_hist": 2.9887,
+      "sma25_diff_pct": 10.89,
+      "volume_ratio": 1.38,
+      "drawdown_52w_pct": -9.8,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WY",
+      "score": 3,
+      "rsi": 40.77,
+      "macd_hist": -0.1533,
+      "sma25_diff_pct": -3.49,
+      "volume_ratio": 1.36,
+      "drawdown_52w_pct": -11.79,
+      "reason": "RSI弱め(40.8)+1 / SMA25押し目(-3.5%)+2"
+    },
+    {
+      "ticker": "EXPD",
+      "score": 3,
+      "rsi": 58.64,
+      "macd_hist": 0.0568,
+      "sma25_diff_pct": 4.47,
+      "volume_ratio": 1.34,
+      "drawdown_52w_pct": -7.25,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "FDX",
+      "score": 3,
+      "rsi": 42.23,
+      "macd_hist": -2.9243,
+      "sma25_diff_pct": -3.9,
+      "volume_ratio": 1.34,
+      "drawdown_52w_pct": -10.06,
+      "reason": "RSI弱め(42.2)+1 / SMA25押し目(-3.9%)+2"
+    },
+    {
+      "ticker": "PYPL",
+      "score": 3,
+      "rsi": 42.65,
+      "macd_hist": -0.3665,
+      "sma25_diff_pct": -3.94,
+      "volume_ratio": 1.33,
+      "drawdown_52w_pct": -9.66,
+      "reason": "RSI弱め(42.6)+1 / SMA25押し目(-3.9%)+2"
+    },
+    {
+      "ticker": "DD",
+      "score": 3,
+      "rsi": 62.75,
+      "macd_hist": 0.1335,
+      "sma25_diff_pct": 6.06,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -4.06,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "FRT",
+      "score": 3,
+      "rsi": 68.31,
+      "macd_hist": 0.2991,
+      "sma25_diff_pct": 4.66,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -0.03,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WAT",
+      "score": 3,
+      "rsi": 58.64,
+      "macd_hist": 0.4677,
+      "sma25_diff_pct": 8.77,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -10.11,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AAPL",
+      "score": 3,
+      "rsi": 66.55,
+      "macd_hist": 1.3196,
+      "sma25_diff_pct": 6.78,
+      "volume_ratio": 1.29,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "IT",
+      "score": 3,
+      "rsi": 47.0,
+      "macd_hist": -0.2549,
+      "sma25_diff_pct": -1.52,
+      "volume_ratio": 1.29,
+      "drawdown_52w_pct": -12.57,
+      "reason": "MACD加速+1 / SMA25押し目(-1.5%)+2"
+    },
+    {
+      "ticker": "CAT",
+      "score": 3,
+      "rsi": 74.08,
+      "macd_hist": 7.8373,
+      "sma25_diff_pct": 13.38,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ED",
+      "score": 3,
+      "rsi": 43.86,
+      "macd_hist": -0.0156,
+      "sma25_diff_pct": -1.9,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -5.47,
+      "reason": "RSI弱め(43.9)+1 / SMA25押し目(-1.9%)+2"
+    },
+    {
+      "ticker": "EXC",
+      "score": 3,
+      "rsi": 40.22,
+      "macd_hist": -0.0669,
+      "sma25_diff_pct": -2.97,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -8.17,
+      "reason": "RSI弱め(40.2)+1 / SMA25押し目(-3.0%)+2"
+    },
+    {
+      "ticker": "MAA",
+      "score": 3,
+      "rsi": 61.29,
+      "macd_hist": 0.4999,
+      "sma25_diff_pct": 3.53,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -3.44,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "OMC",
+      "score": 3,
+      "rsi": 55.03,
+      "macd_hist": 0.0025,
+      "sma25_diff_pct": 1.37,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": -8.61,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ROK",
+      "score": 3,
+      "rsi": 68.62,
+      "macd_hist": 0.991,
+      "sma25_diff_pct": 9.63,
+      "volume_ratio": 1.27,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "FISV",
+      "score": 3,
+      "rsi": 39.57,
+      "macd_hist": -0.2825,
+      "sma25_diff_pct": -4.31,
+      "volume_ratio": 1.26,
+      "drawdown_52w_pct": -10.7,
+      "reason": "RSI弱め(39.6)+1 / SMA25押し目(-4.3%)+2"
+    },
+    {
+      "ticker": "ALL",
+      "score": 3,
+      "rsi": 55.46,
+      "macd_hist": 0.1965,
+      "sma25_diff_pct": 2.23,
+      "volume_ratio": 1.25,
+      "drawdown_52w_pct": -0.62,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AEP",
+      "score": 3,
+      "rsi": 59.5,
+      "macd_hist": 0.0874,
+      "sma25_diff_pct": 2.0,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -0.08,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "RVTY",
+      "score": 3,
+      "rsi": 56.68,
+      "macd_hist": 0.0043,
+      "sma25_diff_pct": 3.25,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -11.82,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AMCR",
+      "score": 3,
+      "rsi": 38.86,
+      "macd_hist": -0.2095,
+      "sma25_diff_pct": -5.53,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -24.61,
+      "reason": "RSI弱め(38.9)+1 / MACD加速+1 / 52w押し目(-24.6%)+1"
+    },
+    {
+      "ticker": "GD",
+      "score": 3,
+      "rsi": 60.12,
+      "macd_hist": 3.5053,
+      "sma25_diff_pct": 3.73,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -4.19,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "TYL",
+      "score": 3,
+      "rsi": 44.46,
+      "macd_hist": -0.8574,
+      "sma25_diff_pct": -2.37,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -12.49,
+      "reason": "RSI弱め(44.5)+1 / SMA25押し目(-2.4%)+2"
+    },
+    {
+      "ticker": "VTRS",
+      "score": 3,
+      "rsi": 73.0,
+      "macd_hist": 0.1031,
+      "sma25_diff_pct": 8.73,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -2.96,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "APH",
+      "score": 3,
+      "rsi": 44.38,
+      "macd_hist": -1.5034,
+      "sma25_diff_pct": -3.81,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -10.55,
+      "reason": "RSI弱め(44.4)+1 / SMA25押し目(-3.8%)+2"
+    },
+    {
+      "ticker": "EQR",
+      "score": 3,
+      "rsi": 71.68,
+      "macd_hist": 0.382,
+      "sma25_diff_pct": 6.51,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "BG",
+      "score": 3,
+      "rsi": 61.85,
+      "macd_hist": 0.4186,
+      "sma25_diff_pct": 3.99,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CBOE",
+      "score": 3,
+      "rsi": 75.59,
+      "macd_hist": 4.0172,
+      "sma25_diff_pct": 13.62,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "HLT",
+      "score": 3,
+      "rsi": 43.92,
+      "macd_hist": -3.2283,
+      "sma25_diff_pct": -3.13,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": -8.78,
+      "reason": "RSI弱め(43.9)+1 / SMA25押し目(-3.1%)+2"
+    },
+    {
+      "ticker": "UDR",
+      "score": 3,
+      "rsi": 66.07,
+      "macd_hist": 0.2475,
+      "sma25_diff_pct": 5.54,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": -5.95,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "GM",
+      "score": 3,
+      "rsi": 44.28,
+      "macd_hist": -0.348,
+      "sma25_diff_pct": -1.09,
+      "volume_ratio": 1.2,
+      "drawdown_52w_pct": -9.39,
+      "reason": "RSI弱め(44.3)+1 / SMA25押し目(-1.1%)+2"
+    },
+    {
+      "ticker": "INTC",
+      "score": 3,
+      "rsi": 84.58,
+      "macd_hist": 3.0046,
+      "sma25_diff_pct": 52.84,
+      "volume_ratio": 1.2,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "EME",
+      "score": 3,
+      "rsi": 71.98,
+      "macd_hist": 6.8342,
+      "sma25_diff_pct": 12.87,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WMB",
+      "score": 3,
+      "rsi": 66.68,
+      "macd_hist": 0.5462,
+      "sma25_diff_pct": 4.84,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": -0.25,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "VLTO",
+      "score": 3,
+      "rsi": 47.72,
+      "macd_hist": -0.0904,
+      "sma25_diff_pct": -1.18,
+      "volume_ratio": 1.18,
+      "drawdown_52w_pct": -9.95,
+      "reason": "MACD加速+1 / SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "CMI",
+      "score": 3,
+      "rsi": 69.57,
+      "macd_hist": 1.3645,
+      "sma25_diff_pct": 9.02,
+      "volume_ratio": 1.17,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PSKY",
+      "score": 3,
+      "rsi": 49.28,
+      "macd_hist": -0.079,
+      "sma25_diff_pct": -1.23,
+      "volume_ratio": 1.17,
+      "drawdown_52w_pct": -20.69,
+      "reason": "SMA25押し目(-1.2%)+2 / 52w押し目(-20.7%)+1"
+    },
+    {
+      "ticker": "ERIE",
+      "score": 3,
+      "rsi": 36.0,
+      "macd_hist": -2.8828,
+      "sma25_diff_pct": -8.39,
+      "volume_ratio": 1.16,
+      "drawdown_52w_pct": -22.66,
+      "reason": "RSI弱め(36.0)+1 / MACD加速+1 / 52w押し目(-22.7%)+1"
+    },
+    {
+      "ticker": "DDOG",
+      "score": 3,
+      "rsi": 70.35,
+      "macd_hist": 2.1407,
+      "sma25_diff_pct": 16.6,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -0.65,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "EMR",
+      "score": 3,
+      "rsi": 48.92,
+      "macd_hist": -0.6645,
+      "sma25_diff_pct": -1.04,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -14.09,
+      "reason": "MACD加速+1 / SMA25押し目(-1.0%)+2"
+    },
+    {
+      "ticker": "FFIV",
+      "score": 3,
+      "rsi": 69.14,
+      "macd_hist": 2.6358,
+      "sma25_diff_pct": 10.42,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "MRNA",
+      "score": 3,
+      "rsi": 40.56,
+      "macd_hist": -0.7372,
+      "sma25_diff_pct": -7.64,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -19.19,
+      "reason": "RSI弱め(40.6)+1 / MACD加速+1 / 52w押し目(-19.2%)+1"
+    },
+    {
+      "ticker": "HIG",
+      "score": 3,
+      "rsi": 41.5,
+      "macd_hist": -0.4813,
+      "sma25_diff_pct": -2.29,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -6.14,
+      "reason": "RSI弱め(41.5)+1 / SMA25押し目(-2.3%)+2"
+    },
+    {
+      "ticker": "LVS",
+      "score": 3,
+      "rsi": 42.57,
+      "macd_hist": -0.3228,
+      "sma25_diff_pct": -3.8,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -10.67,
+      "reason": "RSI弱め(42.6)+1 / SMA25押し目(-3.8%)+2"
+    },
+    {
+      "ticker": "YUM",
+      "score": 3,
+      "rsi": 38.27,
+      "macd_hist": -0.598,
+      "sma25_diff_pct": -3.09,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -8.49,
+      "reason": "RSI弱め(38.3)+1 / SMA25押し目(-3.1%)+2"
+    },
+    {
+      "ticker": "INCY",
+      "score": 3,
+      "rsi": 53.84,
+      "macd_hist": 0.1397,
+      "sma25_diff_pct": 1.33,
+      "volume_ratio": 1.11,
+      "drawdown_52w_pct": -10.6,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CB",
+      "score": 3,
+      "rsi": 42.51,
+      "macd_hist": -0.5333,
+      "sma25_diff_pct": -1.62,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -5.61,
+      "reason": "RSI弱め(42.5)+1 / SMA25押し目(-1.6%)+2"
+    },
+    {
+      "ticker": "CTVA",
+      "score": 3,
+      "rsi": 64.94,
+      "macd_hist": 0.1479,
+      "sma25_diff_pct": 2.43,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -1.83,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "SNDK",
+      "score": 3,
+      "rsi": 80.96,
+      "macd_hist": 34.8706,
+      "sma25_diff_pct": 50.38,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "VRSK",
+      "score": 3,
+      "rsi": 48.6,
+      "macd_hist": 1.0383,
+      "sma25_diff_pct": 1.04,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -16.08,
+      "reason": "MACDゴールデン+2 / 52w押し目(-16.1%)+1"
+    },
+    {
+      "ticker": "IFF",
+      "score": 3,
+      "rsi": 47.41,
+      "macd_hist": -0.1241,
+      "sma25_diff_pct": -1.44,
+      "volume_ratio": 1.09,
+      "drawdown_52w_pct": -14.23,
+      "reason": "MACD加速+1 / SMA25押し目(-1.4%)+2"
+    },
+    {
+      "ticker": "MU",
+      "score": 3,
+      "rsi": 81.41,
+      "macd_hist": 14.0055,
+      "sma25_diff_pct": 38.89,
+      "volume_ratio": 1.09,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "TJX",
+      "score": 3,
+      "rsi": 41.61,
+      "macd_hist": -0.5198,
+      "sma25_diff_pct": -2.55,
+      "volume_ratio": 1.09,
+      "drawdown_52w_pct": -6.08,
+      "reason": "RSI弱め(41.6)+1 / SMA25押し目(-2.5%)+2"
+    },
+    {
+      "ticker": "MPC",
+      "score": 3,
+      "rsi": 72.03,
+      "macd_hist": 3.7056,
+      "sma25_diff_pct": 12.06,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "TRMB",
+      "score": 3,
+      "rsi": 56.56,
+      "macd_hist": 0.0772,
+      "sma25_diff_pct": 2.14,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -2.97,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "UBER",
+      "score": 3,
+      "rsi": 44.45,
+      "macd_hist": -0.2462,
+      "sma25_diff_pct": -1.49,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -6.22,
+      "reason": "RSI弱め(44.5)+1 / SMA25押し目(-1.5%)+2"
+    },
+    {
+      "ticker": "ARES",
+      "score": 3,
+      "rsi": 64.1,
+      "macd_hist": 0.7334,
+      "sma25_diff_pct": 9.39,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -9.28,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AJG",
+      "score": 3,
+      "rsi": 31.83,
+      "macd_hist": -1.6221,
+      "sma25_diff_pct": -5.12,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -14.55,
+      "reason": "RSI売られすぎ(31.8)+3"
+    },
+    {
+      "ticker": "CNP",
+      "score": 3,
+      "rsi": 55.51,
+      "macd_hist": 0.0649,
+      "sma25_diff_pct": 0.93,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -1.38,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PRU",
+      "score": 3,
+      "rsi": 58.63,
+      "macd_hist": 0.2265,
+      "sma25_diff_pct": 2.6,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -3.89,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "KMB",
+      "score": 3,
+      "rsi": 47.95,
+      "macd_hist": 0.0899,
+      "sma25_diff_pct": 0.03,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -11.7,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "KHC",
+      "score": 3,
+      "rsi": 51.3,
+      "macd_hist": 0.067,
+      "sma25_diff_pct": 0.25,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -8.29,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "LITE",
+      "score": 3,
+      "rsi": 64.98,
+      "macd_hist": 7.0113,
+      "sma25_diff_pct": 15.27,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "LYB",
+      "score": 3,
+      "rsi": 60.48,
+      "macd_hist": 0.4043,
+      "sma25_diff_pct": 5.01,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": -5.61,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CMS",
+      "score": 3,
+      "rsi": 41.56,
+      "macd_hist": -0.209,
+      "sma25_diff_pct": -2.96,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -6.27,
+      "reason": "RSI弱め(41.6)+1 / SMA25押し目(-3.0%)+2"
+    },
+    {
+      "ticker": "EFX",
+      "score": 3,
+      "rsi": 38.0,
+      "macd_hist": -1.0447,
+      "sma25_diff_pct": -5.93,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -18.42,
+      "reason": "RSI弱め(38.0)+1 / MACD加速+1 / 52w押し目(-18.4%)+1"
+    },
+    {
+      "ticker": "MSI",
+      "score": 3,
+      "rsi": 47.19,
+      "macd_hist": 0.214,
+      "sma25_diff_pct": -0.3,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -9.66,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PSX",
+      "score": 3,
+      "rsi": 64.3,
+      "macd_hist": 2.3228,
+      "sma25_diff_pct": 7.56,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -4.26,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ZTS",
+      "score": 3,
+      "rsi": 37.84,
+      "macd_hist": -0.5618,
+      "sma25_diff_pct": -4.2,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -13.78,
+      "reason": "RSI弱め(37.8)+1 / SMA25押し目(-4.2%)+2"
+    },
+    {
+      "ticker": "AWK",
+      "score": 3,
+      "rsi": 34.07,
+      "macd_hist": -0.7338,
+      "sma25_diff_pct": -5.27,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -9.76,
+      "reason": "RSI売られすぎ(34.1)+3"
+    },
+    {
+      "ticker": "FIX",
+      "score": 3,
+      "rsi": 75.34,
+      "macd_hist": 18.0856,
+      "sma25_diff_pct": 18.96,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "MCHP",
+      "score": 3,
+      "rsi": 79.24,
+      "macd_hist": 1.4084,
+      "sma25_diff_pct": 23.86,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "VLO",
+      "score": 3,
+      "rsi": 61.25,
+      "macd_hist": 1.4878,
+      "sma25_diff_pct": 5.26,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": -0.34,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "SMCI",
+      "score": 3,
+      "rsi": 52.26,
+      "macd_hist": 0.1078,
+      "sma25_diff_pct": 5.99,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -19.05,
+      "reason": "MACDゴールデン+2 / 52w押し目(-19.1%)+1"
+    },
+    {
+      "ticker": "ETR",
+      "score": 3,
+      "rsi": 65.75,
+      "macd_hist": 0.0861,
+      "sma25_diff_pct": 2.83,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "IBKR",
+      "score": 3,
+      "rsi": 71.43,
+      "macd_hist": 0.3376,
+      "sma25_diff_pct": 10.61,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PKG",
+      "score": 3,
+      "rsi": 58.92,
+      "macd_hist": 1.4784,
+      "sma25_diff_pct": 5.22,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": -9.05,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "COF",
+      "score": 3,
+      "rsi": 44.68,
+      "macd_hist": -1.0911,
+      "sma25_diff_pct": -1.97,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -14.54,
+      "reason": "RSI弱め(44.7)+1 / SMA25押し目(-2.0%)+2"
+    },
+    {
+      "ticker": "TRGP",
+      "score": 3,
+      "rsi": 68.19,
+      "macd_hist": 2.2854,
+      "sma25_diff_pct": 6.6,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -0.14,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CEG",
+      "score": 3,
+      "rsi": 60.74,
+      "macd_hist": 3.0578,
+      "sma25_diff_pct": 9.02,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -3.38,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "KEYS",
+      "score": 3,
+      "rsi": 71.33,
+      "macd_hist": 0.0879,
+      "sma25_diff_pct": 8.54,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "AKAM",
+      "score": 3,
+      "rsi": 68.12,
+      "macd_hist": 2.0981,
+      "sma25_diff_pct": 14.87,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -1.02,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "APA",
+      "score": 3,
+      "rsi": 60.97,
+      "macd_hist": 0.2665,
+      "sma25_diff_pct": 5.73,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -5.93,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ADSK",
+      "score": 3,
+      "rsi": 59.43,
+      "macd_hist": 1.4095,
+      "sma25_diff_pct": 4.9,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -5.56,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "SPGI",
+      "score": 3,
+      "rsi": 44.04,
+      "macd_hist": -1.8717,
+      "sma25_diff_pct": -1.97,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -6.3,
+      "reason": "RSI弱め(44.0)+1 / SMA25押し目(-2.0%)+2"
+    },
+    {
+      "ticker": "PCAR",
+      "score": 3,
+      "rsi": 33.26,
+      "macd_hist": -1.538,
+      "sma25_diff_pct": -7.18,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -12.4,
+      "reason": "RSI売られすぎ(33.3)+3"
+    },
+    {
+      "ticker": "SRE",
+      "score": 3,
+      "rsi": 49.3,
+      "macd_hist": -0.0264,
+      "sma25_diff_pct": -1.2,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -5.39,
+      "reason": "MACD加速+1 / SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "TTWO",
+      "score": 3,
+      "rsi": 66.22,
+      "macd_hist": 1.0155,
+      "sma25_diff_pct": 6.69,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -0.92,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CSCO",
+      "score": 3,
+      "rsi": 75.53,
+      "macd_hist": 0.5287,
+      "sma25_diff_pct": 10.07,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "DE",
+      "score": 3,
+      "rsi": 48.06,
+      "macd_hist": -0.42,
+      "sma25_diff_pct": -1.22,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -12.83,
+      "reason": "MACD加速+1 / SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "FAST",
+      "score": 3,
+      "rsi": 43.95,
+      "macd_hist": -0.0507,
+      "sma25_diff_pct": -2.52,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -9.36,
+      "reason": "RSI弱め(44.0)+1 / SMA25押し目(-2.5%)+2"
+    },
+    {
+      "ticker": "KMI",
+      "score": 3,
+      "rsi": 53.58,
+      "macd_hist": 0.1348,
+      "sma25_diff_pct": 0.85,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -4.35,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "COST",
+      "score": 3,
+      "rsi": 57.72,
+      "macd_hist": 1.5691,
+      "sma25_diff_pct": 1.34,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -1.37,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "HPE",
+      "score": 3,
+      "rsi": 73.94,
+      "macd_hist": 0.0887,
+      "sma25_diff_pct": 12.99,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ISRG",
+      "score": 3,
+      "rsi": 42.79,
+      "macd_hist": -1.1558,
+      "sma25_diff_pct": -2.26,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -10.95,
+      "reason": "RSI弱め(42.8)+1 / SMA25押し目(-2.3%)+2"
+    },
+    {
+      "ticker": "KVUE",
+      "score": 3,
+      "rsi": 48.32,
+      "macd_hist": 0.0079,
+      "sma25_diff_pct": 0.09,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -9.15,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PM",
+      "score": 3,
+      "rsi": 56.88,
+      "macd_hist": 1.4123,
+      "sma25_diff_pct": 4.8,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -9.92,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CDNS",
+      "score": 3,
+      "rsi": 70.26,
+      "macd_hist": 3.3014,
+      "sma25_diff_pct": 14.47,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "XOM",
+      "score": 3,
+      "rsi": 53.55,
+      "macd_hist": 0.6453,
+      "sma25_diff_pct": 0.69,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -9.68,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "FCX",
+      "score": 3,
+      "rsi": 42.68,
+      "macd_hist": -1.2194,
+      "sma25_diff_pct": -8.65,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -18.02,
+      "reason": "RSI弱め(42.7)+1 / MACD加速+1 / 52w押し目(-18.0%)+1"
+    },
+    {
+      "ticker": "HPQ",
+      "score": 3,
+      "rsi": 64.26,
+      "macd_hist": 0.1093,
+      "sma25_diff_pct": 7.44,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "TEL",
+      "score": 3,
+      "rsi": 43.49,
+      "macd_hist": -2.9504,
+      "sma25_diff_pct": -6.18,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -16.44,
+      "reason": "RSI弱め(43.5)+1 / MACD加速+1 / 52w押し目(-16.4%)+1"
+    },
+    {
+      "ticker": "VRT",
+      "score": 3,
+      "rsi": 69.37,
+      "macd_hist": 1.1752,
+      "sma25_diff_pct": 13.54,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "PGR",
+      "score": 3,
+      "rsi": 43.66,
+      "macd_hist": -0.3346,
+      "sma25_diff_pct": -1.11,
+      "volume_ratio": 0.87,
+      "drawdown_52w_pct": -7.4,
+      "reason": "RSI弱め(43.7)+1 / SMA25押し目(-1.1%)+2"
+    },
+    {
+      "ticker": "RL",
+      "score": 3,
+      "rsi": 48.17,
+      "macd_hist": -3.0071,
+      "sma25_diff_pct": -2.12,
+      "volume_ratio": 0.87,
+      "drawdown_52w_pct": -7.57,
+      "reason": "MACD加速+1 / SMA25押し目(-2.1%)+2"
+    },
+    {
+      "ticker": "CVX",
+      "score": 3,
+      "rsi": 53.13,
+      "macd_hist": 0.8216,
+      "sma25_diff_pct": 0.88,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -8.77,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WFC",
+      "score": 3,
+      "rsi": 45.76,
+      "macd_hist": -0.1686,
+      "sma25_diff_pct": -2.17,
+      "volume_ratio": 0.85,
+      "drawdown_52w_pct": -15.56,
+      "reason": "SMA25押し目(-2.2%)+2 / 52w押し目(-15.6%)+1"
+    },
+    {
+      "ticker": "EOG",
+      "score": 3,
+      "rsi": 59.69,
+      "macd_hist": 0.744,
+      "sma25_diff_pct": 3.18,
+      "volume_ratio": 0.84,
+      "drawdown_52w_pct": -5.32,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "RSG",
+      "score": 3,
+      "rsi": 37.69,
+      "macd_hist": -0.0782,
+      "sma25_diff_pct": -3.76,
+      "volume_ratio": 0.84,
+      "drawdown_52w_pct": -11.97,
+      "reason": "RSI弱め(37.7)+1 / SMA25押し目(-3.8%)+2"
+    },
+    {
+      "ticker": "IVZ",
+      "score": 3,
+      "rsi": 66.8,
+      "macd_hist": 0.1699,
+      "sma25_diff_pct": 8.08,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -0.96,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "STZ",
+      "score": 3,
+      "rsi": 42.45,
+      "macd_hist": -1.1356,
+      "sma25_diff_pct": -3.89,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -9.24,
+      "reason": "RSI弱め(42.5)+1 / SMA25押し目(-3.9%)+2"
+    },
+    {
+      "ticker": "DGX",
+      "score": 3,
+      "rsi": 42.61,
+      "macd_hist": -0.5942,
+      "sma25_diff_pct": -2.42,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -9.55,
+      "reason": "RSI弱め(42.6)+1 / SMA25押し目(-2.4%)+2"
+    },
+    {
+      "ticker": "TMUS",
+      "score": 3,
+      "rsi": 46.81,
+      "macd_hist": 0.9267,
+      "sma25_diff_pct": -0.61,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -12.3,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WST",
+      "score": 3,
+      "rsi": 72.42,
+      "macd_hist": 1.4424,
+      "sma25_diff_pct": 11.82,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "STLD",
+      "score": 3,
+      "rsi": 80.03,
+      "macd_hist": 1.5367,
+      "sma25_diff_pct": 15.13,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ADBE",
+      "score": 3,
+      "rsi": 57.01,
+      "macd_hist": 1.8266,
+      "sma25_diff_pct": 4.97,
+      "volume_ratio": 0.8,
+      "drawdown_52w_pct": -9.87,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "FTNT",
+      "score": 3,
+      "rsi": 65.17,
+      "macd_hist": 0.6542,
+      "sma25_diff_pct": 7.93,
+      "volume_ratio": 0.8,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CF",
+      "score": 3,
+      "rsi": 56.31,
+      "macd_hist": 0.2594,
+      "sma25_diff_pct": 3.32,
+      "volume_ratio": 0.79,
+      "drawdown_52w_pct": -6.95,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "NTAP",
+      "score": 3,
+      "rsi": 68.62,
+      "macd_hist": 0.6337,
+      "sma25_diff_pct": 8.82,
+      "volume_ratio": 0.79,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CPAY",
+      "score": 3,
+      "rsi": 42.32,
+      "macd_hist": -1.7051,
+      "sma25_diff_pct": -2.57,
+      "volume_ratio": 0.78,
+      "drawdown_52w_pct": -14.79,
+      "reason": "RSI弱め(42.3)+1 / SMA25押し目(-2.6%)+2"
+    },
+    {
+      "ticker": "MOS",
+      "score": 3,
+      "rsi": 41.03,
+      "macd_hist": -0.0121,
+      "sma25_diff_pct": -5.05,
+      "volume_ratio": 0.78,
+      "drawdown_52w_pct": -25.83,
+      "reason": "RSI弱め(41.0)+1 / MACD加速+1 / 52w押し目(-25.8%)+1"
+    },
+    {
+      "ticker": "CINF",
+      "score": 3,
+      "rsi": 41.88,
+      "macd_hist": -0.6308,
+      "sma25_diff_pct": -1.58,
+      "volume_ratio": 0.77,
+      "drawdown_52w_pct": -6.58,
+      "reason": "RSI弱め(41.9)+1 / SMA25押し目(-1.6%)+2"
+    },
+    {
+      "ticker": "CRM",
+      "score": 3,
+      "rsi": 54.97,
+      "macd_hist": 1.0956,
+      "sma25_diff_pct": 3.59,
+      "volume_ratio": 0.77,
+      "drawdown_52w_pct": -7.25,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "DOW",
+      "score": 3,
+      "rsi": 59.5,
+      "macd_hist": 0.121,
+      "sma25_diff_pct": 3.6,
+      "volume_ratio": 0.76,
+      "drawdown_52w_pct": -2.56,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "SJM",
+      "score": 3,
+      "rsi": 48.17,
+      "macd_hist": 0.623,
+      "sma25_diff_pct": 1.71,
+      "volume_ratio": 0.75,
+      "drawdown_52w_pct": -16.65,
+      "reason": "MACDゴールデン+2 / 52w押し目(-16.6%)+1"
+    },
+    {
+      "ticker": "SCHW",
+      "score": 3,
+      "rsi": 49.64,
+      "macd_hist": 0.0525,
+      "sma25_diff_pct": -0.84,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -13.52,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "ORCL",
+      "score": 3,
+      "rsi": 66.06,
+      "macd_hist": 0.4597,
+      "sma25_diff_pct": 13.48,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -1.15,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "APP",
+      "score": 3,
+      "rsi": 61.08,
+      "macd_hist": 1.6031,
+      "sma25_diff_pct": 8.87,
+      "volume_ratio": 0.72,
+      "drawdown_52w_pct": -7.56,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "RJF",
+      "score": 3,
+      "rsi": 65.08,
+      "macd_hist": 0.588,
+      "sma25_diff_pct": 5.02,
+      "volume_ratio": 0.71,
+      "drawdown_52w_pct": -8.18,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "WBD",
+      "score": 3,
+      "rsi": 48.88,
+      "macd_hist": 0.0056,
+      "sma25_diff_pct": -0.14,
+      "volume_ratio": 0.69,
+      "drawdown_52w_pct": -6.62,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "INTU",
+      "score": 3,
+      "rsi": 48.47,
+      "macd_hist": 2.5122,
+      "sma25_diff_pct": 0.74,
+      "volume_ratio": 0.66,
+      "drawdown_52w_pct": -16.96,
+      "reason": "MACDゴールデン+2 / 52w押し目(-17.0%)+1"
+    },
+    {
+      "ticker": "CRWD",
+      "score": 3,
+      "rsi": 66.68,
+      "macd_hist": 3.273,
+      "sma25_diff_pct": 11.22,
+      "volume_ratio": 0.63,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "CASY",
+      "score": 3,
+      "rsi": 78.83,
+      "macd_hist": 6.6546,
+      "sma25_diff_pct": 11.62,
+      "volume_ratio": 0.45,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2 / MACD加速+1"
+    },
+    {
+      "ticker": "MO",
+      "score": 2,
+      "rsi": 67.42,
+      "macd_hist": 0.8784,
+      "sma25_diff_pct": 8.22,
+      "volume_ratio": 1.5,
+      "drawdown_52w_pct": -2.36,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NCLH",
+      "score": 2,
+      "rsi": 35.7,
+      "macd_hist": -0.1804,
+      "sma25_diff_pct": -11.61,
+      "volume_ratio": 1.48,
+      "drawdown_52w_pct": -32.29,
+      "reason": "RSI弱め(35.7)+1 / 52w押し目(-32.3%)+1"
+    },
+    {
+      "ticker": "SBUX",
+      "score": 2,
+      "rsi": 66.07,
+      "macd_hist": 0.721,
+      "sma25_diff_pct": 6.64,
+      "volume_ratio": 1.47,
+      "drawdown_52w_pct": -0.91,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "VTR",
+      "score": 2,
+      "rsi": 57.32,
+      "macd_hist": 0.4013,
+      "sma25_diff_pct": 2.51,
+      "volume_ratio": 1.46,
+      "drawdown_52w_pct": -1.41,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "GOOG",
+      "score": 2,
+      "rsi": 80.65,
+      "macd_hist": 4.672,
+      "sma25_diff_pct": 15.23,
+      "volume_ratio": 1.41,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NXPI",
+      "score": 2,
+      "rsi": 80.04,
+      "macd_hist": 7.4921,
+      "sma25_diff_pct": 27.42,
+      "volume_ratio": 1.4,
+      "drawdown_52w_pct": -0.98,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "GOOGL",
+      "score": 2,
+      "rsi": 81.67,
+      "macd_hist": 4.8199,
+      "sma25_diff_pct": 15.7,
+      "volume_ratio": 1.38,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CAH",
+      "score": 2,
+      "rsi": 37.72,
+      "macd_hist": -0.947,
+      "sma25_diff_pct": -5.12,
+      "volume_ratio": 1.37,
+      "drawdown_52w_pct": -14.1,
+      "reason": "RSI弱め(37.7)+1 / MACD加速+1"
+    },
+    {
+      "ticker": "CNC",
+      "score": 2,
+      "rsi": 81.02,
+      "macd_hist": 1.4697,
+      "sma25_diff_pct": 27.96,
+      "volume_ratio": 1.35,
+      "drawdown_52w_pct": -1.85,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "GDDY",
+      "score": 2,
+      "rsi": 56.13,
+      "macd_hist": 0.4099,
+      "sma25_diff_pct": 3.86,
+      "volume_ratio": 1.35,
+      "drawdown_52w_pct": -10.79,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "V",
+      "score": 2,
+      "rsi": 55.86,
+      "macd_hist": 1.6335,
+      "sma25_diff_pct": 3.06,
+      "volume_ratio": 1.34,
+      "drawdown_52w_pct": -3.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "REGN",
+      "score": 2,
+      "rsi": 37.44,
+      "macd_hist": -4.8031,
+      "sma25_diff_pct": -5.73,
+      "volume_ratio": 1.32,
+      "drawdown_52w_pct": -12.46,
+      "reason": "RSI弱め(37.4)+1 / MACD加速+1"
+    },
+    {
+      "ticker": "BEN",
+      "score": 2,
+      "rsi": 76.57,
+      "macd_hist": 0.3046,
+      "sma25_diff_pct": 13.99,
+      "volume_ratio": 1.31,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "HD",
+      "score": 2,
+      "rsi": 36.05,
+      "macd_hist": -2.1737,
+      "sma25_diff_pct": -5.26,
+      "volume_ratio": 1.31,
+      "drawdown_52w_pct": -18.8,
+      "reason": "RSI弱め(36.0)+1 / 52w押し目(-18.8%)+1"
+    },
+    {
+      "ticker": "MLM",
+      "score": 2,
+      "rsi": 46.79,
+      "macd_hist": -0.9859,
+      "sma25_diff_pct": -1.21,
+      "volume_ratio": 1.31,
+      "drawdown_52w_pct": -14.3,
+      "reason": "SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "ORLY",
+      "score": 2,
+      "rsi": 53.46,
+      "macd_hist": 0.2137,
+      "sma25_diff_pct": 1.73,
+      "volume_ratio": 1.3,
+      "drawdown_52w_pct": -4.43,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ES",
+      "score": 2,
+      "rsi": 47.92,
+      "macd_hist": 0.1972,
+      "sma25_diff_pct": -0.35,
+      "volume_ratio": 1.29,
+      "drawdown_52w_pct": -8.64,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "D",
+      "score": 2,
+      "rsi": 52.0,
+      "macd_hist": 0.0905,
+      "sma25_diff_pct": 0.39,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -4.28,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "LII",
+      "score": 2,
+      "rsi": 58.5,
+      "macd_hist": 3.9262,
+      "sma25_diff_pct": 5.94,
+      "volume_ratio": 1.24,
+      "drawdown_52w_pct": -8.11,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TROW",
+      "score": 2,
+      "rsi": 76.65,
+      "macd_hist": 0.4241,
+      "sma25_diff_pct": 7.76,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "WEC",
+      "score": 2,
+      "rsi": 48.36,
+      "macd_hist": 0.0532,
+      "sma25_diff_pct": -0.72,
+      "volume_ratio": 1.23,
+      "drawdown_52w_pct": -3.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "DECK",
+      "score": 2,
+      "rsi": 36.84,
+      "macd_hist": -1.1593,
+      "sma25_diff_pct": -6.32,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -18.52,
+      "reason": "RSI弱め(36.8)+1 / 52w押し目(-18.5%)+1"
+    },
+    {
+      "ticker": "IEX",
+      "score": 2,
+      "rsi": 65.0,
+      "macd_hist": 1.1184,
+      "sma25_diff_pct": 6.0,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -0.96,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ON",
+      "score": 2,
+      "rsi": 79.71,
+      "macd_hist": 1.1309,
+      "sma25_diff_pct": 24.97,
+      "volume_ratio": 1.22,
+      "drawdown_52w_pct": -0.35,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "AMZN",
+      "score": 2,
+      "rsi": 80.86,
+      "macd_hist": 0.9931,
+      "sma25_diff_pct": 11.72,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CARR",
+      "score": 2,
+      "rsi": 57.68,
+      "macd_hist": 0.4676,
+      "sma25_diff_pct": 5.31,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": -4.75,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NI",
+      "score": 2,
+      "rsi": 58.77,
+      "macd_hist": 0.0226,
+      "sma25_diff_pct": 1.46,
+      "volume_ratio": 1.21,
+      "drawdown_52w_pct": -0.19,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ESS",
+      "score": 2,
+      "rsi": 66.44,
+      "macd_hist": 1.1169,
+      "sma25_diff_pct": 4.87,
+      "volume_ratio": 1.2,
+      "drawdown_52w_pct": -0.44,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "WELL",
+      "score": 2,
+      "rsi": 57.92,
+      "macd_hist": 0.6884,
+      "sma25_diff_pct": 2.85,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": -1.4,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "INVH",
+      "score": 2,
+      "rsi": 71.64,
+      "macd_hist": 0.1505,
+      "sma25_diff_pct": 6.96,
+      "volume_ratio": 1.16,
+      "drawdown_52w_pct": -0.42,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "AVB",
+      "score": 2,
+      "rsi": 70.44,
+      "macd_hist": 1.1994,
+      "sma25_diff_pct": 6.9,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TECH",
+      "score": 2,
+      "rsi": 52.85,
+      "macd_hist": -0.1132,
+      "sma25_diff_pct": 1.82,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -15.01,
+      "reason": "MACD加速+1 / 52w押し目(-15.0%)+1"
+    },
+    {
+      "ticker": "CRH",
+      "score": 2,
+      "rsi": 47.71,
+      "macd_hist": -0.6229,
+      "sma25_diff_pct": -1.2,
+      "volume_ratio": 1.15,
+      "drawdown_52w_pct": -12.59,
+      "reason": "SMA25押し目(-1.2%)+2"
+    },
+    {
+      "ticker": "BKNG",
+      "score": 2,
+      "rsi": 40.48,
+      "macd_hist": -2.1055,
+      "sma25_diff_pct": -5.19,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -12.71,
+      "reason": "RSI弱め(40.5)+1 / MACD加速+1"
+    },
+    {
+      "ticker": "CPT",
+      "score": 2,
+      "rsi": 58.29,
+      "macd_hist": 0.2823,
+      "sma25_diff_pct": 2.45,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -4.41,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "HUM",
+      "score": 2,
+      "rsi": 73.92,
+      "macd_hist": 1.9746,
+      "sma25_diff_pct": 14.85,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -1.48,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "LOW",
+      "score": 2,
+      "rsi": 35.94,
+      "macd_hist": -1.9991,
+      "sma25_diff_pct": -6.16,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -21.25,
+      "reason": "RSI弱め(35.9)+1 / 52w押し目(-21.2%)+1"
+    },
+    {
+      "ticker": "MDLZ",
+      "score": 2,
+      "rsi": 67.86,
+      "macd_hist": 0.4844,
+      "sma25_diff_pct": 5.15,
+      "volume_ratio": 1.14,
+      "drawdown_52w_pct": -1.12,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "XEL",
+      "score": 2,
+      "rsi": 55.0,
+      "macd_hist": 0.2192,
+      "sma25_diff_pct": 1.28,
+      "volume_ratio": 1.13,
+      "drawdown_52w_pct": -2.21,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CL",
+      "score": 2,
+      "rsi": 53.42,
+      "macd_hist": 0.5449,
+      "sma25_diff_pct": 2.37,
+      "volume_ratio": 1.12,
+      "drawdown_52w_pct": -12.38,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "EVRG",
+      "score": 2,
+      "rsi": 49.43,
+      "macd_hist": 0.0053,
+      "sma25_diff_pct": -0.62,
+      "volume_ratio": 1.11,
+      "drawdown_52w_pct": -3.32,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "AEE",
+      "score": 2,
+      "rsi": 50.09,
+      "macd_hist": 0.0035,
+      "sma25_diff_pct": -0.16,
+      "volume_ratio": 1.09,
+      "drawdown_52w_pct": -2.34,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NEE",
+      "score": 2,
+      "rsi": 57.14,
+      "macd_hist": 0.312,
+      "sma25_diff_pct": 2.73,
+      "volume_ratio": 1.08,
+      "drawdown_52w_pct": -1.63,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ABBV",
+      "score": 2,
+      "rsi": 48.9,
+      "macd_hist": 1.0148,
+      "sma25_diff_pct": 0.02,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -12.01,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ATO",
+      "score": 2,
+      "rsi": 51.99,
+      "macd_hist": 0.007,
+      "sma25_diff_pct": -0.01,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -2.62,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ADP",
+      "score": 2,
+      "rsi": 56.06,
+      "macd_hist": 1.9528,
+      "sma25_diff_pct": 4.22,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -8.22,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CMCSA",
+      "score": 2,
+      "rsi": 38.16,
+      "macd_hist": -0.1969,
+      "sma25_diff_pct": -6.1,
+      "volume_ratio": 1.07,
+      "drawdown_52w_pct": -17.59,
+      "reason": "RSI弱め(38.2)+1 / 52w押し目(-17.6%)+1"
+    },
+    {
+      "ticker": "AMD",
+      "score": 2,
+      "rsi": 73.05,
+      "macd_hist": 4.0403,
+      "sma25_diff_pct": 26.41,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -1.46,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CTRA",
+      "score": 2,
+      "rsi": 62.53,
+      "macd_hist": 0.3105,
+      "sma25_diff_pct": 5.69,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -1.87,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "IR",
+      "score": 2,
+      "rsi": 35.57,
+      "macd_hist": -0.8251,
+      "sma25_diff_pct": -7.87,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": -23.21,
+      "reason": "RSI弱め(35.6)+1 / 52w押し目(-23.2%)+1"
+    },
+    {
+      "ticker": "DASH",
+      "score": 2,
+      "rsi": 46.7,
+      "macd_hist": -0.9757,
+      "sma25_diff_pct": -1.32,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -12.47,
+      "reason": "SMA25押し目(-1.3%)+2"
+    },
+    {
+      "ticker": "OKE",
+      "score": 2,
+      "rsi": 59.82,
+      "macd_hist": 0.6062,
+      "sma25_diff_pct": 4.04,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -3.05,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "DVN",
+      "score": 2,
+      "rsi": 62.42,
+      "macd_hist": 0.4439,
+      "sma25_diff_pct": 5.7,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": -2.07,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "KO",
+      "score": 2,
+      "rsi": 57.49,
+      "macd_hist": 0.34,
+      "sma25_diff_pct": 2.3,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -3.11,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CCI",
+      "score": 2,
+      "rsi": 58.21,
+      "macd_hist": 0.3304,
+      "sma25_diff_pct": 3.29,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": -1.79,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NDSN",
+      "score": 2,
+      "rsi": 54.94,
+      "macd_hist": 0.1649,
+      "sma25_diff_pct": 1.93,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": -5.26,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "O",
+      "score": 2,
+      "rsi": 52.31,
+      "macd_hist": 0.0044,
+      "sma25_diff_pct": 0.68,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": -5.08,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ZBRA",
+      "score": 2,
+      "rsi": 55.83,
+      "macd_hist": -0.298,
+      "sma25_diff_pct": 2.33,
+      "volume_ratio": 1.0,
+      "drawdown_52w_pct": -16.69,
+      "reason": "MACD加速+1 / 52w押し目(-16.7%)+1"
+    },
+    {
+      "ticker": "COP",
+      "score": 2,
+      "rsi": 50.31,
+      "macd_hist": 0.1357,
+      "sma25_diff_pct": -0.59,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -7.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "EXE",
+      "score": 2,
+      "rsi": 45.55,
+      "macd_hist": 0.806,
+      "sma25_diff_pct": 0.47,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -12.43,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "BIIB",
+      "score": 2,
+      "rsi": 53.48,
+      "macd_hist": 0.919,
+      "sma25_diff_pct": 3.82,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": -5.99,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "FANG",
+      "score": 2,
+      "rsi": 62.45,
+      "macd_hist": 1.7261,
+      "sma25_diff_pct": 6.19,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -3.51,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "FDS",
+      "score": 2,
+      "rsi": 45.11,
+      "macd_hist": -1.7903,
+      "sma25_diff_pct": -3.4,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -9.6,
+      "reason": "SMA25押し目(-3.4%)+2"
+    },
+    {
+      "ticker": "MNST",
+      "score": 2,
+      "rsi": 47.32,
+      "macd_hist": 0.0086,
+      "sma25_diff_pct": 0.32,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -12.53,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "PG",
+      "score": 2,
+      "rsi": 47.6,
+      "macd_hist": 0.3368,
+      "sma25_diff_pct": 0.46,
+      "volume_ratio": 0.96,
+      "drawdown_52w_pct": -12.68,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "JCI",
+      "score": 2,
+      "rsi": 60.73,
+      "macd_hist": 0.3252,
+      "sma25_diff_pct": 3.44,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -0.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "SWK",
+      "score": 2,
+      "rsi": 55.3,
+      "macd_hist": 0.4229,
+      "sma25_diff_pct": 5.36,
+      "volume_ratio": 0.95,
+      "drawdown_52w_pct": -14.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "CVS",
+      "score": 2,
+      "rsi": 56.76,
+      "macd_hist": 0.399,
+      "sma25_diff_pct": 4.04,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -3.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "WRB",
+      "score": 2,
+      "rsi": 47.15,
+      "macd_hist": 0.0491,
+      "sma25_diff_pct": -0.05,
+      "volume_ratio": 0.94,
+      "drawdown_52w_pct": -9.22,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NUE",
+      "score": 2,
+      "rsi": 85.46,
+      "macd_hist": 1.8467,
+      "sma25_diff_pct": 16.24,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "URI",
+      "score": 2,
+      "rsi": 64.54,
+      "macd_hist": 7.6953,
+      "sma25_diff_pct": 11.84,
+      "volume_ratio": 0.93,
+      "drawdown_52w_pct": -5.35,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NDAQ",
+      "score": 2,
+      "rsi": 53.25,
+      "macd_hist": 0.1272,
+      "sma25_diff_pct": 1.11,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -3.17,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "EQT",
+      "score": 2,
+      "rsi": 45.1,
+      "macd_hist": 0.1938,
+      "sma25_diff_pct": -0.55,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -13.56,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "MET",
+      "score": 2,
+      "rsi": 66.54,
+      "macd_hist": 0.1643,
+      "sma25_diff_pct": 5.03,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -0.41,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "OXY",
+      "score": 2,
+      "rsi": 53.36,
+      "macd_hist": 0.2215,
+      "sma25_diff_pct": 0.87,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -10.42,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "PEP",
+      "score": 2,
+      "rsi": 45.78,
+      "macd_hist": 0.117,
+      "sma25_diff_pct": -0.53,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": -8.25,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "BXP",
+      "score": 2,
+      "rsi": 59.84,
+      "macd_hist": 0.1455,
+      "sma25_diff_pct": 4.88,
+      "volume_ratio": 0.9,
+      "drawdown_52w_pct": -10.24,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ELV",
+      "score": 2,
+      "rsi": 72.04,
+      "macd_hist": 3.6805,
+      "sma25_diff_pct": 11.37,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -2.01,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "PAYX",
+      "score": 2,
+      "rsi": 52.64,
+      "macd_hist": 0.2936,
+      "sma25_diff_pct": 1.77,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -7.93,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "VZ",
+      "score": 2,
+      "rsi": 50.35,
+      "macd_hist": 0.2145,
+      "sma25_diff_pct": 0.54,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -6.48,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "ADI",
+      "score": 2,
+      "rsi": 70.0,
+      "macd_hist": 1.2876,
+      "sma25_diff_pct": 10.72,
+      "volume_ratio": 0.88,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TXN",
+      "score": 2,
+      "rsi": 77.18,
+      "macd_hist": 3.1874,
+      "sma25_diff_pct": 19.28,
+      "volume_ratio": 0.88,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "DOV",
+      "score": 2,
+      "rsi": 54.88,
+      "macd_hist": 0.1724,
+      "sma25_diff_pct": 2.41,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -4.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "EW",
+      "score": 2,
+      "rsi": 53.04,
+      "macd_hist": 0.3406,
+      "sma25_diff_pct": 2.36,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -4.9,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "NSC",
+      "score": 2,
+      "rsi": 59.52,
+      "macd_hist": 0.535,
+      "sma25_diff_pct": 3.49,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -2.45,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TMO",
+      "score": 2,
+      "rsi": 40.29,
+      "macd_hist": -4.0541,
+      "sma25_diff_pct": -5.54,
+      "volume_ratio": 0.86,
+      "drawdown_52w_pct": -14.55,
+      "reason": "RSI弱め(40.3)+1 / MACD加速+1"
+    },
+    {
+      "ticker": "CSX",
+      "score": 2,
+      "rsi": 62.15,
+      "macd_hist": 0.009,
+      "sma25_diff_pct": 3.85,
+      "volume_ratio": 0.85,
+      "drawdown_52w_pct": -2.49,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "UNP",
+      "score": 2,
+      "rsi": 59.53,
+      "macd_hist": 0.5941,
+      "sma25_diff_pct": 3.39,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -2.67,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "WMT",
+      "score": 2,
+      "rsi": 56.86,
+      "macd_hist": 0.2345,
+      "sma25_diff_pct": 2.46,
+      "volume_ratio": 0.83,
+      "drawdown_52w_pct": -2.11,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "PFG",
+      "score": 2,
+      "rsi": 66.95,
+      "macd_hist": 0.2658,
+      "sma25_diff_pct": 5.48,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -0.22,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "AMT",
+      "score": 2,
+      "rsi": 50.82,
+      "macd_hist": 0.2763,
+      "sma25_diff_pct": 0.57,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -6.83,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "APO",
+      "score": 2,
+      "rsi": 67.3,
+      "macd_hist": 0.6708,
+      "sma25_diff_pct": 9.69,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -2.33,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "FIS",
+      "score": 2,
+      "rsi": 46.03,
+      "macd_hist": 0.0842,
+      "sma25_diff_pct": -0.08,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -9.47,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "KDP",
+      "score": 2,
+      "rsi": 62.57,
+      "macd_hist": 0.2375,
+      "sma25_diff_pct": 6.74,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -5.98,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TSLA",
+      "score": 2,
+      "rsi": 55.7,
+      "macd_hist": 2.1142,
+      "sma25_diff_pct": 4.14,
+      "volume_ratio": 0.8,
+      "drawdown_52w_pct": -9.08,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "SNPS",
+      "score": 2,
+      "rsi": 68.75,
+      "macd_hist": 3.581,
+      "sma25_diff_pct": 12.61,
+      "volume_ratio": 0.79,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "TDY",
+      "score": 2,
+      "rsi": 46.39,
+      "macd_hist": -1.2434,
+      "sma25_diff_pct": -1.35,
+      "volume_ratio": 0.78,
+      "drawdown_52w_pct": -8.24,
+      "reason": "SMA25押し目(-1.4%)+2"
+    },
+    {
+      "ticker": "AMP",
+      "score": 2,
+      "rsi": 59.15,
+      "macd_hist": 1.4462,
+      "sma25_diff_pct": 3.95,
+      "volume_ratio": 0.77,
+      "drawdown_52w_pct": -12.01,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "UNH",
+      "score": 2,
+      "rsi": 75.28,
+      "macd_hist": 1.4992,
+      "sma25_diff_pct": 10.81,
+      "volume_ratio": 0.77,
+      "drawdown_52w_pct": -1.86,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "BKR",
+      "score": 2,
+      "rsi": 62.86,
+      "macd_hist": 0.5108,
+      "sma25_diff_pct": 6.68,
+      "volume_ratio": 0.76,
+      "drawdown_52w_pct": -2.39,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "DHI",
+      "score": 2,
+      "rsi": 45.71,
+      "macd_hist": -1.1443,
+      "sma25_diff_pct": -1.35,
+      "volume_ratio": 0.76,
+      "drawdown_52w_pct": -12.7,
+      "reason": "SMA25押し目(-1.4%)+2"
+    },
+    {
+      "ticker": "PCG",
+      "score": 2,
+      "rsi": 35.3,
+      "macd_hist": -0.066,
+      "sma25_diff_pct": -5.18,
+      "volume_ratio": 0.76,
+      "drawdown_52w_pct": -14.3,
+      "reason": "RSI弱め(35.3)+1 / MACD加速+1"
+    },
+    {
+      "ticker": "SLB",
+      "score": 2,
+      "rsi": 62.55,
+      "macd_hist": 0.1339,
+      "sma25_diff_pct": 5.28,
+      "volume_ratio": 0.75,
+      "drawdown_52w_pct": -1.62,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "UAL",
+      "score": 2,
+      "rsi": 50.18,
+      "macd_hist": -0.0605,
+      "sma25_diff_pct": -0.04,
+      "volume_ratio": 0.73,
+      "drawdown_52w_pct": -19.89,
+      "reason": "MACD加速+1 / 52w押し目(-19.9%)+1"
+    },
+    {
+      "ticker": "HAL",
+      "score": 2,
+      "rsi": 64.74,
+      "macd_hist": 0.2529,
+      "sma25_diff_pct": 6.64,
+      "volume_ratio": 0.72,
+      "drawdown_52w_pct": -1.37,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "PANW",
+      "score": 2,
+      "rsi": 63.41,
+      "macd_hist": 0.8394,
+      "sma25_diff_pct": 7.28,
+      "volume_ratio": 0.69,
+      "drawdown_52w_pct": -0.31,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "HAS",
+      "score": 2,
+      "rsi": 53.05,
+      "macd_hist": 0.13,
+      "sma25_diff_pct": 1.5,
+      "volume_ratio": 0.65,
+      "drawdown_52w_pct": -9.94,
+      "reason": "MACDゴールデン+2"
+    },
+    {
+      "ticker": "IQV",
+      "score": 1,
+      "rsi": 59.65,
+      "macd_hist": -0.0425,
+      "sma25_diff_pct": 4.42,
+      "volume_ratio": 1.48,
+      "drawdown_52w_pct": -8.43,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "FTV",
+      "score": 1,
+      "rsi": 57.34,
+      "macd_hist": -0.1835,
+      "sma25_diff_pct": 1.96,
+      "volume_ratio": 1.28,
+      "drawdown_52w_pct": -2.13,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "REG",
+      "score": 1,
+      "rsi": 52.44,
+      "macd_hist": -0.2526,
+      "sma25_diff_pct": 0.11,
+      "volume_ratio": 1.28,
+      "drawdown_52w_pct": -2.75,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "AFL",
+      "score": 1,
+      "rsi": 52.74,
+      "macd_hist": -0.1738,
+      "sma25_diff_pct": 1.14,
+      "volume_ratio": 1.2,
+      "drawdown_52w_pct": -1.78,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "APD",
+      "score": 1,
+      "rsi": 62.14,
+      "macd_hist": -0.2431,
+      "sma25_diff_pct": 2.19,
+      "volume_ratio": 1.2,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "BF-B",
+      "score": 1,
+      "rsi": 45.74,
+      "macd_hist": -0.4385,
+      "sma25_diff_pct": -5.13,
+      "volume_ratio": 1.19,
+      "drawdown_52w_pct": -13.59,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "C",
+      "score": 1,
+      "rsi": 59.88,
+      "macd_hist": -0.7797,
+      "sma25_diff_pct": 2.18,
+      "volume_ratio": 1.12,
+      "drawdown_52w_pct": -3.33,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "DOC",
+      "score": 1,
+      "rsi": 49.43,
+      "macd_hist": -0.0072,
+      "sma25_diff_pct": -0.13,
+      "volume_ratio": 1.12,
+      "drawdown_52w_pct": -6.32,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "GRMN",
+      "score": 1,
+      "rsi": 35.87,
+      "macd_hist": -3.8766,
+      "sma25_diff_pct": -7.27,
+      "volume_ratio": 1.11,
+      "drawdown_52w_pct": -12.29,
+      "reason": "RSI弱め(35.9)+1"
+    },
+    {
+      "ticker": "DIS",
+      "score": 1,
+      "rsi": 44.86,
+      "macd_hist": -0.2728,
+      "sma25_diff_pct": -0.8,
+      "volume_ratio": 1.1,
+      "drawdown_52w_pct": -8.62,
+      "reason": "RSI弱め(44.9)+1"
+    },
+    {
+      "ticker": "A",
+      "score": 1,
+      "rsi": 51.86,
+      "macd_hist": -0.2897,
+      "sma25_diff_pct": 0.87,
+      "volume_ratio": 1.09,
+      "drawdown_52w_pct": -9.09,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "TDG",
+      "score": 1,
+      "rsi": 50.27,
+      "macd_hist": -2.2825,
+      "sma25_diff_pct": -0.4,
+      "volume_ratio": 1.06,
+      "drawdown_52w_pct": -11.03,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "ALGN",
+      "score": 1,
+      "rsi": 39.09,
+      "macd_hist": -2.1502,
+      "sma25_diff_pct": -6.36,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -14.58,
+      "reason": "RSI弱め(39.1)+1"
+    },
+    {
+      "ticker": "HWM",
+      "score": 1,
+      "rsi": 49.54,
+      "macd_hist": -0.8988,
+      "sma25_diff_pct": -0.85,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -8.46,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "VST",
+      "score": 1,
+      "rsi": 52.41,
+      "macd_hist": -0.0074,
+      "sma25_diff_pct": 1.62,
+      "volume_ratio": 1.05,
+      "drawdown_52w_pct": -9.17,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "GLW",
+      "score": 1,
+      "rsi": 54.16,
+      "macd_hist": -1.869,
+      "sma25_diff_pct": 0.39,
+      "volume_ratio": 1.04,
+      "drawdown_52w_pct": -7.84,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "COHR",
+      "score": 1,
+      "rsi": 62.46,
+      "macd_hist": -2.0149,
+      "sma25_diff_pct": 9.15,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -4.21,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "WYNN",
+      "score": 1,
+      "rsi": 52.07,
+      "macd_hist": -0.124,
+      "sma25_diff_pct": 1.06,
+      "volume_ratio": 1.03,
+      "drawdown_52w_pct": -9.74,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "Q",
+      "score": 1,
+      "rsi": 66.89,
+      "macd_hist": -0.0095,
+      "sma25_diff_pct": 9.75,
+      "volume_ratio": 1.02,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "MAR",
+      "score": 1,
+      "rsi": 50.44,
+      "macd_hist": -2.7953,
+      "sma25_diff_pct": -0.36,
+      "volume_ratio": 1.01,
+      "drawdown_52w_pct": -6.39,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "CRL",
+      "score": 1,
+      "rsi": 60.59,
+      "macd_hist": -0.1045,
+      "sma25_diff_pct": 6.12,
+      "volume_ratio": 0.99,
+      "drawdown_52w_pct": -2.02,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "LRCX",
+      "score": 1,
+      "rsi": 62.82,
+      "macd_hist": -0.4698,
+      "sma25_diff_pct": 9.04,
+      "volume_ratio": 0.98,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "AMAT",
+      "score": 1,
+      "rsi": 61.57,
+      "macd_hist": -1.1265,
+      "sma25_diff_pct": 6.2,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -1.49,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "COIN",
+      "score": 1,
+      "rsi": 54.3,
+      "macd_hist": -0.0742,
+      "sma25_diff_pct": 5.06,
+      "volume_ratio": 0.97,
+      "drawdown_52w_pct": -6.56,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "EA",
+      "score": 1,
+      "rsi": 42.68,
+      "macd_hist": -0.2402,
+      "sma25_diff_pct": -0.69,
+      "volume_ratio": 0.92,
+      "drawdown_52w_pct": -1.27,
+      "reason": "RSI弱め(42.7)+1"
+    },
+    {
+      "ticker": "HST",
+      "score": 1,
+      "rsi": 64.98,
+      "macd_hist": -0.021,
+      "sma25_diff_pct": 4.14,
+      "volume_ratio": 0.91,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "BAC",
+      "score": 1,
+      "rsi": 56.83,
+      "macd_hist": -0.1291,
+      "sma25_diff_pct": 1.49,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -5.5,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "ROP",
+      "score": 1,
+      "rsi": 49.0,
+      "macd_hist": -0.5174,
+      "sma25_diff_pct": -0.04,
+      "volume_ratio": 0.89,
+      "drawdown_52w_pct": -2.73,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "LYV",
+      "score": 1,
+      "rsi": 52.7,
+      "macd_hist": -0.0067,
+      "sma25_diff_pct": -0.25,
+      "volume_ratio": 0.85,
+      "drawdown_52w_pct": -5.42,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "MTD",
+      "score": 1,
+      "rsi": 53.63,
+      "macd_hist": -2.8393,
+      "sma25_diff_pct": 0.68,
+      "volume_ratio": 0.85,
+      "drawdown_52w_pct": -6.99,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "DAL",
+      "score": 1,
+      "rsi": 58.32,
+      "macd_hist": -0.0444,
+      "sma25_diff_pct": 3.35,
+      "volume_ratio": 0.84,
+      "drawdown_52w_pct": -5.7,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "NRG",
+      "score": 1,
+      "rsi": 51.46,
+      "macd_hist": -0.3202,
+      "sma25_diff_pct": 0.17,
+      "volume_ratio": 0.82,
+      "drawdown_52w_pct": -14.19,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "EXPE",
+      "score": 1,
+      "rsi": 51.82,
+      "macd_hist": -1.582,
+      "sma25_diff_pct": 1.15,
+      "volume_ratio": 0.81,
+      "drawdown_52w_pct": -9.19,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "AVGO",
+      "score": 1,
+      "rsi": 70.02,
+      "macd_hist": -0.2059,
+      "sma25_diff_pct": 11.31,
+      "volume_ratio": 0.8,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "FITB",
+      "score": 1,
+      "rsi": 54.75,
+      "macd_hist": -0.1012,
+      "sma25_diff_pct": 1.54,
+      "volume_ratio": 0.79,
+      "drawdown_52w_pct": -7.85,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "CIEN",
+      "score": 1,
+      "rsi": 67.07,
+      "macd_hist": -0.1705,
+      "sma25_diff_pct": 11.79,
+      "volume_ratio": 0.76,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "ALB",
+      "score": 1,
+      "rsi": 54.86,
+      "macd_hist": -0.7437,
+      "sma25_diff_pct": 3.57,
+      "volume_ratio": 0.75,
+      "drawdown_52w_pct": -9.65,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "PNC",
+      "score": 1,
+      "rsi": 54.05,
+      "macd_hist": -0.6211,
+      "sma25_diff_pct": 0.98,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -7.9,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "SNA",
+      "score": 1,
+      "rsi": 51.25,
+      "macd_hist": -0.7217,
+      "sma25_diff_pct": 0.48,
+      "volume_ratio": 0.74,
+      "drawdown_52w_pct": -3.06,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "VRSN",
+      "score": 1,
+      "rsi": 60.08,
+      "macd_hist": -0.9978,
+      "sma25_diff_pct": 2.36,
+      "volume_ratio": 0.69,
+      "drawdown_52w_pct": -0.43,
+      "reason": "MACD加速+1"
+    },
+    {
+      "ticker": "DELL",
+      "score": 1,
+      "rsi": 68.69,
+      "macd_hist": -0.701,
+      "sma25_diff_pct": 11.03,
+      "volume_ratio": 0.68,
+      "drawdown_52w_pct": 0.0,
+      "reason": "MACD加速+1"
+    }
+  ]
+}
