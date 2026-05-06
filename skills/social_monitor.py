@@ -75,9 +75,9 @@ def _llm_analyze(ticker: str, posts: list[str]) -> dict:
     )
     try:
         raw = _get_llm().invoke(prompt).content.strip()
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
-            parsed = json.loads(m.group())
+        start = raw.find("{")
+        if start != -1:
+            parsed, _ = json.JSONDecoder().raw_decode(raw, start)
             return {
                 "sentiment":  str(parsed.get("overall_sentiment", "NEUTRAL")).upper(),
                 "hype_score": float(parsed.get("hype_score", 0.5)),
