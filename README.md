@@ -298,6 +298,7 @@ streamlit run dashboard.py        # 可視化ダッシュボード
 - 📅 **2026-05-01 14:28:10** | 🛠️ **内容:** `auto-backup: 2026-05-01 14:28:10 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/fadd468aca11b8174e413a31cff29f39e610f41e)
 
 ## 🔄 Development History
+- 📅 **2026-05-06 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-06 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/c61ac00c72421202d4f78fa85865c5e0f48c41f1)
 - 📅 **2026-05-05 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-05 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/62e657e98d43edc2bd7d795f67db6cb9dddef077)
 - 📅 **2026-05-05 08:47:07** | 🛠️ **内容:** `auto-backup: 2026-05-05 08:47:07 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/ceff7624e2f42ed1f4fb642fdab8e14e3b4592c4)
 - 📅 **2026-05-05 08:33:47** | 🛠️ **内容:** `auto-backup: 2026-05-05 08:33:47 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/5236a3c315e28d5688b9415e6e0e1a960e2ccf8a)
