@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_ENDPOINT = "http://100.105.163.75:11434/api/generate"
+OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api/generate"
 OLLAMA_MODEL    = "llama3.1"
 OLLAMA_TIMEOUT  = 60  # seconds
 
