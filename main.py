@@ -1416,9 +1416,8 @@ def run_trade_cycle(
                 judgment["critic_override"]   = True
                 judgment["critic_reason"]     = _critic_res.get("critique_reason")
             elif _is_fallback:
-                _log("⚠️  Ollama 未接続（フォールバック） → 安全側: 発注キャンセル")
-                proceed_with_buy = False
-                judgment["critic_override"]   = True
+                _log("⚠️  Ollama 未接続（フォールバック） → CriticAgent スキップ、発注継続")
+                judgment["critic_override"]   = False
                 judgment["critic_reason"]     = _critic_res.get("critique_reason")
             else:
                 _log(f"✅ {_cd} → BUY 継続")
