@@ -44,6 +44,17 @@ TAKE_PROFIT_PCT = 10.0   # 含み益がこの % 以上 → 利確
 STOP_LOSS_PCT   = -5.0   # 含み損がこの % 以下 → 損切り
 
 
+def _safe_log_path(base: Path, filename: str) -> Path | None:
+    """base ディレクトリの外に出ないことを resolve() で保証してパスを返す。"""
+    if not filename:
+        return None
+    resolved = (base / filename).resolve()
+    if not str(resolved).startswith(str(base.resolve())):
+        logger.warning("[ExitAgent] 不正なログファイルパス（拒否）: %s", filename)
+        return None
+    return resolved
+
+
 # ============================================================
 # ExitAgent
 # ============================================================
@@ -251,9 +262,10 @@ class ExitAgent:
         logger.info("  [ExitAgent] 売却ログ保存: %s", sell_path.name)
 
         buy_file = pos.get("buy_log_file", "")
-        if buy_file:
+        buy_log_path = _safe_log_path(OBSIDIAN_LOGS, buy_file)
+        if buy_log_path:
             self._ob_log.close_log(
-                log_path      = OBSIDIAN_LOGS / buy_file,
+                log_path      = buy_log_path,
                 outcome       = "CLOSED",
                 profit_loss   = pl_str,
                 sell_log_name = sell_path.name,
@@ -273,7 +285,7 @@ class ExitAgent:
         if updated:
             logger.info("  [ExitAgent] training_data.jsonl outcome 更新: %s +%d件", decision["ticker"], updated)
         else:
-            logger.warning("  [ExitAgent] training_data.jsonl に対応レコードなし: %s", decision["ticker"])
+            logger.debug("  [ExitAgent] training_data.jsonl に対応レコードなし（旧ポジションまたは未記録）: %s", decision["ticker"])
 
     # ----------------------------------------------------------
     # データ取得
@@ -303,19 +315,18 @@ class ExitAgent:
     def _extract_thesis(self, pos: dict) -> str:
         """購入ログの '当時の市場コンテキスト' セクションを抽出する。"""
         buy_file = pos.get("buy_log_file", "")
-        if buy_file:
-            log_path = OBSIDIAN_LOGS / buy_file
-            if log_path.exists():
-                try:
-                    text  = log_path.read_text(encoding="utf-8")
-                    start = text.find("## 1. 当時の市場コンテキスト")
-                    if start != -1:
-                        end     = text.find("\n## 2.", start)
-                        section = text[start + len("## 1. 当時の市場コンテキスト"):
-                                       end if end != -1 else start + 600]
-                        return section.strip()
-                except Exception as e:
-                    logger.error("  [ExitAgent] thesis 抽出エラー (%s): %s", buy_file, e)
+        log_path = _safe_log_path(OBSIDIAN_LOGS, buy_file)
+        if log_path and log_path.exists():
+            try:
+                text  = log_path.read_text(encoding="utf-8")
+                start = text.find("## 1. 当時の市場コンテキスト")
+                if start != -1:
+                    end     = text.find("\n## 2.", start)
+                    section = text[start + len("## 1. 当時の市場コンテキスト"):
+                                   end if end != -1 else start + 600]
+                    return section.strip()
+            except Exception as e:
+                logger.error("  [ExitAgent] thesis 抽出エラー (%s): %s", buy_file, e)
         return pos.get("thesis", "")
 
     def _is_thesis_broken(self, ticker: str, thesis: str, news: str) -> bool:

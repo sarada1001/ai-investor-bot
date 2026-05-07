@@ -38,6 +38,7 @@ import sys
 import json
 import time
 import datetime
+import re
 import warnings
 import yaml
 import requests
@@ -747,7 +748,7 @@ class ManagerAgent:
         wiki_context: str = "",
     ) -> str:
         history_block = (
-            f"\n\n【過去実績（参考）】\n{wiki_context}\n"
+            f"\n\n【過去実績（参考）】\n{wiki_context[:600]}\n"
             if wiki_context else ""
         )
         prompt = (
@@ -1162,7 +1163,6 @@ def _fetch_past_lessons(ticker: str, max_rules: int = 5) -> str:
     Obsidian ログから過去の失敗・成功教訓を抽出し、CriticAgent 用テキストを返す。
     対象: outcome=CLOSED かつ action=SELL のログ（負の損益を優先）
     """
-    import re
     logs_dir = Path("data/knowledge_base/obsidian_logs")
     if not logs_dir.exists():
         return "（過去ログなし）"
@@ -1193,7 +1193,6 @@ def _fetch_wiki_context(ticker: str, max_trades: int = 5) -> str:
     Wiki ティッカーページから直近 SELL 実績と関連コンセプトを抽出し、
     ManagerAgent の rationale 生成に注入するコンテキストを返す。
     """
-    import re
     ticker_file = Path("data/knowledge_base/wiki/tickers") / f"{ticker.upper()}.md"
     if not ticker_file.exists():
         return ""
@@ -1212,19 +1211,18 @@ def _fetch_wiki_context(ticker: str, max_trades: int = 5) -> str:
     if trade_match:
         seen_log: set[str] = set()
         for row in trade_match.group(1).splitlines():
-            if "| SELL |" not in row:
-                continue
             # 空セルを保持したまま分割（価格・スコアが空の場合がある）
             cols = [c.strip() for c in row.split("|")]
-            # 先頭・末尾の空要素を除いた実セル（通常: ['', date, action, price, score, result, log, '']）
-            cells = [c for i, c in enumerate(cols) if i > 0 and i < len(cols) - 1]
-            if len(cells) < 6:
+            cells = [c for i, c in enumerate(cols) if 0 < i < len(cols) - 1]
+            if len(cells) < 6 or cells[1] != "SELL":
                 continue
-            date, _, _, _, result, log_key = cells[0], cells[1], cells[2], cells[3], cells[4], cells[5]
+            entry_date, result, raw_log_key = cells[0], cells[4], cells[5]
+            # [[LogName|alias]] 形式のエイリアスを除去して正規化
+            log_key = re.sub(r"\|[^\]]*", "", raw_log_key)
             if log_key in seen_log:
                 continue
             seen_log.add(log_key)
-            recent_sells.append(f"{date}: P&L={result}")
+            recent_sells.append(f"{entry_date}: P&L={result}")
             if len(recent_sells) >= max_trades:
                 break
 

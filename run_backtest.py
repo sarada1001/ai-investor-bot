@@ -17,19 +17,25 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime
-import importlib.util
 import json
+import math
 import sys
 import warnings
 from pathlib import Path
 
 import yfinance as yf
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=FutureWarning, module="yfinance")
 
 # ── パス定数 ────────────────────────────────────────────────────────────────
 PROJECT_ROOT   = Path(__file__).parent
 TRAINING_FILE  = PROJECT_ROOT / "data" / "training" / "training_data.jsonl"
+
+# skills/ をパスに追加して通常 import できるようにする
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import skills.training_data_collector as _training_mod  # noqa: E402
 
 _W = 70  # 表示幅
 
@@ -163,21 +169,21 @@ def run_batch(records: list[dict], hold_days: int) -> list[dict]:
     results = []
     total = len(records)
     for i, r in enumerate(records, 1):
-        ticker = r.get("ticker", "?")
-        date   = r.get("date", "")
+        ticker          = r.get("ticker", "?")
+        entry_date_str  = r.get("date", "")
         mo     = r.get("manager_output") or {}
         score  = mo.get("score")
         cot    = r.get("manager_chain_of_thought") or {}
         sigs   = (cot.get("signals") or {})
 
-        print(f"  [{i:2d}/{total}] {ticker:6s}  {date}  score={score or '?'} ... ", end="", flush=True)
+        print(f"  [{i:2d}/{total}] {ticker:6s}  {entry_date_str}  score={score or '?'} ... ", end="", flush=True)
 
         # 既に outcome_label が設定済み（ExitAgent 経由）なら実績値を使う
         if r.get("outcome_label") is not None:
             outcome = r.get("outcome") or {}
             result = {
                 "status":      "completed",
-                "entry_date":  date,
+                "entry_date":  entry_date_str,
                 "exit_date":   outcome.get("exit_date", ""),
                 "entry_price": None,
                 "exit_price":  outcome.get("exit_price"),
@@ -186,7 +192,7 @@ def run_batch(records: list[dict], hold_days: int) -> list[dict]:
                 "source":      "exit_agent",
             }
         else:
-            result = fetch_pnl(ticker, date, hold_days)
+            result = fetch_pnl(ticker, entry_date_str, hold_days)
             result["source"] = "yfinance"
 
         pnl_str = f"{result.get('pnl_pct', 0):+.2f}%" if result.get("pnl_pct") is not None else "error"
@@ -197,7 +203,7 @@ def run_batch(records: list[dict], hold_days: int) -> list[dict]:
         results.append({
             "record_id":    r.get("record_id"),
             "ticker":       ticker,
-            "date":         date,
+            "date":         entry_date_str,
             "score":        score,
             "sig_fa":       sigs.get("fundamental"),
             "sig_tech":     sigs.get("technical"),
@@ -259,9 +265,9 @@ def print_report(results: list[dict], hold_days: int) -> None:
         w    = [r for r in comp if r.get("win")]
         wr   = len(w) / len(comp) * 100 if comp else float("nan")
         ap   = sum(r["pnl_pct"] for r in comp) / len(comp) if comp else float("nan")
-        bar  = _bar(ap if ap == ap else 0, 10.0, width=15)
-        wr_s = f"{wr:.0f}%" if wr == wr else "N/A"
-        ap_s = f"{ap:+.2f}%" if ap == ap else "N/A"
+        bar  = _bar(ap if math.isfinite(ap) else 0, 10.0, width=15)
+        wr_s = f"{wr:.0f}%" if math.isfinite(wr) else "N/A"
+        ap_s = f"{ap:+.2f}%" if math.isfinite(ap) else "N/A"
         print(f"  {tkr:8s} {len(sub):>4}  {len(w):>4}  {wr_s:>6}  {ap_s:>8}  │{bar}│")
     _hr("─")
 
@@ -288,10 +294,10 @@ def print_report(results: list[dict], hold_days: int) -> None:
                 continue
             w_avg = sum(w_vals) / len(w_vals) if w_vals else float("nan")
             l_avg = sum(l_vals) / len(l_vals) if l_vals else float("nan")
-            diff  = (w_avg - l_avg) if (w_avg == w_avg and l_avg == l_avg) else float("nan")
-            w_s   = f"{w_avg:+.3f}" if w_avg == w_avg else "  N/A "
-            l_s   = f"{l_avg:+.3f}" if l_avg == l_avg else "  N/A "
-            d_s   = f"{diff:+.3f}" if diff == diff else "  N/A "
+            diff  = (w_avg - l_avg) if (math.isfinite(w_avg) and math.isfinite(l_avg)) else float("nan")
+            w_s   = f"{w_avg:+.3f}" if math.isfinite(w_avg) else "  N/A "
+            l_s   = f"{l_avg:+.3f}" if math.isfinite(l_avg) else "  N/A "
+            d_s   = f"{diff:+.3f}" if math.isfinite(diff) else "  N/A "
             print(f"  {label:20s} {w_s:>9}  {l_s:>9}  {d_s:>8}")
         _hr("─")
 
@@ -333,13 +339,6 @@ def export_csv(results: list[dict], path: Path) -> None:
 
 def backfill_outcomes(results: list[dict]) -> int:
     """status=completed かつ outcome_label 未設定のレコードを自動更新する。"""
-    spec = importlib.util.spec_from_file_location(
-        "training_data_collector",
-        PROJECT_ROOT / "skills" / "training_data_collector.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
     updated_total = 0
     for r in results:
         if r.get("status") != "completed":
@@ -348,7 +347,7 @@ def backfill_outcomes(results: list[dict]) -> int:
             continue
         if r.get("pnl_pct") is None:
             continue
-        n = mod.update_outcome(
+        n = _training_mod.update_outcome(
             ticker     = r["ticker"],
             pnl_pct    = r["pnl_pct"],
             exit_price = r.get("exit_price") or 0.0,
