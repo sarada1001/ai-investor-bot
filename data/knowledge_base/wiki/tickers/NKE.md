@@ -34,10 +34,10 @@ assessment_score: 0.0
 - [[concepts/risk_management]] — リスク管理
 - [[concepts/stop_loss]] — 損切り
 - [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ・テクニカル分析
-- [[concepts/entry_criteria]] — エントリー条件
+- [[concepts/entry_strategy]] — エントリー条件
 - [[concepts/stop_loss]] — ストップロス
-- [[concepts/stop_loss_strategy]] — ストップロス戦略
-- [[concepts/fundamental_technical_analysis_confirmation]] — ファンダメンタルズ・テクニカル分析の確認
+- [[concepts/stop_loss]] — ストップロス戦略
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ・テクニカル分析の確認
 - [[concepts/social_hype]] — SNS煽り
 
 ## 関連ニュース（最新3件）

@@ -62,13 +62,13 @@ assessment_score: 0.0
 - 2026-05-05: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
-- [[concepts/stop_loss_strategy]] — 損切り戦略
+- [[concepts/stop_loss]] — 損切り戦略
 - [[concepts/thesis_driven_trading]] — シナリオに基づく取引
 - [[concepts/emotional_control]] — 感情コントロール
 - [[concepts/take_profit]] — 利益確定
 - [[concepts/thesis_driven_trading]] — セシストレード
-- [[concepts/social_media_sentiment]] — SNSセンチメント分析
-- [[concepts/fundamental_analysis]] — ファンダメンタルズ分析
+- [[concepts/social_sentiment]] — SNSセンチメント分析
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ分析
 - [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ・テクニカル分析
 - [[concepts/social_sentiment]] — SNSセンチメント
 - [[concepts/stop_loss]] — 損切り戦略
@@ -77,20 +77,20 @@ assessment_score: 0.0
 - [[concepts/thesis_driven_trading]] — セシスドリブントレード
 - [[concepts/llm_based_analysis]] — LLMに基づく分析
 - [[concepts/risk_management]] — リスク管理
-- [[concepts/thesis_driven_investing]] — 仮説駆動投資
-- [[concepts/fundamental_technical_analysis_combination]] — ファンダメンタル・テクニカル分析の組み合わせ
-- [[concepts/take_profit_strategy]] — 利確戦略
+- [[concepts/thesis_driven_trading]] — 仮説駆動投資
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタル・テクニカル分析の組み合わせ
+- [[concepts/take_profit]] — 利確戦略
 - [[concepts/social_hype]] — SNS煽り
-- [[concepts/target_price]] — 目標株価設定
-- [[concepts/social_sentiment_analysis]] — ソーシャルセンチメント分析
-- [[concepts/fundamental_technical_analysis_fusion]] — ファンダメンタル・テクニカル分析の融合
+- [[concepts/price_target]] — 目標株価設定
+- [[concepts/social_sentiment]] — ソーシャルセンチメント分析
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタル・テクニカル分析の融合
 - [[concepts/price_target]] — 目標株価設定
 - [[concepts/take_profit]] — 利確戦略
-- [[concepts/take_profit_strategy]] — 利益確定戦略
-- [[concepts/social_media_sentiment_analysis]] — ソーシャルメディアセンチメント分析
-- [[concepts/fundamental_technical_analysis_integration]] — ファンダメンタル・テクニカル分析の統合
+- [[concepts/take_profit]] — 利益確定戦略
+- [[concepts/social_sentiment]] — ソーシャルメディアセンチメント分析
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタル・テクニカル分析の統合
 - [[concepts/sma_divergence]] — SMA乖離
-- [[concepts/fundamental_analysis]] — ファンダメンタル分析
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタル分析
 - [[concepts/macd]] — MACD (移動平均収束拡散法)
 
 ## 関連ニュース（最新3件）

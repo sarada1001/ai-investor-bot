@@ -38,9 +38,9 @@ assessment_score: 0.0
 - 2026-05-05: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
-- [[concepts/volatility_filter]] — ボラティリティフィルタ
-- [[concepts/earnings_play]] — 決算プレイ
-- [[concepts/entry_criteria]] — エントリー基準
+- [[concepts/vix_filtering]] — ボラティリティフィルタ
+- [[concepts/earnings_beat]] — 決算プレイ
+- [[concepts/entry_strategy]] — エントリー基準
 - [[concepts/risk_management]] — リスク管理
 - [[concepts/low_vix]] — 低ボラティリティ環境
 - [[concepts/stop_loss]] — ストップロス戦略
@@ -51,8 +51,8 @@ assessment_score: 0.0
 - [[concepts/breakout]] — ブレイクアウト
 - [[concepts/entry_strategy]] — エントリー戦略
 - [[concepts/stop_loss]] — ストップロス
-- [[concepts/low_vix_environment]] — 低VIX環境
-- [[concepts/earnings_surprise]] — 決算サプライズ
-- [[concepts/breakout_trading]] — ブレイクアウト取引
+- [[concepts/low_vix]] — 低VIX環境
+- [[concepts/earnings_beat]] — 決算サプライズ
+- [[concepts/breakout]] — ブレイクアウト取引
 
 ## 関連ニュース（最新3件）

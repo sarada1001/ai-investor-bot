@@ -26,7 +26,7 @@ assessment_score: 0.0
 - 2026-05-06: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
-- [[concepts/fundamental_technical_analysis_confirmation]] — ファンダメンタルズ・テクニカル分析の確認
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ・テクニカル分析の確認
 - [[concepts/market_sentiment]] — 市場センチメント
 - [[concepts/confirmation_bias_reduction]] — 確証バイアス軽減
 - [[concepts/social_hype]] — SNS煽り
