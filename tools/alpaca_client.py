@@ -175,11 +175,12 @@ class AlpacaClient:
         """
         買い成行注文を発行する。
 
+        閉場中でも time_in_force=DAY で送信し、Alpaca が寄り付きに自動執行する。
+
         安全チェック順序:
-          1. 市場開場チェック
-          2. 既存ポジション重複チェック
-          3. 未決済注文重複チェック
-          4. 注文送信
+          1. 既存ポジション重複チェック
+          2. 未決済注文重複チェック
+          3. 注文送信
 
         Returns:
             成功: {"success": True, "order_id": ..., "status": ..., ...}
@@ -190,9 +191,7 @@ class AlpacaClient:
 
         is_open, market_msg = self.is_market_open()
         if not is_open:
-            logger.warning("  [AlpacaClient] 買い注文スキップ (%s): %s", sym, market_msg)
-            return {"success": False, "skipped": True, "skip_reason": f"市場閉場中: {market_msg}",
-                    "symbol": sym, "qty": qty, "side": "buy"}
+            logger.info("  [AlpacaClient] 閉場中のため寄り付き注文として送信 (%s): %s", sym, market_msg)
 
         if self.has_position(sym):
             logger.warning("  [AlpacaClient] 買い注文スキップ (%s): 既に保有中", sym)
@@ -211,20 +210,18 @@ class AlpacaClient:
         売り成行注文を発行する。
 
         qty=None の場合は Alpaca の保有株数を全て売却する。
+        閉場中でも time_in_force=DAY で送信し、Alpaca が寄り付きに自動執行する。
 
         安全チェック順序:
-          1. 市場開場チェック
-          2. 保有株数チェック（保有なし → スキップ）
-          3. 未決済注文重複チェック
-          4. 注文送信
+          1. 保有株数チェック（保有なし → スキップ）
+          2. 未決済注文重複チェック
+          3. 注文送信
         """
         sym = symbol.upper()
 
         is_open, market_msg = self.is_market_open()
         if not is_open:
-            logger.warning("  [AlpacaClient] 売り注文スキップ (%s): %s", sym, market_msg)
-            return {"success": False, "skipped": True, "skip_reason": f"市場閉場中: {market_msg}",
-                    "symbol": sym, "qty": qty, "side": "sell"}
+            logger.info("  [AlpacaClient] 閉場中のため寄り付き注文として送信 (%s): %s", sym, market_msg)
 
         actual_qty = qty if qty is not None else self.get_position_qty(sym)
         if actual_qty <= 0:

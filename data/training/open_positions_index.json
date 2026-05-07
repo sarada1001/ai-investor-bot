@@ -85,6 +85,38 @@
       "session_id": "20260505_161424",
       "entry_date": "2026-05-05",
       "entry_price": null
+    },
+    {
+      "record_id": "b7cbd3c9-0bfa-4efc-9a94-328ece0b15a0",
+      "session_id": "20260507_053917",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "cc9044b6-ce17-4b03-9295-776d8e20b6f4",
+      "session_id": "20260507_054100",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "eee38063-80c0-4239-a8e7-0ddfcba6d735",
+      "session_id": "20260507_055821",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    }
+  ],
+  "HSY": [
+    {
+      "record_id": "6f16c17a-9ab3-48d4-833c-efd6042222a6",
+      "session_id": "20260507_062246",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "268f3f51-4c7e-4c7d-abd2-61a9f6c51b14",
+      "session_id": "20260507_062725",
+      "entry_date": "2026-05-07",
+      "entry_price": null
     }
   ]
 }
