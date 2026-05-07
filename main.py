@@ -1152,7 +1152,7 @@ def _fetch_past_lessons(ticker: str, max_rules: int = 5) -> str:
         return "（過去ログなし）"
 
     lessons: list[str] = []
-    for log_file in sorted(logs_dir.glob(f"*_{ticker.upper()}_SELL.md"), reverse=True):
+    for log_file in sorted(logs_dir.glob(f"*_{ticker.upper()}_SELL*.md"), reverse=True):
         try:
             text = log_file.read_text(encoding="utf-8")
             if "outcome: CLOSED" not in text:
