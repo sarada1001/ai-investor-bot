@@ -318,3 +318,6 @@ python main.py --screen --dry-run --top-n 3
 - [ ] バックテスト強化 — 過去データでのシミュレーション精度向上
 - [ ] ポートフォリオ最適化 — 複数銘柄間のリスク分散ロジック追加
 - [ ] FinanceBench評価 — RAG検索品質の体系的ベンチマーク
+
+## 🔄 Development History
+- 📅 **2026-05-07 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-07 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/105e1349850b71854bdfca75bd82323d50eab0df)
