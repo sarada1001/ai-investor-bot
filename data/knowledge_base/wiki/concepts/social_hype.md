@@ -1,7 +1,7 @@
 ---
 concept: social_hype
 title: SNS煽り
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 linked_tickers: [AAPL, GEHC, NKE]
 ---
 
@@ -15,6 +15,10 @@ SNSでの盛り上がりを投資判断の材料の一つとして利用して�
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/NKE]] | 失敗 | |
+| 2026-05-06 | [[tickers/GEHC]] | 中立 | |
+| 2026-05-05 | [[tickers/AAPL]] | 中立 | |
+| 2026-05-05 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-06 | [[tickers/GEHC]] | 中立 | |
 | 2026-05-06 | [[tickers/NKE]] | 失敗 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |

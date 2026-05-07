@@ -1,8 +1,8 @@
 ---
 concept: stop_loss
 title: ストップロス
-last_updated: 2026-05-06
-linked_tickers: [NKE, NVDA]
+last_updated: 2026-05-07
+linked_tickers: [AAPL, NKE, NVDA]
 ---
 
 # [[concepts/stop_loss|ストップロス]]
@@ -15,6 +15,11 @@ linked_tickers: [NKE, NVDA]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/NKE]] | 成功 | |
+| 2026-05-06 | [[tickers/NKE]] | 失敗 | |
+| 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
+| 2026-05-05 | [[tickers/NVDA]] | 成功 | |
+| 2026-05-06 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-06 | [[tickers/NKE]] | 成功 | |
 | 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
 | 2026-05-05 | [[tickers/NVDA]] | 失敗 | |

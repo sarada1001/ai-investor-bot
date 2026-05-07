@@ -1,21 +1,20 @@
 ---
-concept: earnings_surprise
-title: 決算サプライズ
+concept: low_vix
+title: 低ボラティリティ環境
 last_updated: 2026-05-07
 linked_tickers: [NVDA]
 ---
 
-# [[concepts/earnings_surprise|決算サプライズ]]
+# [[concepts/low_vix|低ボラティリティ環境]]
 
 ## 定義
 
-企業の決算発表が市場予想を大幅に上回ったことを好感して買いを入れる戦略。
+VIXが低水準であることをリスクオン環境と判断し、買いエントリーの根拠の一つとしている。
 
 ## 観測事例
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
-| 2026-05-05 | [[tickers/NVDA]] | 中立 | |
 | 2026-05-05 | [[tickers/NVDA]] | 中立 | |
 
 ## 教訓

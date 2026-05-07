@@ -1,7 +1,7 @@
 ---
 concept: take_profit_strategy
 title: 利益確定戦略
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 linked_tickers: [AAPL]
 ---
 
@@ -15,6 +15,10 @@ linked_tickers: [AAPL]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-05 | [[tickers/AAPL]] | 成功 | |
+| 2026-05-05 | [[tickers/AAPL]] | 成功 | |
+| 2026-05-05 | [[tickers/AAPL]] | 成功 | |
+| 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |

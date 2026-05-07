@@ -1,7 +1,7 @@
 ---
 concept: macd
 title: MACD (移動平均収束拡散法)
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 linked_tickers: [AAPL]
 ---
 
@@ -15,6 +15,9 @@ MACDのゴールデンクロスを買いの判断材料として利用。
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/AAPL]] | 失敗 | |
+| 2026-05-05 | [[tickers/AAPL]] | 中立 | |
+| 2026-05-06 | [[tickers/AAPL]] | 失敗 | |
 | 2026-05-05 | [[tickers/AAPL]] | 中立 | |
 
 ## 教訓

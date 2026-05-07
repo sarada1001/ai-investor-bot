@@ -2,7 +2,7 @@
 ticker: NKE
 name: NIKE, Inc.
 sector: Consumer Cyclical
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 assessment: HOLD
 assessment_score: 0.0
 ---
@@ -20,12 +20,20 @@ assessment_score: 0.0
 |---|---|---|---|---|---|
 | 2026-05-06 | SELL |  |  | -76.72% | [[Log_20260506_NKE_SELL]] |
 | 2026-05-06 | BUY |  |  | -76.72% | [[Log_20260506_NKE_BUY]] |
+| 2026-05-06 | SELL |  |  | -76.72% | [[Log_20260506_NKE_SELL]] |
+| 2026-05-06 | BUY |  |  | -76.72% | [[Log_20260506_NKE_BUY]] |
 
 ## 評価変遷
 - 2026-05-06: HOLD (score=, P&L=-76.72%)
 - 2026-05-06: BUY (score=, P&L=-76.72%)
+- 2026-05-06: HOLD (score=, P&L=-76.72%)
+- 2026-05-06: BUY (score=, P&L=-76.72%)
 
 ## 関連コンセプト
+- [[concepts/entry_strategy]] — エントリー戦略
+- [[concepts/risk_management]] — リスク管理
+- [[concepts/stop_loss]] — 損切り
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ・テクニカル分析
 - [[concepts/entry_criteria]] — エントリー条件
 - [[concepts/stop_loss]] — ストップロス
 - [[concepts/stop_loss_strategy]] — ストップロス戦略

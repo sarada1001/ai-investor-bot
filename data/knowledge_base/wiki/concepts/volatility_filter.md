@@ -1,22 +1,20 @@
 ---
-concept: earnings_beat
-title: 好決算
+concept: volatility_filter
+title: ボラティリティフィルタ
 last_updated: 2026-05-07
 linked_tickers: [NVDA]
 ---
 
-# [[concepts/earnings_beat|好決算]]
+# [[concepts/volatility_filter|ボラティリティフィルタ]]
 
 ## 定義
 
-好決算が強気トレンドを後押し。
+VIXが20未満という低ボラティリティ環境を条件とした取引。
 
 ## 観測事例
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
-| 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
-| 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
 | 2026-05-05 | [[tickers/NVDA]] | 成功 | |
 
 ## 教訓

@@ -1,8 +1,8 @@
 ---
 concept: entry_strategy
 title: エントリー戦略
-last_updated: 2026-05-06
-linked_tickers: [NVDA]
+last_updated: 2026-05-07
+linked_tickers: [NKE, NVDA]
 ---
 
 # [[concepts/entry_strategy|エントリー戦略]]
@@ -15,6 +15,7 @@ linked_tickers: [NVDA]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/NKE]] | 失敗 | |
 | 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
 
 ## 教訓

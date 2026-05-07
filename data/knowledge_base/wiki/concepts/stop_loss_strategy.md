@@ -1,8 +1,8 @@
 ---
 concept: stop_loss_strategy
 title: ストップロス戦略
-last_updated: 2026-05-06
-linked_tickers: [NKE]
+last_updated: 2026-05-07
+linked_tickers: [AAPL, NKE]
 ---
 
 # [[concepts/stop_loss_strategy|ストップロス戦略]]
@@ -15,6 +15,7 @@ linked_tickers: [NKE]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-06 | [[tickers/NKE]] | 失敗 | |
 
 ## 教訓

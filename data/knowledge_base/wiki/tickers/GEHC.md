@@ -2,7 +2,7 @@
 ticker: GEHC
 name: GE HealthCare Technologies Inc.
 sector: Healthcare
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 assessment: BUY
 assessment_score: 0.0
 ---
@@ -19,11 +19,15 @@ assessment_score: 0.0
 | 日付 | アクション | 価格 | スコア | 結果 | ログ |
 |---|---|---|---|---|---|
 | 2026-05-06 | BUY |  |  | 未確定 | [[Log_20260506_GEHC_BUY]] |
+| 2026-05-06 | BUY |  |  | 未確定 | [[Log_20260506_GEHC_BUY]] |
 
 ## 評価変遷
 - 2026-05-06: BUY (score=, P&L=未確定)
+- 2026-05-06: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
+- [[concepts/fundamental_technical_analysis_confirmation]] — ファンダメンタルズ・テクニカル分析の確認
+- [[concepts/market_sentiment]] — 市場センチメント
 - [[concepts/confirmation_bias_reduction]] — 確証バイアス軽減
 - [[concepts/social_hype]] — SNS煽り
 - [[concepts/composite_signal]] — 複合シグナル

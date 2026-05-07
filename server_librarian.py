@@ -166,21 +166,26 @@ class WikiIngestor:
                 result[k.strip()] = v.strip().strip('"')
         return result
 
-    def _last_ingest_time(self) -> datetime:
+    def _processed_log_names(self) -> set[str]:
+        """log.md の INGEST 行から処理済みファイル名（stem）を収集する。"""
         if not self.log_path.exists():
-            return datetime.min
-        lines = [l for l in self.log_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-        if not lines:
-            return datetime.min
-        try:
-            ts = lines[-1].split("|")[0].strip()
-            return datetime.strptime(ts, "%Y-%m-%d %H:%M")
-        except Exception:
-            return datetime.min
+            return set()
+        result: set[str] = set()
+        for line in self.log_path.read_text(encoding="utf-8").splitlines():
+            if "| INGEST |" not in line:
+                continue
+            m = re.search(r"files=\[([^\]]*)\]", line)
+            if m:
+                for name in m.group(1).split(","):
+                    name = name.strip()
+                    if name:
+                        result.add(name)
+        return result
 
-    def _append_log(self, tickers: list[str], summary: str):
+    def _append_log(self, tickers: list[str], summary: str, log_files: list[str] | None = None):
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        line = f"{NOW} | INGEST | {','.join(tickers) or 'なし'} | {summary}\n"
+        files_part = f"files=[{','.join(log_files)}] | " if log_files else ""
+        line = f"{NOW} | INGEST | {','.join(tickers) or 'なし'} | {files_part}{summary}\n"
         with self.log_path.open("a", encoding="utf-8") as f:
             f.write(line)
         print(f"[ingest] log.md に追記: {line.strip()}")
@@ -455,12 +460,12 @@ AIエージェントの直近判断をもとに自動生成。詳細は各ティ
     # ── メイン Ingest ──────────────────────────
 
     def run(self):
-        last_ingest = self._last_ingest_time()
-        print(f"[ingest] 前回Ingest: {last_ingest} 以降の新規ログを処理します")
+        processed = self._processed_log_names()
+        print(f"[ingest] 処理済みファイル数: {len(processed)}件。未処理ログを確認します")
 
-        # 新規 obsidian_logs を取得（前回Ingest以降のもの）
-        all_logs = sorted(LOG_DIR.glob("Log_*.md"), key=os.path.getmtime)
-        new_logs = [p for p in all_logs if datetime.fromtimestamp(p.stat().st_mtime) > last_ingest]
+        # 処理済みファイル名で除外（mtime/時刻に依存しない）
+        all_logs = sorted(LOG_DIR.glob("Log_*.md"), key=lambda p: p.name)
+        new_logs = [p for p in all_logs if p.stem not in processed]
 
         if not new_logs:
             print("[ingest] 新規ログなし。Ingestをスキップします。")
@@ -508,7 +513,11 @@ AIエージェントの直近判断をもとに自動生成。詳細は各ティ
         self.rebuild_index()
 
         summary = " | ".join(updated_summaries) if updated_summaries else "変更なし"
-        self._append_log(list(dict.fromkeys(processed_tickers)), f"INDEX再生成 | {summary}")
+        self._append_log(
+            list(dict.fromkeys(processed_tickers)),
+            f"INDEX再生成 | {summary}",
+            log_files=[p.stem for p in new_logs],
+        )
         print(f"[ingest] 完了。処理銘柄: {set(processed_tickers)}")
 
 

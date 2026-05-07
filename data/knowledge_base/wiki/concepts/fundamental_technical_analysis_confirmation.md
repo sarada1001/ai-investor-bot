@@ -1,8 +1,8 @@
 ---
 concept: fundamental_technical_analysis_confirmation
 title: ファンダメンタルズ・テクニカル分析の確認
-last_updated: 2026-05-06
-linked_tickers: [NKE]
+last_updated: 2026-05-07
+linked_tickers: [GEHC, NKE]
 ---
 
 # [[concepts/fundamental_technical_analysis_confirmation|ファンダメンタルズ・テクニカル分析の確認]]
@@ -15,6 +15,7 @@ FA(ファンダメンタルズ)とTech(テクニカル)の両方が確認済み�
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-06 | [[tickers/GEHC]] | 中立 | |
 | 2026-05-06 | [[tickers/NKE]] | 失敗 | |
 
 ## 教訓

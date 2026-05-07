@@ -1,7 +1,7 @@
 ---
 concept: breakout
 title: ブレイクアウト
-last_updated: 2026-05-06
+last_updated: 2026-05-07
 linked_tickers: [NVDA]
 ---
 
@@ -15,6 +15,8 @@ linked_tickers: [NVDA]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-05 | [[tickers/NVDA]] | 中立 | |
+| 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
 | 2026-05-05 | [[tickers/NVDA]] | 失敗 | |
 | 2026-05-05 | [[tickers/NVDA]] | 成功 | |
 
