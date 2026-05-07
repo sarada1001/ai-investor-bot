@@ -744,9 +744,16 @@ class ManagerAgent:
         score: float,
         sigs: dict[str, float],
         reasons: dict[str, str],
+        wiki_context: str = "",
     ) -> str:
+        history_block = (
+            f"\n\n【過去実績（参考）】\n{wiki_context}\n"
+            if wiki_context else ""
+        )
         prompt = (
-            f"スイングトレード分析結果を投資家向けに200文字以内で要約してください。\n\n"
+            f"スイングトレード分析結果を投資家向けに200文字以内で要約してください。"
+            f"過去実績がある場合は現在の判断との整合性も言及してください。\n"
+            f"{history_block}\n"
             f"銘柄: {ticker}\n"
             f"最終判断: {decision}  (加重スコア: {score:+.3f})\n"
             f"マクロ環境       ({WEIGHTS['macro']:.0%}): {sigs['macro']:+.2f} — {reasons['macro']}\n"
@@ -882,6 +889,14 @@ class ManagerAgent:
             _log("⚠ マクロ NEGATIVE のため強制 HOLD（安全弁）")
         _sep()
 
+        # ── Wiki 過去実績コンテキストの取得 ──────────────────────
+        wiki_ctx = _fetch_wiki_context(ticker)
+        if wiki_ctx:
+            _log("📚 Wiki 過去実績:")
+            for line in wiki_ctx.splitlines():
+                _log(f"  {line}")
+            _sep()
+
         # ── LLM による根拠テキスト生成 ────────────────────────────
         if mock_mode:
             _log("⚠️  [MOCK] LLM スキップ — ダミー根拠テキストを使用")
@@ -897,7 +912,8 @@ class ManagerAgent:
             )
         else:
             _log("根拠テキスト生成中 (gemini-2.0-flash)...")
-            rationale = self._build_rationale(ticker, decision, score, sigs, reasons)
+            rationale = self._build_rationale(ticker, decision, score, sigs, reasons,
+                                              wiki_context=wiki_ctx)
 
         # ── 判断通知（発注は RiskAgent 算出後に run_trade_cycle で実行）──
         if is_strong_buy:
@@ -1170,6 +1186,70 @@ def _fetch_past_lessons(ticker: str, max_rules: int = 5) -> str:
     if not lessons:
         return "（対象銘柄の過去教訓なし）"
     return "\n\n".join(lessons[:max_rules])
+
+
+def _fetch_wiki_context(ticker: str, max_trades: int = 5) -> str:
+    """
+    Wiki ティッカーページから直近 SELL 実績と関連コンセプトを抽出し、
+    ManagerAgent の rationale 生成に注入するコンテキストを返す。
+    """
+    import re
+    ticker_file = Path("data/knowledge_base/wiki/tickers") / f"{ticker.upper()}.md"
+    if not ticker_file.exists():
+        return ""
+
+    text = ticker_file.read_text(encoding="utf-8")
+
+    # frontmatter から最終評価を取得
+    assessment_m = re.search(r"^assessment:\s*(\w+)", text, re.MULTILINE)
+    score_m      = re.search(r"^assessment_score:\s*([\d.+\-]+)", text, re.MULTILINE)
+    assessment   = assessment_m.group(1) if assessment_m else "UNKNOWN"
+    score_str    = score_m.group(1)      if score_m      else "?"
+
+    # トレード履歴から直近 SELL を重複排除して抽出
+    trade_match = re.search(r"## トレード履歴\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
+    recent_sells: list[str] = []
+    if trade_match:
+        seen_log: set[str] = set()
+        for row in trade_match.group(1).splitlines():
+            if "| SELL |" not in row:
+                continue
+            # 空セルを保持したまま分割（価格・スコアが空の場合がある）
+            cols = [c.strip() for c in row.split("|")]
+            # 先頭・末尾の空要素を除いた実セル（通常: ['', date, action, price, score, result, log, '']）
+            cells = [c for i, c in enumerate(cols) if i > 0 and i < len(cols) - 1]
+            if len(cells) < 6:
+                continue
+            date, _, _, _, result, log_key = cells[0], cells[1], cells[2], cells[3], cells[4], cells[5]
+            if log_key in seen_log:
+                continue
+            seen_log.add(log_key)
+            recent_sells.append(f"{date}: P&L={result}")
+            if len(recent_sells) >= max_trades:
+                break
+
+    # 関連コンセプトを重複排除して収集
+    concepts_match = re.search(r"## 関連コンセプト\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
+    unique_concepts: list[str] = []
+    if concepts_match:
+        seen_cpt: set[str] = set()
+        for line in concepts_match.group(1).splitlines():
+            m = re.search(r"\[\[concepts/([^\]|]+)", line)
+            if m:
+                cname = m.group(1)
+                if cname not in seen_cpt:
+                    seen_cpt.add(cname)
+                    unique_concepts.append(cname)
+
+    if not recent_sells and not unique_concepts:
+        return ""
+
+    parts = [f"【{ticker} 過去実績】直近評価: {assessment} (score={score_str})"]
+    if recent_sells:
+        parts.append("直近SELL実績:\n" + "\n".join(f"  {s}" for s in recent_sells))
+    if unique_concepts:
+        parts.append("関連コンセプト: " + ", ".join(unique_concepts[:8]))
+    return "\n".join(parts)
 
 
 def run_trade_cycle(
