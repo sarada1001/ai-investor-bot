@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "updated_at": "2026-05-07T06:28:02.647032",
+  "updated_at": "2026-05-07T13:31:00.996718",
   "_doc": {
     "positions[].id": "pos_{YYYYMMDD}_{TICKER} — 一意識別子",
     "positions[].ticker": "銘柄コード（大文字）",
@@ -13,5 +13,18 @@
     "positions[].thesis": "購入理由サマリー（buy_log_file 抽出失敗時の fallback）",
     "positions[].status": "OPEN | CLOSED"
   },
-  "positions": []
+  "positions": [
+    {
+      "id": "pos_sync_HSY",
+      "ticker": "HSY",
+      "entry_date": "2026-05-07",
+      "entry_price": 186.5,
+      "shares": 134,
+      "target_price": 205.15,
+      "stop_loss_price": 177.17,
+      "buy_log_file": "",
+      "thesis": "Alpaca sync: 起動時に検出された既存ポジション",
+      "status": "OPEN"
+    }
+  ]
 }
