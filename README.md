@@ -1,211 +1,247 @@
-# exa-investor — 自律型金融AIエージェント
+# ai-investor-bot — 自律型スイングトレードAIエージェント
 
-> **スイングトレード意思決定のための分散推論システム**  
-> Multi-HyDE RAG・ChromaDB・3層分散コンピューティングインフラによるマルチエージェント合意アーキテクチャ。
-
----
-
-## 概要
-
-**exa-investor** は情報科学の研究を目的として設計された、研究志向の自律型金融AIエージェントです。  
-S&P 500の金融コーパスを自動収集してローカルナレッジベースにベクトル化し、厳格に権限スコープを分離した5つの専門エージェントがパイプラインを実行することで、完全な推論ログ付きのコンプライアンス準拠スイングトレード判断を生成します。
-
-本プロジェクトの長期目標は、エージェントの推論トレースを蓄積し、ローカルLLM（Ollama上のLlama 3.1）を通じて将来の推論サイクルへフィードバックする自己改善型RAGパイプラインの構築です。これにより、外部API依存なしの継続的な知識蒸留を実現します。
+> S&P500を対象にした、マルチエージェント合意方式の自律売買システム。  
+> ステージゲート型パイプライン・Multi-HyDE RAG・Alpaca自動発注・Obsidian知識ベース連携。
 
 ---
 
-## システムアーキテクチャ
+## システム概要
 
-共有Gitリポジトリと JST/UTC対応のcronジョブによって協調する、物理的に独立した3層コンピューティング構成で動作します。
+5つの専門エージェントが共有メモリ（BBS）を通じて協調し、ManagerAgentが最終売買判断を行います。  
+判断はCriticAgent（ローカルLLM）による独立審査を経てAlpacaへ自動発注されます。
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        TIER 1 — クラウドサーバー                        │
-│                        (www.dmgpt.site / Linux)                        │
-│                                                                         │
-│   cron 07:30 JST    →   run_pipeline.py --hybrid                       │
-│   cron 23:00 JST    →   auto_push.sh  (git commit + push to GitHub)    │
-│                                                                         │
-│   • S&P 500日次スクリーニング (yfinance + Gemini 2.5 Flash)             │
-│   • 5エージェント合意パイプライン  →  BBS共有メモリ                      │
-│   • 金融コーパス自動収集  (build_corpus.py, 503銘柄)                    │
-│   • 訓練データ蓄積  (data/training/training_data.jsonl)                 │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │  GitHub (自動プッシュ)
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     TIER 2 — エッジコントローラー                        │
-│                     (ThinkPad E16 / RAM 32 GB)                         │
-│                                                                         │
-│   • Librarian.py  — タスクオーケストレーション & クラウドログ同期        │
-│   • ChromaDB  — 永続ベクトルストア (financial_corpusコレクション)        │
-│   • RAG検索ホスト  (rag_test.py / rag_search スキル)                   │
-│   • Streamlitダッシュボード  (dashboard.py)                             │
-│   • JST対応cronによるGitHub自動プッシュ                                 │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │  推論リクエスト
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TIER 3 — GPU推論ノード                               │
-│                    (ASRock RX 5700 XT / 8 GB VRAM)                    │
-│                                                                         │
-│   • RTCスケジュール起動 (マザーボードによる早朝自動電源ON)               │
-│   • Ollama + Llama 3.1  — オフライン推論 & 推論ログ分析                │
-│   • 知識蒸留  →  ObsidianマークダウンVault（自動エクスポート）           │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Stage 1 — 安価スキャン（並列実行）                               │
+│                                                                  │
+│   TechnicalAgent   NewsAgent   MacroAgent   SocialAgent          │
+│   RSI/MACD/SMA     ニュース     SPY/VIX      SNSセンチメント       │
+│        └──────────────┴─────────────┴────────────┘              │
+│                           BBS（共有メモリ）                       │
+│                               │                                  │
+│  Gate: Macro NEGATIVE → 即HOLD / Tech+News双方NEUTRAL → 即HOLD   │
+│                               │                                  │
+│  Stage 2 — ファンダメンタル分析（Gate通過時のみ）                  │
+│                                                                  │
+│              FundamentalAgent（Multi-HyDE RAG + EDGAR）          │
+│                               │                                  │
+│  Stage 3 — 最終判断                                               │
+│                                                                  │
+│    ManagerAgent → CriticAgent（Ollama） → 加重スコア算出          │
+│                               │                                  │
+│  Stage 4 — リスク計算（STRONG BUY時のみ）                         │
+│                                                                  │
+│        RiskAgent（Fixed Fractional + Kelly Criterion）           │
+│                               │                                  │
+│              Alpaca発注 / LINE通知 / Obsidianログ記録              │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+**STRONG BUY 判定条件（すべて満たすこと）**
+
+- 加重スコア ≥ 0.60（FA×0.40 / Tech×0.20 / Macro×0.20 / News×0.10 / Social×0.10）
+- Fundamental シグナル > 0（必須）
+- Technical シグナル ≥ 0
+- News シグナル ≥ 0
+- Macro シグナル ≥ 0（NEGATIVE時は強制HOLD）
 
 ---
 
-## エージェントアーキテクチャ
+## エージェント一覧
 
-5つの専門エージェントは共有 **BBS（掲示板システム）** テキストメモリのみを通じて通信します。各エージェントは他のエージェントへの直接参照を持たず、定義されたフェーズ順序に従ってBBSの読み書きを行います。
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  フェーズ1 — 並列情報収集                                             │
-│                                                                      │
-│   NewsAgent            FundamentalAgent        TechnicalAgent        │
-│   [news_monitor]       [rag_search]            [technical_calc]      │
-│   RSS + LLM感情分析    Multi-HyDE × ChromaDB   RSI / MACD / MA25    │
-│        │                      │                       │              │
-│        └──────────────────────┴───────────────────────┘             │
-│                               │                                      │
-│                         BBS（共有メモリ）                             │
-│                               │                                      │
-│  フェーズ2 — 統合判断                                                 │
-│                               │                                      │
-│                         ManagerAgent                                 │
-│                 [ニュース30% / FA 40% / TA 30%]                      │
-│                               │                                      │
-│  フェーズ3 — コンプライアンスゲート                                    │
-│                               │                                      │
-│                       ComplianceAgent                                │
-│               [8ルール適用、REJECT / MODIFY / PASS]                  │
-│                               │                                      │
-│                    LINEプッシュ通知                                   │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-### エージェント権限マトリクス
-
-| エージェント | 役割 | 許可スキル |
+| エージェント | 役割 | スキル |
 |---|---|---|
-| **NewsAgent** | Google News RSSを取得し、LLMによる感情分類（ポジティブ / ニュートラル / ネガティブ）を実行 | `news_monitor` |
-| **FundamentalAgent** | Multi-HyDEで金融コーパスを検索し、貸借対照表の質と成長性を評価 | `rag_search` |
-| **TechnicalAgent** | yfinanceで日次OHLCVを取得し、RSI・MACD・MA25・出来高スパイクスコアを算出 | `technical_calc` |
-| **ManagerAgent** | BBSを読み込み、加重合意によるBUY/HOLD/SELL判断と信頼度スコアを生成 | _（BBS読み取り専用）_ |
-| **ComplianceAgent** | 8つのハードコンプライアンスルールを適用し、非準拠判断をREJECTまたはMODIFY | _（BBS読み取り専用）_ |
-| **ExitAgent** | オープンポジションを監視し、ストップロスまたは利確の決済をトリガー | `portfolio_monitor` |
-
-### Multi-HyDE
-
-**仮説的ドキュメント埋め込み（HyDE）** を複数仮説生成に拡張した手法です。  
-クエリごとに、実際の決算書に掲載されるような仮説的な文書抜粋を3つLLMに生成させ、元のクエリとともにすべて埋め込みます。これにより、金融ドメイン固有の専門用語に対する再現率が大幅に向上します。
+| **TechnicalAgent** | RSI・MACD・SMA25乖離・出来高比を算出してLLM評価 | `technical_calc` |
+| **NewsAgent** | Alpha Vantage / Finnhubからニュース取得 → センチメント判定 | `news_monitor` |
+| **MacroAgent** | SPY・VIXでマクロ環境評価 | `macro_monitor` |
+| **SocialAgent** | SNSセンチメント + hype_score（≥0.7で買い煽りペナルティ） | `social_monitor` |
+| **FundamentalAgent** | Multi-HyDE RAG（Chroma）+ EDGAR自律取得で財務評価 | `rag_search`, `edgar_fetcher` |
+| **ManagerAgent** | BBS集約・加重スコア算出・SNS買い煽り検出 | — |
+| **CriticAgent** | Ollama（ローカルLLM）による独立審査・OVERRIDE可能 | `tools/critic_agent` |
+| **RiskAgent** | ポジションサイジング・ストップロス算出 | `risk_calculator` |
+| **ExitAgent** | 保有ポジション監視（+10%利確 / -5%損切 / THESIS_BROKEN） | `portfolio_monitor` |
 
 ---
 
-## 機能
+## 実行方法
 
-### 金融ナレッジベース（`build_corpus.py`）
-- WikipediaのS&P 500リストからティッカーユニバースを取得（503銘柄）
-- yfinanceで各銘柄の `sector`・`industry`・`longBusinessSummary` を取得
-- **メタデータ / コンテンツを明示的に分離**したJSON形式で `data/knowledge_base/` に1銘柄1ファイル保存 — ChromaDBのメタデータフィルタリングに対応
-- **再開機能**: 再実行時は取得済み銘柄をスキップ。いつでも安全に中断可能
-- **IPバン対策**: リクエスト間にランダムな `sleep(1〜3秒)` と `tqdm` プログレスバーを実装
+### 基本コマンド
 
-```json
-{
-  "metadata": { "ticker": "NVDA", "name": "NVIDIA Corporation",
-                "sector": "Technology", "industry": "Semiconductors", ... },
-  "content":  { "long_business_summary": "NVIDIA Corporation operates as a data center ..." }
-}
+```bash
+# S&P500スクリーニング → 上位5銘柄をAI分析（発注あり）
+python main.py --screen --notify-line
+
+# ドライラン（発注なし・ログのみ）
+python main.py --screen --dry-run
+
+# 単一銘柄指定
+python main.py --ticker AAPL --dry-run
+
+# 複数銘柄ウォッチリスト
+python main.py --tickers AAPL MSFT NVDA --dry-run
+
+# スクリーニング結果の確認のみ（AI分析なし）
+python main.py --screen --screen-only
+
+# 24時間デーモン（自動スクリーニング + 自動売買）
+python main.py --screen --daemon --notify-line
 ```
 
-### RAGプロトタイプ（`rag_test.py`）
-- `data/chroma_db/` に `PersistentClient` ChromaDBを初期化
-- `all-MiniLM-L6-v2`（ChromaDB標準EF）で全 `long_business_summary` を埋め込み
-- **セマンティック検索**と**メタデータフィルタリングによるハイブリッドクエリ**をサポート
-- 再開対応のバッチアップサート（既存ドキュメントIDはスキップ）
+### 実行オプション一覧
 
-### Streamlitダッシュボード（`dashboard.py`）
-- 銘柄ごとのエージェント推論プロセスをリアルタイム可視化
-- エージェントごとにカラーコードされたバッジ付きBBSセッションログブラウザ
-- 信頼度スコアゲージ、コンプライアンス判断タイムライン、オープンポジションモニター
+| オプション | 説明 |
+|---|---|
+| `--screen` | S&P500スクリーニングで上位N銘柄を自動選出 |
+| `--screen-only` | スクリーニング結果表示のみ（AI分析スキップ） |
+| `--top-n N` | スクリーニング選出銘柄数（デフォルト: 5） |
+| `--dry-run` | Alpaca発注をスキップ（テスト用） |
+| `--hybrid` | 全ステージリアル分析 + 発注スキップ（本番前検証） |
+| `--mock` | LLM/API呼び出しゼロ（システムフロー確認用） |
+| `--notify-line` | 最終判断をLINE通知 |
+| `--daemon` | 24時間自動取引ループ（市場閉場中は自動スリープ） |
+| `--interval N` | デーモン評価間隔（秒、デフォルト: 3600） |
+| `--exclude エージェント名` | 特定エージェントを除外（アブレーション実験用） |
 
-### Git自動パイプライン（`auto_push.sh`）
-- `git status -s` で未コミット変更を検出。変更がなければスキップ
-- タイムスタンプ付きメッセージでコミットし、`README.md` の開発履歴にエントリを追記
-- `git push` の終了コードを確認。失敗時は誤検知成功ではなく `ERROR` をログに記録
-- **JST 23:00**（UTC `0 14 * * 1-5`）にcronで実行
+### 知識ベース管理
+
+```bash
+# 日報生成（latest_summary.md に出力）
+python server_librarian.py
+
+# 取引ログをWikiに反映（Obsidian連携）
+python server_librarian.py --ingest
+
+# Wikiヘルスチェック（リンク切れ・孤児ページ・矛盾検出）
+python scripts/lint_wiki.py
+```
 
 ---
 
-## コンプライアンスルール
+## S&P500スクリーナー
 
-`ComplianceAgent` は以下の8つのルールを機械的に適用します。違反があれば、判断が実行レイヤーに到達する前に `REJECT` または `MODIFY` をトリガーします。
+LLMを使わずテクニカルスコアで全503銘柄を高速スコアリングし、候補を絞り込みます。
 
-| ルールID | 制約内容 |
+| 指標 | 内容 |
 |---|---|
-| RULE-01 | 1銘柄あたりの最大保有額は総資産の **20%** （集中リスク制限） |
-| RULE-02 | 同一銘柄への **3営業日以内の連続BUYを禁止**（ナンピン防止） |
-| RULE-03 | ストップロスはエントリー価格から **−8%** 以内に設定（ハードキャップ） |
-| RULE-04 | 推奨保有期間は **20営業日以内** |
-| RULE-05 | 信頼度スコア **50未満 → 強制HOLD** |
-| RULE-06 | 対象銘柄にネガティブニュースが検出された場合、**BUYを禁止** |
-| RULE-07 | 最大同時保有ポジション数 **4件**、総エクスポージャーは資産の **60%以内** |
-| RULE-08 | **根拠のない憶測による判断を禁止** |
+| RSI | 過売買領域（30以下 or 70以上）を評価 |
+| MACD | ゴールデンクロス / デッドクロス |
+| SMA25乖離 | 移動平均からの乖離率 |
+| 出来高比 | 直近20日平均との比較 |
+| 52週高値からの下落率 | 押し目判定 |
+
+当日キャッシュ機能あり（同日中は再スクリーニングをスキップ）。
+
+---
+
+## Multi-HyDE RAG
+
+FundamentalAgentが採用する高精度検索手法。
+
+クエリに対して「実際の決算書に書かれているであろう仮説的な回答」を3パターンLLMに生成させ、元のクエリと合わせてベクトル検索します。金融ドメイン固有の専門用語に対する再現率が大幅に向上します。
+
+```
+ユーザークエリ
+  └→ LLMで仮説ドキュメント×3生成
+       └→ [クエリ + 仮説×3] でChromaDB検索
+            └→ 上位チャンクをコンテキストに注入 → LLM最終回答
+```
+
+---
+
+## Obsidian知識ベース（Second Brain）
+
+取引ログを生きたWikiに自動昇華させる3層構造。
+
+```
+data/knowledge_base/
+├── obsidian_logs/          # 生ログ（BUY/SELL時に自動生成）
+│   └── Log_YYYYMMDD_TICKER_ACTION.md
+└── wiki/
+    ├── INDEX.md            # 全体目次（自動再生成）
+    ├── tickers/            # 銘柄別ページ（トレード履歴・評価変遷）
+    │   ├── AAPL.md
+    │   └── NVDA.md
+    ├── concepts/           # 投資コンセプトページ（自動抽出）
+    │   ├── macd_golden_cross.md
+    │   └── thesis_driven_trading.md
+    └── log.md              # Ingestログ（処理済みファイル名を記録）
+```
+
+`server_librarian.py --ingest` を実行するとobsidian_logsの未処理ログを検出し、ticker/conceptページを更新・INDEX.mdを再生成します。処理済みファイルはファイル名で管理するためタイミングによる取りこぼしがありません。
+
+---
+
+## インフラ構成
+
+```
+┌─────────────────────────────────────────────────────┐
+│  メインサーバー（uema2lab-search）                    │
+│                                                     │
+│  cron 07:30 JST → main.py --screen --hybrid         │
+│  cron 23:00 JST → auto_push.sh（git自動コミット）    │
+│                                                     │
+│  • S&P500日次スクリーニング                           │
+│  • 5エージェント合意パイプライン                      │
+│  • ChromaDB永続ベクトルストア                         │
+│  • 訓練データ蓄積（data/training/）                  │
+└─────────────────────────────────────────────────────┘
+                        │ Ollama API
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│  GPU推論サーバー（ASRock / Radeon RX 5700 XT）        │
+│                                                     │
+│  • Ollama — CriticAgent用ローカルLLM独立審査          │
+│  • RTCアラームで早朝自動電源ON                        │
+│  • 処理完了後は自動スリープ                           │
+└─────────────────────────────────────────────────────┘
+                        │ git push
+                        ▼
+              github.com/sarada1001/ai-investor-bot
+```
 
 ---
 
 ## ディレクトリ構造
 
 ```
-exa-investor/
-├── agents/                      # エージェント実装
-│   └── fundamental_agent.py
-├── skills/                      # スキルモジュール（独立・副作用なし）
-│   ├── news_monitor.py          # RSSフェッチ + LLM感情分析
-│   ├── rag_search.py            # Multi-HyDE × ChromaDB検索
-│   ├── technical_calc.py        # RSI / MACD / MA25
-│   ├── portfolio_monitor.py     # Alpacaポジションヘルスチェック
-│   └── training_data_collector.py
-├── rules/
-│   └── swing_trade_rules.md     # 8つのコンプライアンスルール（機械可読）
-├── data/
-│   ├── knowledge_base/          # 銘柄別JSONコーパス（S&P 500、503銘柄）
-│   ├── chroma_db/               # ChromaDB永続ベクトルストア
-│   └── training/
-│       └── training_data.jsonl  # エージェント推論トレース蓄積
-├── bbs/                         # BBSセッションログ（エージェント共有メモリ）
-│   └── YYYYMMDD_HHMMSS.json
-├── main.py                      # フルパイプラインオーケストレーター
-├── run_pipeline.py              # cronトリガーのハイブリッドスクリーニングパイプライン
-├── build_corpus.py              # S&P 500金融コーパスビルダー
-├── rag_test.py                  # ChromaDB RAG検索プロトタイプ
+ai-investor-bot/
+├── main.py                      # メインエンジン（ステージゲートパイプライン）
+├── server_librarian.py          # 日報生成 & Wikiインジェスト
+├── run_pipeline.py              # cronトリガー用スクリプト
+├── build_corpus.py              # S&P500金融コーパスビルダー
 ├── dashboard.py                 # Streamlit可視化ダッシュボード
-├── auto_push.sh                 # Git自動コミット + プッシュ（JST対応）
+├── auto_push.sh                 # Git自動コミット+プッシュ
+├── agents/
+│   ├── fundamental_agent.py     # Multi-HyDE RAG + EDGAR
+│   └── exit_agent.py            # ExitAgent（保有ポジション監視）
+├── skills/
+│   ├── screener.py              # S&P500スクリーナー（LLM不使用）
+│   ├── technical_calc.py        # テクニカル指標計算
+│   ├── news_monitor.py          # ニュース取得・センチメント分析
+│   ├── macro_monitor.py         # マクロ指標取得
+│   ├── social_monitor.py        # SNSセンチメント取得
+│   ├── risk_calculator.py       # ポジションサイジング
+│   ├── rag_search.py            # ChromaDB検索
+│   ├── edgar_fetcher.py         # SEC EDGAR自律取得
+│   ├── alpaca_trade.py          # Alpaca発注
+│   ├── portfolio_monitor.py     # ポートフォリオ追跡
+│   └── training_data_collector.py
+├── tools/
+│   ├── critic_agent.py          # CriticAgent（Ollama独立審査）
+│   ├── auto_logger.py           # Obsidianログ自動生成
+│   ├── alpaca_client.py         # Alpacaクライアント
+│   └── create_reflexion_log.py
+├── scripts/
+│   ├── lint_wiki.py             # Wikiヘルスチェック
+│   └── run_ablation_test.py     # アブレーションテスト
+├── data/
+│   ├── knowledge_base/          # 銘柄別JSONコーパス + Obsidian Wiki
+│   ├── screener/cache.json      # スクリーナー当日キャッシュ
+│   ├── training/                # 推論トレース蓄積（JSONL）
+│   └── portfolio.json           # 保有ポジション管理
+├── bbs/                         # エージェント間通信ログ
 └── requirements.txt
 ```
-
----
-
-## 技術スタック
-
-| カテゴリ | 技術 |
-|---|---|
-| LLM（クラウド） | Google Gemini 2.5 Flash（`langchain-google-genai`） |
-| LLM（ローカル） | Llama 3.1 via Ollama（GPUノード） |
-| 埋め込み | `all-MiniLM-L6-v2`（ChromaDB標準）/ `intfloat/multilingual-e5-small` |
-| ベクトルDB | ChromaDB（PersistentClient） |
-| RAG手法 | Multi-HyDE（複数仮説による仮説的ドキュメント埋め込み） |
-| 金融データ | yfinance（日次OHLCV + ファンダメンタルズ） |
-| ニュース | Google News RSS（`feedparser`） |
-| 取引執行 | Alpaca Markets API（`alpaca-py`） |
-| 通知 | LINE Messaging API |
-| ダッシュボード | Streamlit + Plotly |
-| 知識Vault | Obsidian Markdown（GPUノード自動エクスポート） |
-| スケジューリング | cron（UTC対応・JST整合） |
 
 ---
 
@@ -215,7 +251,7 @@ exa-investor/
 
 ```bash
 git clone https://github.com/sarada1001/ai-investor-bot.git
-cd exa-investor
+cd ai-investor-bot
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -223,107 +259,62 @@ pip install -r requirements.txt
 ### 2. 環境変数
 
 ```bash
-cp .env.example .env   # 各キーを入力してください
+cp .env.example .env
 ```
 
 ```env
-GOOGLE_API_KEY=          # Google AI Studio (Gemini 2.5 Flash)
-LINE_ACCESS_TOKEN=       # LINE Messaging API
-LINE_USER_ID=
+GOOGLE_API_KEY=          # Google AI Studio（Gemini 2.0/2.5 Flash）
 ALPACA_API_KEY=          # Alpaca Markets（ペーパーまたはライブ）
 ALPACA_SECRET_KEY=
+ALPACA_BASE_URL=         # https://paper-api.alpaca.markets（ペーパー）
+LINE_ACCESS_TOKEN=       # LINE Messaging API
+LINE_USER_ID=
+OLLAMA_ENDPOINT=         # http://<GPU-server-IP>:11434
+ALPHA_VANTAGE_API_KEY=   # ニュース取得（オプション）
+FINNHUB_API_KEY=         # ニュース取得（オプション）
 ```
 
 ### 3. 金融コーパスのビルド
 
 ```bash
-# テスト実行（5銘柄）
-python build_corpus.py          # TEST_MODE = True（デフォルト）
-
-# フル実行 — S&P 500（約20分、再開対応）
-# build_corpus.py の TEST_MODE を False に変更してから実行:
-python build_corpus.py
+python build_corpus.py   # S&P500全503銘柄（再開対応・約20分）
 ```
 
-### 4. ChromaDBへのインポート & 検索確認
+### 4. 動作確認
 
 ```bash
-python rag_test.py
+# トークン消費ゼロのモックテスト
+python main.py --screen --mock
+
+# ドライラン（実データ・発注なし）
+python main.py --screen --dry-run --top-n 3
 ```
 
-### 5. エージェントパイプラインの実行
+---
 
-```bash
-python run_pipeline.py --hybrid   # スクリーニング + エージェントパイプライン
-streamlit run dashboard.py        # 可視化ダッシュボード
-```
+## 技術スタック
+
+| カテゴリ | 技術 |
+|---|---|
+| LLM（クラウド） | Google Gemini 2.0/2.5 Flash（`langchain-google-genai`） |
+| LLM（ローカル） | Ollama（CriticAgent用独立審査） |
+| 埋め込み | `intfloat/multilingual-e5-small`（ChromaDB） |
+| ベクトルDB | ChromaDB（PersistentClient） |
+| RAG手法 | Multi-HyDE（複数仮説による仮説的ドキュメント埋め込み） |
+| 金融データ | yfinance（OHLCV + ファンダメンタルズ） |
+| ニュース | Alpha Vantage / Finnhub |
+| 取引執行 | Alpaca Markets API（`alpaca-py`） |
+| 通知 | LINE Messaging API |
+| 知識管理 | Obsidian Markdown（自動Wiki生成） |
+| ダッシュボード | Streamlit |
+| スケジューリング | cron（JST対応） |
 
 ---
 
 ## ロードマップ
 
-- [ ] **セマンティックチャンキング** — ドキュメント全体の埋め込みを段落レベルのチャンクに置き換え、検索粒度を向上
-- [ ] **Multi-HyDEの拡張** — S&P 500コーパスへの既存Multi-HyDE手法の適用（現在はIR PDFの検索にのみ使用）
-- [ ] **Self-Refine / Reflexion** — コンプライアンスゲート前の推論品質向上のためのエージェント間ディベート・自己批判ループ
-- [ ] **推論ログフィードバックループ** — 日次エージェントトレースをLlama 3.1（GPUノード）で蒸留し、ChromaDBナレッジベースへ継続的に反映
-- [ ] **FinanceBench評価** — FinanceBench QAデータセットによるRAG検索品質の体系的ベンチマーク
-
----
-
-## 🚀 本日のピック銘柄
-
-> 最終更新: 2026-05-02 10:42
-
-### 本日の精鋭3銘柄 (2026-05-02)
-
-| # | ティッカー | スコア | 価格 | 選出理由 |
-|---|-----------|--------|------|---------|
-| 1 | **NVDA** | 0.7123 | $875.50 | RSI=28.3（売られすぎ） / 出来高2.4倍スパイク / MA20から4.2%下方乖離 |
-| 2 | **AAPL** | 0.5210 | $182.30 | RSI=72.1（強トレンド） / 出来高1.8倍スパイク / MA20から3.1%上方乖離 |
-| 3 | **MSFT** | 0.4800 | $415.20 | MA20から2.5%上方乖離 |
-
-#### 指標内訳
-
-| ティッカー | RSI | VOL倍率 | VOLスコア | MAスコア | 総合スコア |
-|-----------|-----|--------|----------|--------|----------|
-| NVDA | 28.3 | 2.40x | 0.700 | 0.840 | 0.7123 |
-| AAPL | 72.1 | 1.80x | 0.400 | 0.620 | 0.5210 |
-| MSFT | 55.0 | 1.20x | 0.100 | 0.500 | 0.4800 |
-
----
-
-## 🔄 開発履歴
-- 📅 **2026-05-04 09:27:46** | 🛠️ **内容:** `auto-backup: 2026-05-04 09:27:46 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/13ff9292a4ae19fdd8ec8522ac84e7c8902604c0)
-- 📅 **2026-05-01 23:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-01 23:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/9e699096cffdb4900efe87a14fc8448dc2ca2c32)
-- 📅 **2026-05-01 14:28:10** | 🛠️ **内容:** `auto-backup: 2026-05-01 14:28:10 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/fadd468aca11b8174e413a31cff29f39e610f41e)
-
-## 🔄 Development History
-- 📅 **2026-05-06 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-06 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/c61ac00c72421202d4f78fa85865c5e0f48c41f1)
-- 📅 **2026-05-05 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-05 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/62e657e98d43edc2bd7d795f67db6cb9dddef077)
-- 📅 **2026-05-05 08:47:07** | 🛠️ **内容:** `auto-backup: 2026-05-05 08:47:07 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/ceff7624e2f42ed1f4fb642fdab8e14e3b4592c4)
-- 📅 **2026-05-05 08:33:47** | 🛠️ **内容:** `auto-backup: 2026-05-05 08:33:47 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/5236a3c315e28d5688b9415e6e0e1a960e2ccf8a)
-- 📅 **2026-05-04 09:42:44** | 🛠️ **内容:** `auto-backup: 2026-05-04 09:42:44 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/27dd51275a5ba75e9ba71020f84b56440ac93902)
-
-## 🚀 Latest Daily Pick
-
-> 最終更新: 2026-05-05 22:36
-
-### 本日の精鋭3銘柄 (2026-05-05)
-
-| # | ティッカー | スコア | 価格 | 選出理由 |
-|---|-----------|--------|------|---------|
-| 1 | **HII** | 0.8527 | $326.13 | RSI=12.6（売られすぎ） / 出来高3.1倍スパイク / MA20から13.7%下方乖離 |
-| 2 | **APTV** | 0.7668 | $54.83 | RSI=20.0（売られすぎ） / 出来高3.8倍スパイク / MA20から7.9%下方乖離 |
-| 3 | **POOL** | 0.7290 | $187.04 | RSI=23.2（売られすぎ） / 出来高3.5倍スパイク / MA20から14.5%下方乖離 |
-
-#### 指標内訳
-
-| ティッカー | RSI | VOL倍率 | VOLスコア | MAスコア | 総合スコア |
-|-----------|-----|--------|----------|--------|----------|
-| HII | 12.6 | 3.09x | 1.000 | 1.000 | 0.8527 |
-| APTV | 20.0 | 3.76x | 1.000 | 1.000 | 0.7668 |
-| POOL | 23.2 | 3.45x | 1.000 | 1.000 | 0.7290 |
-
-### 本日の Exit 判断
-
-- **NVDA**: ストップロス到達（現在 $115.0 < SL $118.0） (損益: -4.17%)
+- [ ] セマンティックチャンキング — 段落レベルのチャンク分割でRAG精度向上
+- [ ] 推論ログフィードバックループ — エージェントトレースをローカルLLMで蒸留してナレッジベースに反映
+- [ ] バックテスト強化 — 過去データでのシミュレーション精度向上
+- [ ] ポートフォリオ最適化 — 複数銘柄間のリスク分散ロジック追加
+- [ ] FinanceBench評価 — RAG検索品質の体系的ベンチマーク
