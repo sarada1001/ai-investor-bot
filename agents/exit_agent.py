@@ -32,6 +32,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import skills.news_monitor as _news_mod
+import skills.training_data_collector as _training_mod
 from tools.auto_logger import ObsidianLogger
 
 logger = logging.getLogger(__name__)
@@ -261,6 +262,18 @@ class ExitAgent:
                 sell_price    = decision["current_price"],
                 sell_date     = date.today().isoformat(),
             )
+
+        # training_data.jsonl の対応レコードに WIN/LOSS を書き戻す
+        updated = _training_mod.update_outcome(
+            ticker     = decision["ticker"],
+            pnl_pct    = decision["pnl_pct"],
+            exit_price = decision["current_price"],
+            exit_reason= decision["exit_type"],
+        )
+        if updated:
+            logger.info("  [ExitAgent] training_data.jsonl outcome 更新: %s +%d件", decision["ticker"], updated)
+        else:
+            logger.warning("  [ExitAgent] training_data.jsonl に対応レコードなし: %s", decision["ticker"])
 
     # ----------------------------------------------------------
     # データ取得
