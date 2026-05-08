@@ -1,17 +1,18 @@
 {
   "schema_version": "1.0",
-  "updated_at": "2026-05-07T13:31:00.996718",
+  "updated_at": "2026-05-08T13:31:01.151832",
   "_doc": {
     "positions[].id": "pos_{YYYYMMDD}_{TICKER} — 一意識別子",
     "positions[].ticker": "銘柄コード（大文字）",
     "positions[].entry_date": "購入日 YYYY-MM-DD",
     "positions[].entry_price": "購入単価（USD）",
     "positions[].shares": "保有株数（整数）",
-    "positions[].target_price": "目標株価（USD）。null の場合は +10% ルールのみ適用",
-    "positions[].stop_loss_price": "ストップロス価格（USD）。null の場合は -5% ルールのみ適用",
+    "positions[].target_price": "ATRベース利益確定価格（USD）= entry_price + ATR×4.0。null の場合は固定+10%フォールバック",
+    "positions[].stop_loss_price": "ATRベース損切価格（USD）= entry_price - ATR×2.0。null の場合は固定-5%フォールバック",
     "positions[].buy_log_file": "Obsidian BUY ログのファイル名（obsidian_logs/ 相対）",
     "positions[].thesis": "購入理由サマリー（buy_log_file 抽出失敗時の fallback）",
-    "positions[].status": "OPEN | CLOSED"
+    "positions[].status": "OPEN | CLOSED",
+    "_atr_rule": "SL=ATR×2.0 / TP=ATR×4.0 → リスクリワード 1:2。ATR計算失敗時は固定%フォールバック（SL:-5% / TP:+10%）"
   },
   "positions": [
     {

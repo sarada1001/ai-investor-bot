@@ -1,4 +1,4 @@
-import os
+先ほど生成してくれた wiki フォルダのファイル群を、GitHubに add, commit, push してください。import os
 import warnings
 import requests
 import json

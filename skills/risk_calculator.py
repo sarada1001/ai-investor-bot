@@ -2,7 +2,10 @@
 Skill: risk_calculator
 Permission: RiskAgent only
 
-Calculates recommended position size (shares) and stop-loss price using:
+Calculates recommended position size (shares), ATR-based stop-loss, and
+take-profit prices using:
+  - Stop Loss  : current_price - (ATR × 2.0)
+  - Take Profit: current_price + (ATR × 4.0)  ← 1:2 risk-reward
   - Fixed Fractional: risk 2% of account per trade ÷ (ATR × 2) = max shares
   - Kelly Criterion (simplified): win_rate=55%, win/loss ratio=1.5
   The more conservative value (min of the two) becomes recommended_shares.
@@ -18,6 +21,7 @@ warnings.filterwarnings("ignore")
 _ACCOUNT_BALANCE  = 100_000.0
 _RISK_FRACTION    = 0.02
 _ATR_MULTIPLIER   = 2.0
+_TP_MULTIPLIER    = 4.0     # ATR × 4 → 1:2 risk-reward (SL=2×ATR, TP=4×ATR)
 _ATR_PCT_FALLBACK = 0.015   # 1.5% of price when yfinance unavailable
 
 _KELLY_WIN_RATE  = 0.55
@@ -89,8 +93,12 @@ def calculate_position(
 
     atr           = _calc_atr(ticker, current_price)
     stop_distance = _ATR_MULTIPLIER * atr
-    stop_loss_price = round(current_price - stop_distance, 2)
-    stop_loss_pct   = round(stop_distance / current_price * 100, 2)
+    tp_distance   = _TP_MULTIPLIER * atr
+
+    stop_loss_price   = round(current_price - stop_distance, 2)
+    stop_loss_pct     = round(stop_distance / current_price * 100, 2)
+    take_profit_price = round(current_price + tp_distance, 2)
+    take_profit_pct   = round(tp_distance / current_price * 100, 2)
 
     risk_amount  = account_balance * _RISK_FRACTION
     ff_shares    = max(1, int(risk_amount / stop_distance))
@@ -99,7 +107,8 @@ def calculate_position(
 
     reason = (
         f"口座 ${account_balance:,.0f} の {_RISK_FRACTION:.0%} をリスク (${risk_amount:,.0f})。"
-        f" ATR=${atr:.2f} × {_ATR_MULTIPLIER} = ストップ距離 ${stop_distance:.2f}。"
+        f" ATR=${atr:.2f} × {_ATR_MULTIPLIER} = SL距離 ${stop_distance:.2f}"
+        f" / × {_TP_MULTIPLIER} = TP距離 ${tp_distance:.2f}（RR 1:2）。"
         f" Fixed Fractional={ff_shares}株, Kelly={k_shares}株 → 保守的な {recommended}株を採用。"
     )
 
@@ -110,6 +119,8 @@ def calculate_position(
         "atr":                     round(atr, 4),
         "stop_loss_price":         stop_loss_price,
         "stop_loss_pct":           stop_loss_pct,
+        "take_profit_price":       take_profit_price,
+        "take_profit_pct":         take_profit_pct,
         "risk_amount":             round(risk_amount, 2),
         "fixed_fractional_shares": ff_shares,
         "kelly_shares":            k_shares,

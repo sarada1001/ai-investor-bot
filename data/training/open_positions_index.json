@@ -103,6 +103,24 @@
       "session_id": "20260507_055821",
       "entry_date": "2026-05-07",
       "entry_price": null
+    },
+    {
+      "record_id": "4554d521-5229-48ac-8c28-56b524a0d3fa",
+      "session_id": "20260507_173157",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "6882c782-1e01-46a3-b45e-854e15adddcc",
+      "session_id": "20260507_183245",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "70c0a973-7340-4d8b-a65a-48679cd8adfe",
+      "session_id": "20260507_193332",
+      "entry_date": "2026-05-07",
+      "entry_price": null
     }
   ],
   "HSY": [
@@ -115,6 +133,12 @@
     {
       "record_id": "268f3f51-4c7e-4c7d-abd2-61a9f6c51b14",
       "session_id": "20260507_062725",
+      "entry_date": "2026-05-07",
+      "entry_price": null
+    },
+    {
+      "record_id": "936d5548-eeb9-42fa-8511-ad667acc353a",
+      "session_id": "20260507_223049",
       "entry_date": "2026-05-07",
       "entry_price": null
     }

@@ -40,8 +40,8 @@ logger = logging.getLogger(__name__)
 PORTFOLIO_PATH  = Path(__file__).parent.parent / "data" / "portfolio.json"
 OBSIDIAN_LOGS   = Path(__file__).parent.parent / "data" / "knowledge_base" / "obsidian_logs"
 
-TAKE_PROFIT_PCT = 10.0   # 含み益がこの % 以上 → 利確
-STOP_LOSS_PCT   = -5.0   # 含み損がこの % 以下 → 損切り
+TAKE_PROFIT_PCT = 10.0   # 固定利確フォールバック（ATR価格未設定時のみ適用）
+STOP_LOSS_PCT   = -5.0   # 固定損切りフォールバック（ATR価格未設定時のみ適用）
 
 
 def _safe_log_path(base: Path, filename: str) -> Path | None:
@@ -165,8 +165,8 @@ class ExitAgent:
     def _evaluate(self, pos: dict, mock_mode: bool = False) -> dict:
         ticker      = pos["ticker"]
         entry_price = float(pos["entry_price"])
-        target      = float(pos.get("target_price") or 0)
-        stop        = float(pos.get("stop_loss_price") or 0)
+        target      = float(pos.get("target_price") or 0)   # ATR-based TP price
+        stop        = float(pos.get("stop_loss_price") or 0) # ATR-based SL price
 
         current = self._fetch_price(ticker)
         if current <= 0:
@@ -176,21 +176,23 @@ class ExitAgent:
         pnl_pct = (current - entry_price) / entry_price * 100.0
 
         # 利確チェック
-        if (target and current >= target) or pnl_pct >= TAKE_PROFIT_PCT:
-            reason = (
-                f"目標株価 ${target:.2f} に到達"
-                if (target and current >= target)
-                else f"含み益 {pnl_pct:+.2f}% が利確閾値 +{TAKE_PROFIT_PCT:.0f}% を超過"
-            )
+        # ATR由来のtarget_priceが設定されていればそれを優先。
+        # 未設定の場合のみ固定+10%フォールバックを適用する。
+        if target and current >= target:
+            reason = f"ATRベース目標株価 ${target:.2f} に到達"
+            return self._build(pos, "SELL", "TAKE_PROFIT", reason, current, pnl_pct)
+        if not target and pnl_pct >= TAKE_PROFIT_PCT:
+            reason = f"含み益 {pnl_pct:+.2f}% が固定利確閾値 +{TAKE_PROFIT_PCT:.0f}% を超過（ATR未設定フォールバック）"
             return self._build(pos, "SELL", "TAKE_PROFIT", reason, current, pnl_pct)
 
         # 損切りチェック
-        if (stop and current <= stop) or pnl_pct <= STOP_LOSS_PCT:
-            reason = (
-                f"ストップロス ${stop:.2f} を下回る"
-                if (stop and current <= stop)
-                else f"含み損 {pnl_pct:+.2f}% が損切り閾値 {STOP_LOSS_PCT:.0f}% を超過"
-            )
+        # ATR由来のstop_loss_priceが設定されていればそれを優先。
+        # 未設定の場合のみ固定-5%フォールバックを適用する。
+        if stop and current <= stop:
+            reason = f"ATRベースストップロス ${stop:.2f} を下回る"
+            return self._build(pos, "SELL", "STOP_LOSS", reason, current, pnl_pct)
+        if not stop and pnl_pct <= STOP_LOSS_PCT:
+            reason = f"含み損 {pnl_pct:+.2f}% が固定損切り閾値 {STOP_LOSS_PCT:.0f}% を超過（ATR未設定フォールバック）"
             return self._build(pos, "SELL", "STOP_LOSS", reason, current, pnl_pct)
 
         # Thesis 破綻チェック（LLM — mock_mode 時はスキップ）

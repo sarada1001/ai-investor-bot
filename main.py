@@ -130,15 +130,17 @@ MOCK_BBS_DATA: dict[str, dict] = {
         "account_balance":         100_000.0,
         "current_price":           185.00,
         "atr":                     6.25,
-        "stop_loss_price":         172.50,
+        "stop_loss_price":         172.50,   # current_price - ATR×2
         "stop_loss_pct":           6.76,
+        "take_profit_price":       210.00,   # current_price + ATR×4 (RR 1:2)
+        "take_profit_pct":         13.51,
         "risk_amount":             2000.0,
         "fixed_fractional_shares": 40,
         "kelly_shares":            35,
         "recommended_shares":      35,
         "reason": (
             "Volatility is moderate. Risking 2% of total account balance ($2,000). "
-            "ATR=$6.25 × 2 = stop distance $12.50. "
+            "ATR=$6.25 × 2 = SL distance $12.50 / × 4 = TP distance $25.00 (RR 1:2). "
             "Fixed Fractional=40株, Kelly=35株 → 保守的な 35株を採用。"
         ),
     },
@@ -990,6 +992,8 @@ class RiskAgent:
             _log(f"ATR(14日)    : ${result.get('atr', 0):.4f}")
             _log(f"ストップロス : ${result.get('stop_loss_price', 0):.2f}  "
                  f"(現在価格より -{result.get('stop_loss_pct', 0):.2f}%)")
+            _log(f"利益確定     : ${result.get('take_profit_price', 0):.2f}  "
+                 f"(現在価格より +{result.get('take_profit_pct', 0):.2f}%)  ← ATR×4 (RR 1:2)")
             _sep()
             _log(f"リスク許容額 : ${result.get('risk_amount', 0):,.2f}  "
                  f"(口座残高の {_RISK_PCT:.0f}%)")
@@ -1119,6 +1123,8 @@ def _run_mock_risk(bbs: BBS, ticker: str) -> None:
     _log(f"現在価格     : ${data['current_price']:.2f}")
     _log(f"ATR(14日)    : ${data['atr']:.4f}")
     _log(f"ストップロス : ${data['stop_loss_price']:.2f}  (-{data['stop_loss_pct']:.2f}%)")
+    _log(f"利益確定     : ${data.get('take_profit_price', 0):.2f}  "
+         f"(+{data.get('take_profit_pct', 0):.2f}%)  ← ATR×4 (RR 1:2)")
     _sep()
     _log(f"リスク許容額 : ${data['risk_amount']:,.2f}")
     _log(f"Fixed Fractional: {data['fixed_fractional_shares']} 株")
@@ -1126,6 +1132,7 @@ def _run_mock_risk(bbs: BBS, ticker: str) -> None:
     _sep()
     _log(f"✅ 推奨株数     : {data['recommended_shares']} 株  (保守的な方を採用)")
     _log(f"🛑 ストップロス : ${data['stop_loss_price']:.2f}")
+    _log(f"🎯 利益確定     : ${data.get('take_profit_price', 0):.2f}")
     _sep()
     _log(f"根拠: {data['reason'][:80]}")
     bbs.write("RiskAgent", "risk_analysis", data)
@@ -1563,11 +1570,16 @@ def run_trade_cycle(
                     "tags": ["entry", ticker.lower(), session_id],
                 })
                 _log(f"  [Obsidian] 購入ログ保存: {_buy_log.name}")
+                # ATRベースのTP価格を優先。取得できなかった場合のみ+10%フォールバック
+                _atr_tp = risk_data.get("take_profit_price")
+                _target = _atr_tp if _atr_tp else (
+                    round(_actual_entry * 1.10, 2) if _actual_entry else None
+                )
                 _portfolio_add(
                     ticker          = ticker,
                     entry_price     = _actual_entry,
                     shares          = rec_shares,
-                    target_price    = round(_actual_entry * 1.10, 2) if _actual_entry else None,
+                    target_price    = _target,
                     stop_loss_price = _stop_price,
                     buy_log_file    = _buy_log.name,
                     thesis          = judgment.get("rationale", ""),
