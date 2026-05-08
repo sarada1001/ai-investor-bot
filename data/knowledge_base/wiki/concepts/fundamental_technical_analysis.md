@@ -1,7 +1,7 @@
 ---
 concept: fundamental_technical_analysis
 title: ファンダメンタルズ・テクニカル分析
-last_updated: 2026-05-07
+last_updated: 2026-05-08
 linked_tickers: [AAPL, GEHC, NKE]
 ---
 
@@ -16,6 +16,7 @@ FA と Tech の両シグナルが確認されて初めてエントリー根拠�
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-07 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-06 | [[tickers/AAPL]] | 失敗 | |

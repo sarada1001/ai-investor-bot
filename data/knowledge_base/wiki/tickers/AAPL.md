@@ -2,8 +2,8 @@
 ticker: AAPL
 name: Apple Inc.
 sector: Technology
-last_updated: 2026-05-07
-assessment: HOLD
+last_updated: 2026-05-08
+assessment: BUY
 assessment_score: 0.0
 ---
 
@@ -18,6 +18,11 @@ assessment_score: 0.0
 
 | 日付 | アクション | 価格 | スコア | 結果 | ログ |
 |---|---|---|---|---|---|
+| 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY_3]] |
+| 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY_2]] |
+| 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY]] |
+| 2026-05-05 | SELL |  |  | ++4.57% | [[Log_20260505_AAPL_SELL_3]] |
+| 2026-05-05 | BUY |  |  | 未確定 | [[Log_20260505_AAPL_BUY_5]] |
 | 2026-05-06 | SELL |  |  | -0.43% | [[Log_20260506_AAPL_SELL_3]] |
 | 2026-05-06 | SELL |  |  | ++1.96% | [[Log_20260506_AAPL_SELL_2]] |
 | 2026-05-06 | SELL |  |  | ++5.84% | [[Log_20260506_AAPL_SELL]] |
@@ -40,6 +45,11 @@ assessment_score: 0.0
 | 2026-05-05 | BUY |  |  | 未確定 | [[Log_20260505_AAPL_BUY_4]] |
 
 ## 評価変遷
+- 2026-05-07: BUY (score=, P&L=未確定)
+- 2026-05-07: BUY (score=, P&L=未確定)
+- 2026-05-07: BUY (score=, P&L=未確定)
+- 2026-05-05: HOLD (score=, P&L=++4.57%)
+- 2026-05-05: BUY (score=, P&L=未確定)
 - 2026-05-06: HOLD (score=, P&L=-0.43%)
 - 2026-05-06: HOLD (score=, P&L=++1.96%)
 - 2026-05-06: HOLD (score=, P&L=++5.84%)
@@ -62,6 +72,16 @@ assessment_score: 0.0
 - 2026-05-05: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
+- [[concepts/social_hype_factor]] — SNS煽り要因
+- [[concepts/market_sentiment_analysis]] — 市場センチメント分析
+- [[concepts/technical_analysis]] — テクニカル分析
+- [[concepts/fundamental_analysis]] — ファンダメンタル分析
+- [[concepts/social_media_hype]] — SNS煽り
+- [[concepts/fundamental_technical_analysis]] — ファンダメンタルズ/テクニカル分析
+- [[concepts/predefined_target_price]] — 目標株価設定
+- [[concepts/take_profit_strategy]] — 利確戦略
+- [[concepts/market_sentiment]] — 市場センチメント
+- [[concepts/fundamental_analysis]] — ファンダメンタルズ分析
 - [[concepts/stop_loss]] — 損切り戦略
 - [[concepts/thesis_driven_trading]] — シナリオに基づく取引
 - [[concepts/emotional_control]] — 感情コントロール
