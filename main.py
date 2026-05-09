@@ -1855,13 +1855,12 @@ def run_daemon(
             if _fixed_tickers:
                 effective_tickers = _fixed_tickers
             elif use_screener:
-                # スクリーナー: use_cache=True で同日中はキャッシュを再利用
-                _log("[Daemon] S&P500 スクリーニングを実行します...")
+                # Intraday動的スクリーニング: 時間単位キャッシュで毎時間再スクリーニング
+                _log("[Daemon] S&P500 日中動的スクリーニングを実行します...")
                 try:
-                    screened = _screener_mod.screen_sp500(
-                        top_n     = screener_top_n,
-                        use_cache = True,
-                        verbose   = True,
+                    screened = _screener_mod.screen_sp500_intraday(
+                        top_n   = screener_top_n,
+                        verbose = True,
                     )
                     effective_tickers = [s["ticker"] for s in screened]
                 except Exception as e:
@@ -2041,11 +2040,10 @@ if __name__ == "__main__":
 
     # ── screen モード（1回実行） ──────────────────────────────────
     elif args.screen:
-        print("\n[Screen モード] S&P500 をスクリーニング中...\n")
-        screened = _screener_mod.screen_sp500(
-            top_n     = args.top_n,
-            use_cache = True,
-            verbose   = True,
+        print("\n[Screen モード] S&P500 日中動的スクリーニング中...\n")
+        screened = _screener_mod.screen_sp500_intraday(
+            top_n   = args.top_n,
+            verbose = True,
         )
         if not screened:
             print("スクリーニング結果が 0 件でした。終了します。")

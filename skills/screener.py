@@ -401,6 +401,259 @@ def invalidate_cache() -> None:
 
 
 # ------------------------------------------------------------------ #
+# セッション（時間単位）キャッシュ管理                                    #
+# ------------------------------------------------------------------ #
+
+_INTRADAY_CACHE_FILE = _CACHE_DIR / "intraday_cache.json"
+
+
+def _load_intraday_cache() -> list[dict] | None:
+    """当時間のキャッシュがあれば返す。なければ None。"""
+    if not _INTRADAY_CACHE_FILE.exists():
+        return None
+    try:
+        data = json.loads(_INTRADAY_CACHE_FILE.read_text(encoding="utf-8"))
+        now = datetime.datetime.now()
+        cache_key = f"{now.date().isoformat()}_{now.hour:02d}"
+        if data.get("session_key") == cache_key:
+            return data.get("results", [])
+    except Exception:
+        pass
+    return None
+
+
+def _save_intraday_cache(results: list[dict]) -> None:
+    now = datetime.datetime.now()
+    cache_key = f"{now.date().isoformat()}_{now.hour:02d}"
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {"session_key": cache_key, "results": results}
+    _INTRADAY_CACHE_FILE.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+# ------------------------------------------------------------------ #
+# Intraday スコアリング補助関数                                          #
+# ------------------------------------------------------------------ #
+
+def _calc_intraday_volume_spike(volume: pd.Series) -> float:
+    """最新1本のボリューム / 当日平均ボリューム を返す（日中出来高急増指標）。"""
+    if len(volume) < 2:
+        return 1.0
+    avg = float(volume.iloc[:-1].mean())
+    if avg == 0:
+        return 1.0
+    return round(float(volume.iloc[-1]) / avg, 2)
+
+
+def _calc_intraday_momentum(close: pd.Series, open_series: pd.Series) -> float:
+    """(当日最新終値 - 当日始値) / 当日始値 × 100 を返す（日中モメンタム %）。"""
+    if open_series.empty or close.empty:
+        return 0.0
+    day_open = float(open_series.iloc[0])
+    latest_close = float(close.iloc[-1])
+    if day_open == 0:
+        return 0.0
+    return round((latest_close - day_open) / day_open * 100, 2)
+
+
+def _score_intraday(
+    ticker: str,
+    df: pd.DataFrame,
+    daily_score: int,
+    daily_reason: str,
+) -> dict | None:
+    """1h足DataFrameから日中スコアを計算し、日次スコアと合算する。"""
+    try:
+        if df.empty or len(df) < 2:
+            return None
+
+        close  = df["Close"].squeeze().dropna()
+        volume = df["Volume"].squeeze().dropna()
+        open_s = df["Open"].squeeze().dropna()
+
+        if close.empty:
+            return None
+
+        vol_spike  = _calc_intraday_volume_spike(volume)
+        momentum   = _calc_intraday_momentum(close, open_s)
+
+        intraday_score = 0
+        parts: list[str] = []
+
+        if vol_spike >= 2.0:
+            intraday_score += 3
+            parts.append(f"日中出来高急増({vol_spike:.1f}x)+3")
+        elif vol_spike >= 1.5:
+            intraday_score += 2
+            parts.append(f"日中出来高増加({vol_spike:.1f}x)+2")
+        elif vol_spike >= 1.2:
+            intraday_score += 1
+            parts.append(f"日中出来高増加({vol_spike:.1f}x)+1")
+
+        if momentum >= 2.0:
+            intraday_score += 2
+            parts.append(f"日中急騰({momentum:+.1f}%)+2")
+        elif momentum >= 1.0:
+            intraday_score += 1
+            parts.append(f"日中上昇({momentum:+.1f}%)+1")
+        elif momentum <= -2.0:
+            intraday_score -= 2
+            parts.append(f"日中急落({momentum:+.1f}%)-2")
+
+        combined_score = daily_score + intraday_score
+        intraday_reason = " / ".join(parts) if parts else "日中シグナルなし"
+        combined_reason = (
+            f"[日次] {daily_reason}  |  [日中] {intraday_reason}"
+            if daily_reason and daily_reason != "シグナルなし"
+            else f"[日中] {intraday_reason}"
+        )
+
+        return {
+            "ticker":                ticker,
+            "score":                 combined_score,
+            "intraday_score":        intraday_score,
+            "intraday_vol_spike":    vol_spike,
+            "intraday_momentum_pct": momentum,
+            "reason":                combined_reason,
+        }
+    except Exception as exc:
+        print(f"  [Screener] {ticker} 日中スコアリングエラー: {exc}")
+        return None
+
+
+# ------------------------------------------------------------------ #
+# Intraday メイン公開 API                                               #
+# ------------------------------------------------------------------ #
+
+def screen_sp500_intraday(
+    top_n:        int  = 5,
+    pre_filter_n: int  = 50,
+    use_cache:    bool = True,
+    verbose:      bool = True,
+) -> list[dict]:
+    """
+    S&P500 を日次スクリーニングでプレフィルタし、当日 1h 足データで
+    出来高急増・日中モメンタムを検出して上位 top_n 銘柄を返す。
+
+    キャッシュは時間単位（セッションごと = 毎時間の最初の呼び出しで再スクリーニング）。
+
+    Args:
+        top_n:        返す銘柄数（デフォルト 5）
+        pre_filter_n: 日次スクリーナーのプレフィルタ件数（デフォルト 50）
+        use_cache:    True の場合、当時間のキャッシュがあればそれを返す
+        verbose:      進捗ログを表示するか
+
+    Returns:
+        List[dict]: daily フィールドに加え以下を追加:
+            "intraday_score":        int
+            "intraday_vol_spike":    float
+            "intraday_momentum_pct": float
+    """
+    if use_cache:
+        cached = _load_intraday_cache()
+        if cached is not None:
+            now = datetime.datetime.now()
+            if verbose:
+                print(
+                    f"  [Screener/Intraday] 当時間キャッシュを使用 "
+                    f"({now.hour:02d}:xx, {len(cached)} 件中上位 {top_n} 件)"
+                )
+            return cached[:top_n]
+
+    if verbose:
+        print(f"  [Screener/Intraday] 日次上位 {pre_filter_n} 銘柄をプレフィルタリング中...")
+
+    # Step 1: 日次スクリーナーでプレフィルタ（当日キャッシュを積極利用して高速化）
+    daily_results = screen_sp500(top_n=pre_filter_n, use_cache=True, verbose=False)
+    if not daily_results:
+        if verbose:
+            print("  [Screener/Intraday] 日次スクリーナー結果 0 件。フォールバック不可。")
+        return []
+
+    candidate_tickers = [r["ticker"] for r in daily_results]
+    daily_map = {r["ticker"]: r for r in daily_results}
+
+    if verbose:
+        print(f"  [Screener/Intraday] {len(candidate_tickers)} 銘柄の 1h 足データを取得中...")
+
+    # Step 2: 1時間足データを一括ダウンロード
+    ticker_str = " ".join(candidate_tickers)
+    try:
+        raw = yf.download(
+            ticker_str,
+            period      = "1d",
+            interval    = "1h",
+            group_by    = "ticker",
+            auto_adjust = True,
+            progress    = False,
+            threads     = True,
+        )
+    except Exception as e:
+        if verbose:
+            print(f"  [Screener/Intraday] 1h 足取得エラー: {e} → 日次スクリーナー結果を返します")
+        return daily_results[:top_n]
+
+    if raw.empty:
+        if verbose:
+            print("  [Screener/Intraday] 1h 足データが空（市場閉場/休日）→ 日次スクリーナー結果を返します")
+        return daily_results[:top_n]
+
+    # MultiIndex レベル検出
+    _ticker_level: int | None = None
+    if isinstance(raw.columns, pd.MultiIndex):
+        sample = candidate_tickers[0] if candidate_tickers else ""
+        if sample in raw.columns.get_level_values(0):
+            _ticker_level = 0
+        elif sample in raw.columns.get_level_values(1):
+            _ticker_level = 1
+
+    if verbose:
+        print("  [Screener/Intraday] 日中スコアリング中...")
+
+    _intraday_fallback = {"intraday_score": 0, "intraday_vol_spike": 1.0, "intraday_momentum_pct": 0.0}
+    scored: list[dict] = []
+
+    for ticker in candidate_tickers:
+        daily_info   = daily_map.get(ticker, {})
+        daily_score  = daily_info.get("score", 0)
+        daily_reason = daily_info.get("reason", "シグナルなし")
+
+        try:
+            if isinstance(raw.columns, pd.MultiIndex) and _ticker_level is not None:
+                if ticker not in raw.columns.get_level_values(_ticker_level):
+                    scored.append({**daily_info, **_intraday_fallback})
+                    continue
+                df_one = raw.xs(ticker, axis=1, level=_ticker_level)
+            else:
+                df_one = raw
+        except Exception:
+            scored.append({**daily_info, **_intraday_fallback})
+            continue
+
+        result = _score_intraday(ticker, df_one, daily_score, daily_reason)
+        if result is not None:
+            scored.append({**daily_info, **result})
+        else:
+            scored.append({**daily_info, **_intraday_fallback})
+
+    # スコア降順・同点なら日中出来高急増を優先
+    scored.sort(key=lambda x: (x["score"], x.get("intraday_vol_spike", 1.0)), reverse=True)
+
+    if verbose:
+        now = datetime.datetime.now()
+        print(
+            f"  [Screener/Intraday] スコアリング完了 ({now.strftime('%H:%M')}): "
+            f"{len(scored)} 銘柄。上位 {top_n} を選出。"
+        )
+        _print_intraday_results(scored[:top_n])
+
+    _save_intraday_cache(scored)
+    return scored[:top_n]
+
+
+# ------------------------------------------------------------------ #
 # 表示ヘルパー                                                          #
 # ------------------------------------------------------------------ #
 
@@ -416,6 +669,25 @@ def _print_screener_results(results: list[dict]) -> None:
             f"  │  {i:>3}  {r['ticker']:<6}  {r['score']:>5}  "
             f"{r['rsi']:>5.1f}  {r['sma25_diff_pct']:>+7.1f}%  "
             f"{r['reason'][:35]}"
+        )
+        print(line)
+    print(f"  └{bar}┘\n")
+
+
+def _print_intraday_results(results: list[dict]) -> None:
+    bar = "─" * 78
+    print(f"\n  ┌{bar}┐")
+    print(f"  │  {'日中動的スクリーニング結果':^76}  │")
+    print(f"  ├{bar}┤")
+    print(f"  │  {'#':>3}  {'Ticker':<6}  {'合計':>4}  {'日中':>4}  {'VolSpike':>8}  {'Momentum':>9}  根拠（日中）")
+    print(f"  ├{bar}┤")
+    for i, r in enumerate(results, 1):
+        line = (
+            f"  │  {i:>3}  {r['ticker']:<6}  {r['score']:>4}  "
+            f"{r.get('intraday_score', 0):>4}  "
+            f"{r.get('intraday_vol_spike', 1.0):>7.1f}x  "
+            f"{r.get('intraday_momentum_pct', 0.0):>+8.1f}%  "
+            f"{r.get('reason', '')[-30:]}"
         )
         print(line)
     print(f"  └{bar}┘\n")
