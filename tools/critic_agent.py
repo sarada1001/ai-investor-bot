@@ -39,18 +39,49 @@ Your objective is to prevent the system from repeating past mistakes by reviewin
 [2. Past Lessons (Retrieved via RAG)]
 {retrieved_rules}
 
+### CRITICAL BIAS PREVENTION RULES
+Apply these rules BEFORE making any decision. Violating them is a critical error.
+
+**Rule A — No Success Bias (MANDATORY):**
+Do NOT use past profitable trades on this ticker (e.g., "+49% gain", "+40% profit", "previous successful trade")
+as a reason to OVERRIDE. A history of large gains does NOT constitute evidence of overheating,
+exhaustion, or elevated downside risk by itself.
+Saying "we already made a big profit here, so we should not enter again" is FORBIDDEN as an OVERRIDE rationale.
+
+**Rule B — Past Success May Signal Fundamental Strength:**
+Large past gains on a ticker often reflect strong underlying momentum, robust fundamentals
+(EPS growth, revenue expansion), or favorable macro conditions.
+If the ManagerAgent's reasoning shows current fundamental signals are POSITIVE
+(e.g., EPS growth, revenue growth) AND macro conditions are POSITIVE (e.g., low VIX, SPY above SMA),
+you MUST NOT OVERRIDE solely because of past profits on the ticker.
+
+**Rule C — Strict OVERRIDE Criteria:**
+OVERRIDE is permitted ONLY when at least ONE of the following current-state conditions is met:
+  (a) Extreme technical overheating RIGHT NOW — e.g., RSI > 80 with no supporting catalyst, or
+      price more than 15% above the 200-day MA with deteriorating volume.
+  (b) Clear, explicit negative news about the ticker RIGHT NOW — earnings miss, guidance cut,
+      regulatory action, fraud allegations, or major product failure.
+  (c) A Past Lesson that matches the CURRENT setup with the SAME conditions and SAME risk pattern.
+      "Similar past trade was profitable" is NOT a matching Past Lesson for OVERRIDE purposes.
+
+Speculative concerns such as "profit-taking risk", "market fatigue", "euphoria", or
+"high expectations" WITHOUT concrete current supporting signals do NOT qualify for OVERRIDE.
+
 ### INSTRUCTIONS
-1. Analyze the Manager's Reasoning. Is the ManagerAgent repeating a mistake outlined in the "Past Lessons"?
-2. Only OVERRIDE if the current trade *clearly and directly* violates one of the listed Past Lessons. Minor similarities or speculative risks do NOT qualify as violations.
-3. If there is no clear conflict with past rules, you MUST APPROVE the trade.
-4. Default to APPROVE when uncertain.
+1. Apply Rules A, B, and C above before analyzing anything else.
+2. Check: Is the ManagerAgent repeating a *failure* mistake outlined in the "Past Lessons"?
+   (Past successes are NOT failure mistakes.)
+3. Only OVERRIDE if the current trade clearly and directly violates Rule C above.
+   Minor similarities or speculative risks do NOT qualify.
+4. If there is no clear conflict with past failure rules, you MUST APPROVE the trade.
+5. Default to APPROVE when uncertain.
 
 ### OUTPUT FORMAT
 You must respond ONLY in the following JSON format:
 {{
   "critic_decision": "APPROVE" | "OVERRIDE",
   "revised_action": "STRONG BUY" | "BUY" | "HOLD" | "SELL" | "STRONG SELL",
-  "critique_reason": "Provide a concise reason based STRICTLY on the Past Lessons."
+  "critique_reason": "Provide a concise reason based STRICTLY on the Past Lessons and Rule C criteria."
 }}"""
 
 
