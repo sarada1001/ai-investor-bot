@@ -1588,6 +1588,43 @@ def run_trade_cycle(
             except Exception as e:
                 _log(f"  [Portfolio] 登録エラー（ログは保存済）: {e}")
 
+        elif order_result and order_result.get("skipped") and judgment.get("critic_override"):
+            # CriticAgent OVERRIDE → シャドウ・ロギング（発注なしでも記録を残す）
+            try:
+                _cr_reason = (
+                    judgment.get("critic_reason")
+                    or order_result.get("skip_reason", "CriticAgent OVERRIDE")
+                )
+                _price = risk_data.get("current_price", "N/A")
+                _atr   = risk_data.get("atr", "N/A")
+                _sl    = risk_data.get("stop_loss_price", "N/A")
+                _tp    = risk_data.get("take_profit_price", "N/A")
+                _skip_log = _ObsidianLogger().save_log({
+                    "ticker":  ticker,
+                    "action":  "SKIPPED",
+                    "outcome": "OVERRIDE",
+                    "context": (
+                        f"スコア: {judgment.get('score', 0):+.4f}  "
+                        f"(閾値: {STRONG_BUY_SCORE})\n"
+                        f"{judgment.get('rationale', '(根拠なし)')}"
+                    ),
+                    "root_cause": _cr_reason,
+                    "risk_summary": (
+                        f"現在価格: ${_price}  / ATR(14): ${_atr}\n"
+                        f"ストップロス: ${_sl}  / 利益確定: ${_tp}\n"
+                        f"推奨株数: {rec_shares}株"
+                    ),
+                    "rule_for_future": (
+                        "CriticAgentの拒否判断と実際のその後の株価推移を照合し、"
+                        "過去教訓の適切性を定期的に検証すること。"
+                    ),
+                    "profit_loss": "N/A",
+                    "tags": ["skipped", "critic_override", ticker.lower(), session_id],
+                })
+                _log(f"  [Obsidian] SKIPPED ログ保存: {_skip_log.name}")
+            except Exception as e:
+                _log(f"  [Obsidian] SKIPPED ログ保存エラー: {e}")
+
     # ── 最終結果表示 ─────────────────────────────────────────────
     decision   = judgment.get("decision", _HOLD_LABEL)
     score      = judgment.get("score", 0.0)

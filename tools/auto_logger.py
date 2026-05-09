@@ -175,6 +175,9 @@ class ObsidianLogger:
 
     def _build_markdown(self, data: dict) -> str:
         """YAML フロントマターと本文を含む Markdown 文字列を組み立てる。"""
+        if data["action"] == "SKIPPED":
+            return self._build_skipped_markdown(data)
+
         tags_yaml = ", ".join(f'"{t}"' for t in data["tags"])
 
         pl = str(data["profit_loss"])
@@ -212,6 +215,49 @@ tags: [{tags_yaml}]
 {to_bullets(data["root_cause"])}
 
 ## 4. 次回への教訓・ルール
+
+{to_bullets(data["rule_for_future"])}
+"""
+        return md
+
+    def _build_skipped_markdown(self, data: dict) -> str:
+        """CriticAgent OVERRIDE で発注見送りになった際のシャドウ・ログ用テンプレート。
+
+        frontmatter スキーマは通常ログと同一に保ち、Dataview クエリとの互換性を維持する。
+        """
+        tags_yaml = ", ".join(f'"{t}"' for t in data["tags"])
+
+        def to_bullets(text: str) -> str:
+            lines = [l.strip() for l in str(text).splitlines() if l.strip()]
+            return "\n".join(f"- {l}" for l in lines) if lines else "- (未入力)"
+
+        md = f"""\
+---
+date: {data["date"]}
+ticker: {data["ticker"]}
+action: {data["action"]}
+outcome: {data["outcome"]}
+profit_loss: N/A
+tags: [{tags_yaml}]
+---
+
+# [{data["outcome"]}] {data["ticker"]} — 発注見送り（CriticAgent拒否） | {data["date"]}
+
+> **シャドウ・ログ**: ManagerAgentは STRONG BUY と判断したが、CriticAgent の監査により発注がキャンセルされた記録。
+
+## 1. ManagerAgent の判断サマリー
+
+{to_bullets(data["context"])}
+
+## 2. CriticAgent 拒否理由
+
+{to_bullets(data["root_cause"])}
+
+## 3. RiskAgent 算出値（参考）
+
+{to_bullets(data.get("risk_summary", "(RiskAgent データなし)"))}
+
+## 4. 次回への検討事項
 
 {to_bullets(data["rule_for_future"])}
 """
