@@ -13,102 +13,74 @@ from io import StringIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import skills.portfolio_monitor       as _portfolio_mod
 import skills.training_data_collector as _training_mod
+from agents.exit_agent import ExitAgent as _ExitAgent
 
 _W = 62  # ターミナル表示幅
+
+
+class _StubBBS:
+    """run_pipeline.py 専用の軽量BBSスタブ（ExitAgent のインターフェース要件を満たす）。"""
+    def write(self, *args, **kwargs) -> None:
+        pass
+    def read(self, *args, **kwargs):
+        return None
 
 
 def run_exit_check() -> list[dict]:
     """
     フェーズ0: ExitAgent — 保有ポジションの健康診断と Exit 判断。
 
-    判断基準:
-      1. 現在価格 < ストップロス価格 → SELL（ストップロス到達）
-      2. 含み損が取得単価の -5% 超 → SELL（損切りライン超過）
-      3. 上記以外 → HOLD（保有継続）
+    ATRベースのSL/TP価格（portfolio.json に記録）で判断する:
+      - 現在価格 <= stop_loss_price → SELL（ATRベース損切り）
+      - 現在価格 >= target_price   → SELL（ATRベース利確）
+      - ATR価格未設定時のフォールバック: 含み損 <= -5% / 含み益 >= +10%
 
-    SELL 判断が出た場合は警告ログをターミナルに出力する。
     Returns: SELL 判断のリスト
     """
     print("══════════════════════════════════════════════════════════════")
     print(" 🛡️  ExitAgent: 保有ポジションの健康診断を開始...")
     print("══════════════════════════════════════════════════════════════")
 
-    portfolio_data = _portfolio_mod.get_current_portfolio()
-    positions = portfolio_data if isinstance(portfolio_data, list) else []
+    agent = _ExitAgent(_StubBBS())
+    results = agent.run(mock_mode=True)  # mock_mode=True でLLM thesis チェックをスキップ
 
-    if not positions:
+    if not results:
         print("  ℹ️  保有ポジションなし。Exit チェックをスキップします。")
         print()
         return []
 
-    print(f"  {'銘柄':<6} {'保有株数':>6} {'取得単価':>9} {'現在価格':>9} {'損益率':>7} {'ストップ':>9} {'判断':>6}")
-    print(f"  {'─' * 58}")
+    print(f"  {'銘柄':<6} {'保有株数':>6} {'取得単価':>9} {'現在価格':>9} {'損益率':>7} {'判断':>6}")
+    print(f"  {'─' * 52}")
 
-    decisions: list[dict] = []
-
-    for pos in positions:
-        ticker        = pos["ticker"]
-        shares        = pos["shares"]
-        avg_cost      = pos["avg_cost"]
-        current_price = pos["current_price"]
-        stop_loss     = pos["stop_loss"]
-        pnl_pct       = pos["pnl_pct"]
-        stop_hit      = pos["stop_loss_hit"]
-
-        # ExitAgent 判断ロジック（system_prompt の基準をそのまま実装）
-        if stop_hit:
-            action = "SELL"
-            reason = f"ストップロス到達（現在 ${current_price} < SL ${stop_loss}）"
-        elif pnl_pct < -5.0:
-            action = "SELL"
-            reason = f"含み損が -5% 超（{pnl_pct:.2f}%）"
-        else:
-            action = "HOLD"
-            reason = f"条件未達（損益 {pnl_pct:+.2f}%, SL未到達）"
-
-        pnl_icon   = "📉" if pnl_pct < 0 else "📈"
-        action_str = "🔴 SELL" if action == "SELL" else "🟢 HOLD"
-
+    for r in results:
+        pnl_icon   = "📉" if r["pnl_pct"] < 0 else "📈"
+        action_str = "🔴 SELL" if r["action"] == "SELL" else "🟢 HOLD"
         print(
-            f"  {ticker:<6} {shares:>6}株  "
-            f"${avg_cost:>7.2f}  ${current_price:>7.2f}  "
-            f"{pnl_pct:>+6.2f}%{pnl_icon}  "
-            f"${stop_loss:>7.2f}  {action_str}"
+            f"  {r['ticker']:<6} {r.get('shares', 0):>6}株  "
+            f"${float(r['entry_price']):>7.2f}  ${r['current_price']:>7.2f}  "
+            f"{r['pnl_pct']:>+6.2f}%{pnl_icon}  {action_str}"
         )
-
-        decision = {
-            "ticker":         ticker,
-            "action":         action,
-            "reason":         reason,
-            "current_price":  current_price,
-            "stop_loss":      stop_loss,
-            "pnl_pct":        pnl_pct,
-        }
-        decisions.append(decision)
-
-        if action == "SELL":
-            print(f"\n  ⚠️  [{ticker}] {reason}")
-            print(f"  ⚠️  [{ticker}] ストップロス到達のため売却注文を送信しました\n")
+        if r["action"] == "SELL":
+            print(f"\n  ⚠️  [{r['ticker']}] {r['reason']}")
             updated = _training_mod.update_outcome(
-                ticker=ticker,
-                pnl_pct=pnl_pct,
-                exit_price=current_price,
-                exit_reason=reason,
+                ticker     = r["ticker"],
+                pnl_pct    = r["pnl_pct"],
+                exit_price = r["current_price"],
+                exit_reason= r["exit_type"],
             )
             if updated:
-                label = "WIN" if pnl_pct >= 0 else "LOSS"
-                print(f"  📚 [{ticker}] 学習データ更新: outcome_label={label}  (record {updated}件)")
+                label = "WIN" if r["pnl_pct"] >= 0 else "LOSS"
+                print(f"  📚 [{r['ticker']}] 学習データ更新: outcome_label={label}  ({updated}件)\n")
 
-    sell_count = sum(1 for d in decisions if d["action"] == "SELL")
-    hold_count = len(decisions) - sell_count
+    sell_decisions = [r for r in results if r["action"] == "SELL"]
+    hold_count     = len(results) - len(sell_decisions)
 
-    print(f"  {'─' * 58}")
-    print(f"  健康診断完了: SELL={sell_count}件 / HOLD={hold_count}件")
+    print(f"  {'─' * 52}")
+    print(f"  健康診断完了: SELL={len(sell_decisions)}件 / HOLD={hold_count}件")
     print()
 
-    return [d for d in decisions if d["action"] == "SELL"]
+    return sell_decisions
 
 
 # ──────────────────────────────────────────────────────────────────
