@@ -64,6 +64,7 @@ from agents.exit_agent import ExitAgent as _ExitAgentImpl, add_position as _port
 from tools.auto_logger import ObsidianLogger as _ObsidianLogger
 from tools.alpaca_client import AlpacaClient as _AlpacaClient, PORTFOLIO_PATH as _PORTFOLIO_PATH
 from tools.critic_agent import CriticAgent as _CriticAgentImpl
+from tools.circuit_breaker import CircuitBreaker as _CircuitBreaker
 from agents.audit_agent import (
     AuditAgent as _AuditAgentImpl,
     COACHING_PROMPTS as _COACHING_PROMPTS,
@@ -1409,6 +1410,73 @@ def run_trade_cycle(
                     f"損益: {r['pnl_pct']:+.2f}%\n"
                     + (f"注文ID: {order.get('order_id')}" if order.get("order_id") else "")
                 )
+
+    # ── Circuit Breaker チェック（Stage 0 の後、Stage 1 の前）───────
+    # mock_mode 時は Alpaca 口座情報が取れないためスキップ
+    if not mock_mode and _alpaca is not None:
+        try:
+            _acc_info = _alpaca.get_account()
+            _equity   = _acc_info.get("equity", 0.0)
+            _cb       = _CircuitBreaker()
+            _cb_result = _cb.check(_equity)
+
+            if not _cb_result.buy_allowed:
+                _icon = "🚨" if _cb_result.status == "HARD_TRIP" else "⚡"
+                _log(f"[CircuitBreaker] {_icon} {_cb_result.status} 発動 — 新規 BUY を停止")
+                _log(f"  日次損益   : {_cb_result.daily_pnl_pct:+.2f}%")
+                _log(f"  高値比DD   : {_cb_result.total_drawdown_pct:+.2f}%")
+                _log(f"  理由       : {_cb_result.reason}")
+
+                _cb_judgment = {
+                    "ticker":        ticker,
+                    "decision":      _HOLD_LABEL,
+                    "score":         0.0,
+                    "threshold":     STRONG_BUY_SCORE,
+                    "signals":       {"news": 0.0, "technical": 0.0, "macro": 0.0,
+                                      "fundamental": 0.0, "social": 0.0},
+                    "gate_skipped":  True,
+                    "gate_reason":   f"CircuitBreaker {_cb_result.status}: {_cb_result.reason}",
+                    "circuit_trip":  _cb_result.status,
+                    "rationale":     f"CircuitBreaker {_cb_result.status}により新規 BUY を停止",
+                    "order":         None,
+                    "dry_run":       dry_run,
+                }
+                bbs.write("CircuitBreaker", "manager_judgment", _cb_judgment)
+                _decision_box([
+                    f"{'─' * (_W - 2)}",
+                    f"  CircuitBreaker: {_cb_result.status}",
+                    f"{'─' * (_W - 2)}",
+                    f"  銘柄         : {ticker}",
+                    "  判断         : ⏸  HOLD（新規 BUY 停止）",
+                    f"  日次損益     : {_cb_result.daily_pnl_pct:+.2f}%",
+                    f"  高値比 DD    : {_cb_result.total_drawdown_pct:+.2f}%",
+                    f"  理由         : {_cb_result.reason[:55]}",
+                    f"{'─' * (_W - 2)}",
+                    f"  BBS ログ     : {bbs.path}",
+                ])
+                if notify_line:
+                    send_line_message(
+                        f"【ECC {ticker} 判断】⏸ HOLD\n"
+                        f"⚠️ CircuitBreaker {_cb_result.status}\n"
+                        f"日次損益: {_cb_result.daily_pnl_pct:+.2f}%  "
+                        f"高値比DD: {_cb_result.total_drawdown_pct:+.2f}%\n"
+                        f"理由: {_cb_result.reason[:80]}"
+                    )
+                record_id = _training_mod.save_training_record(
+                    session_id=session_id, ticker=ticker,
+                    bbs_entries=bbs.read_all(), judgment=_cb_judgment,
+                    mock_mode=mock_mode, hybrid_mode=hybrid_mode,
+                )
+                _log(f"[学習データ] 保存完了: record_id={record_id}")
+                return _cb_judgment
+            else:
+                _log(
+                    f"[CircuitBreaker] 🟢 OPEN  "
+                    f"日次{_cb_result.daily_pnl_pct:+.2f}%  "
+                    f"高値比{_cb_result.total_drawdown_pct:+.2f}%"
+                )
+        except Exception as _cb_err:
+            _log(f"[CircuitBreaker] チェックエラー（スキップ）: {_cb_err}")
 
     # ── Stage 1: 安価シグナルスキャン ────────────────────────────
     _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
