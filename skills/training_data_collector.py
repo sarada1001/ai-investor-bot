@@ -222,6 +222,7 @@ def _register_open_position(
         order.get("fill_price")
         or order.get("filled_avg_price")
         or order.get("price")
+        or judgment.get("current_price")
     )
     index[ticker].append({
         "record_id": record_id,

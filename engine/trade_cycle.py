@@ -478,6 +478,7 @@ def run_trade_cycle(
                 _log(f"  発注エラー: {e}")
 
         judgment["order"] = order_result
+        judgment["current_price"] = risk_data.get("current_price")
         bbs.write("ManagerAgent", "manager_judgment", judgment)
 
         # ── ポートフォリオ登録 ────────────────────────────────────
