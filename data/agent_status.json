@@ -1,62 +1,74 @@
 {
   "ManagerAgent": {
     "status": "ACTIVE",
-    "win_rate": 0.7,
-    "total_trades": 10,
-    "winning_trades": 7,
-    "losing_trades": 3,
-    "suspension_reason": "取引回数不足のため評価を保留（10/20回） — 勝率 70.0% は参考値",
+    "win_rate": 0.5217,
+    "total_trades": 46,
+    "winning_trades": 24,
+    "losing_trades": 22,
+    "suspension_reason": "合格: 勝率 52.2% >= 50.0%（46 取引中 24 勝）",
     "coaching_prompt": "【補習課題】最終判断でリスク許容度を引き上げてください。加重スコアが 0.50〜0.60 の場合でも、FA・テクニカル両方が POSITIVE ならSTRONG BUY を積極的に検討してください。過去の慎重すぎる判断が機会損失を生んでいます。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   },
   "TechnicalAgent": {
     "status": "ACTIVE",
-    "win_rate": 0.8333,
-    "total_trades": 6,
-    "winning_trades": 5,
-    "losing_trades": 1,
-    "suspension_reason": "取引回数不足のため評価を保留（6/20回） — 勝率 83.3% は参考値",
+    "win_rate": 0.5217,
+    "total_trades": 46,
+    "winning_trades": 24,
+    "losing_trades": 22,
+    "suspension_reason": "合格: 勝率 52.2% >= 50.0%（46 取引中 24 勝）",
     "coaching_prompt": "【補習課題】テクニカル判定が保守的すぎます。RSI が 40〜60 のレンジでも、MACD ゴールデンクロスや出来高増加がある場合はPOSITIVE シグナルを積極的に評価してください。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   },
   "NewsAgent": {
     "status": "ACTIVE",
-    "win_rate": 0.7,
-    "total_trades": 10,
-    "winning_trades": 7,
-    "losing_trades": 3,
-    "suspension_reason": "取引回数不足のため評価を保留（10/20回） — 勝率 70.0% は参考値",
+    "win_rate": 0.5217,
+    "total_trades": 46,
+    "winning_trades": 24,
+    "losing_trades": 22,
+    "suspension_reason": "合格: 勝率 52.2% >= 50.0%（46 取引中 24 勝）",
     "coaching_prompt": "【補習課題】ニュースセンチメント判定が消極的です。業績改善・新製品発表・アナリスト格上げなど将来見通しにポジティブな要素が含まれる場合は POSITIVE 評価を積極的にしてください。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   },
   "MacroAgent": {
-    "status": "ACTIVE",
-    "win_rate": 0.9286,
-    "total_trades": 14,
-    "winning_trades": 13,
-    "losing_trades": 1,
-    "suspension_reason": "取引回数不足のため評価を保留（14/20回） — 勝率 92.9% は参考値",
+    "status": "SUSPENDED",
+    "win_rate": 0.2632,
+    "total_trades": 19,
+    "winning_trades": 5,
+    "losing_trades": 14,
+    "suspension_reason": "仮想取引数不足: 19 < 20 — 検定データ不足のため評価保留",
     "coaching_prompt": "【補習課題】マクロ環境の判定基準を見直してください。VIX が 20 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、明確な悪化シグナルがある場合のみ NEGATIVE としてください。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   },
   "SocialAgent": {
     "status": "ACTIVE",
-    "win_rate": 0.7,
-    "total_trades": 10,
-    "winning_trades": 7,
-    "losing_trades": 3,
-    "suspension_reason": "取引回数不足のため評価を保留（10/20回） — 勝率 70.0% は参考値",
+    "win_rate": 0.5217,
+    "total_trades": 46,
+    "winning_trades": 24,
+    "losing_trades": 22,
+    "suspension_reason": "合格: 勝率 52.2% >= 50.0%（46 取引中 24 勝）",
     "coaching_prompt": "【補習課題】SNS センチメントの Hype ペナルティ適用が過剰です。FA・テクニカルの裏付けがある場合は Hype スコアが高くてもペナルティを軽減し、総合的な判断を優先してください。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   },
   "FundamentalAgent": {
     "status": "ACTIVE",
-    "win_rate": 0.9286,
-    "total_trades": 14,
-    "winning_trades": 13,
-    "losing_trades": 1,
-    "suspension_reason": "取引回数不足のため評価を保留（14/20回） — 勝率 92.9% は参考値",
+    "win_rate": 0.5217,
+    "total_trades": 46,
+    "winning_trades": 24,
+    "losing_trades": 22,
+    "suspension_reason": "合格: 勝率 52.2% >= 50.0%（46 取引中 24 勝）",
     "coaching_prompt": "【補習課題】ファンダメンタルズ分析でリスク要因の重み付けが大きすぎます。成長性・収益性の改善トレンドを重視し、短期的リスクへの過剰反応を避けてください。",
-    "last_evaluated": "2026-05-11T06:32:36.760680"
+    "last_evaluated": "2026-05-11T07:06:32.644152",
+    "exam_mode": true,
+    "exam_period": "90d"
   }
 }
