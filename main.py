@@ -65,6 +65,7 @@ from tools.auto_logger import ObsidianLogger as _ObsidianLogger
 from tools.alpaca_client import AlpacaClient as _AlpacaClient, PORTFOLIO_PATH as _PORTFOLIO_PATH
 from tools.critic_agent import CriticAgent as _CriticAgentImpl
 from tools.circuit_breaker import CircuitBreaker as _CircuitBreaker
+from tools.trade_guard    import TradeGuard     as _TradeGuard
 from agents.audit_agent import (
     AuditAgent as _AuditAgentImpl,
     COACHING_PROMPTS as _COACHING_PROMPTS,
@@ -1411,6 +1412,8 @@ def run_trade_cycle(
                     + (f"注文ID: {order.get('order_id')}" if order.get("order_id") else "")
                 )
 
+    _account_equity: float = 0.0  # TradeGuard 用。CircuitBreaker ブロックで更新。
+
     # ── Circuit Breaker チェック（Stage 0 の後、Stage 1 の前）───────
     # mock_mode 時は Alpaca 口座情報が取れないためスキップ
     if not mock_mode and _alpaca is not None:
@@ -1475,6 +1478,7 @@ def run_trade_cycle(
                     f"日次{_cb_result.daily_pnl_pct:+.2f}%  "
                     f"高値比{_cb_result.total_drawdown_pct:+.2f}%"
                 )
+                _account_equity = _equity  # TradeGuard のポジション比率チェックに使用
         except Exception as _cb_err:
             _log(f"[CircuitBreaker] チェックエラー（スキップ）: {_cb_err}")
 
@@ -1705,12 +1709,28 @@ def run_trade_cycle(
             bbs.write("CriticAgent", "critic_judgment", _critic_res)
             _phase_footer()
 
+        # ── TradeGuard チェック（実発注前のみ）──────────────────────
+        if proceed_with_buy and not dry_run and not mock_mode and not hybrid_mode:
+            _tg = _TradeGuard()
+            _open_pos    = len(_alpaca.get_positions()) if _alpaca is not None else 0
+            _order_value = rec_shares * risk_data.get("current_price", 0.0)
+            _gr = _tg.check_pre_buy(
+                ticker=ticker, order_value=_order_value,
+                account_equity=_account_equity, open_positions=_open_pos,
+            )
+            if not _gr.allowed:
+                _log(f"  🛡 [TradeGuard] 発注ブロック: {_gr.reason}")
+                proceed_with_buy = False
+                judgment["guard_blocked"] = True
+                judgment["guard_reason"]  = _gr.reason
+
         # ── 発注 ────────────────────────────────────────────────
         _sep()
         _log(f"Alpaca に {ticker} {rec_shares}株 買い注文を送信します...")
         if not proceed_with_buy:
-            _log("  CriticAgent OVERRIDE のため発注スキップ")
-            order_result = {"skipped": True, "skip_reason": "CriticAgent OVERRIDE"}
+            skip_reason = judgment.get("guard_reason") or "CriticAgent OVERRIDE"
+            _log(f"  発注スキップ: {skip_reason}")
+            order_result = {"skipped": True, "skip_reason": skip_reason}
         elif dry_run or mock_mode or hybrid_mode:
             label = "hybrid_mode" if hybrid_mode else ("mock_mode" if mock_mode else "dry_run")
             _log(f"  ({label}=True のため実際の発注はスキップ)")
@@ -1724,6 +1744,7 @@ def run_trade_cycle(
                 _log(f"  ✅ 注文完了: order_id={order_result.get('order_id')}")
                 _log(f"     status  : {order_result.get('status')}")
                 _log(f"     symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
+                _TradeGuard().record_buy(ticker)
             elif order_result.get("skipped"):
                 _log(f"  ⏭  注文スキップ: {order_result.get('skip_reason')}")
             else:
