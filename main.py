@@ -64,6 +64,12 @@ from agents.exit_agent import ExitAgent as _ExitAgentImpl, add_position as _port
 from tools.auto_logger import ObsidianLogger as _ObsidianLogger
 from tools.alpaca_client import AlpacaClient as _AlpacaClient, PORTFOLIO_PATH as _PORTFOLIO_PATH
 from tools.critic_agent import CriticAgent as _CriticAgentImpl
+from agents.audit_agent import (
+    AuditAgent as _AuditAgentImpl,
+    COACHING_PROMPTS as _COACHING_PROMPTS,
+    load_agent_status as _load_agent_status,
+    apply_suspension_to_weights as _apply_suspension_to_weights,
+)
 
 # =========================================================
 # 定数
@@ -1020,13 +1026,26 @@ _RISK_PCT = 2  # リスク割合表示用（固定値）
 # オーケストレーション本体
 # =========================================================
 
-def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = None) -> None:
+def _run_mock_stage1(
+    bbs: BBS,
+    ticker: str,
+    excluded_keys:  list[str] | None = None,
+    suspended_keys: list[str] | None = None,
+) -> None:
     """Stage 1 の各エージェントをモックデータで代替する（API 呼び出しなし）。"""
-    excluded_keys = excluded_keys or []
+    excluded_keys  = excluded_keys  or []
+    suspended_keys = suspended_keys or []
     note = "⚠️  [MOCK] LLM スキップ — ダミーデータを BBS に書き込み"
 
-    def _excl_note(key: str) -> str:
-        return "  [アブレーション: 除外済]" if key in excluded_keys else ""
+    def _write_shadow_mock(bbs_key: str, agent_name: str, shadow_data: dict) -> None:
+        coaching = _COACHING_PROMPTS.get(agent_name, "")
+        bbs.write("AuditAgent", f"shadow_{bbs_key}", {
+            **shadow_data, "_shadow_mode": True, "_coaching_prompt": coaching,
+        })
+        bbs.write(agent_name, bbs_key, {
+            "trend": "neutral", "suspended": True,
+            "trend_reason": f"{agent_name} SUSPENDED (shadow mode) — ウェイト=0",
+        })
 
     _phase_header("S1-1/4", "TechnicalAgent")
     _log(note)
@@ -1035,6 +1054,10 @@ def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = No
         _log("  ⚠️  [アブレーション] TechnicalAgent を除外 → NEUTRAL エントリを書き込み")
         bbs.write("TechnicalAgent", "technical_analysis",
                   {"trend": "neutral", "excluded": True, "trend_reason": "TechnicalAgent 除外済"})
+    elif "technical" in suspended_keys:
+        _log("  🔴 [SUSPENDED] TechnicalAgent — Shadow Mode (本番スコア影響なし)")
+        shadow_data: dict = {**MOCK_BBS_DATA["technical_analysis"], "ticker": ticker}
+        _write_shadow_mock("technical_analysis", "TechnicalAgent", shadow_data)
     else:
         data: dict = {**MOCK_BBS_DATA["technical_analysis"], "ticker": ticker}
         _log("テクニカルトレンド判定: 📈 POSITIVE")
@@ -1050,6 +1073,16 @@ def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = No
         bbs.write("NewsAgent", "news_analysis",
                   {"articles": [], "avg_sentiment_score": 0.0, "excluded": True,
                    "trend": "neutral", "trend_reason": "NewsAgent 除外済"})
+    elif "news" in suspended_keys:
+        _log("  🔴 [SUSPENDED] NewsAgent — Shadow Mode (本番スコア影響なし)")
+        articles = [
+            {**a, "ticker": ticker, "company": ticker,
+             "title": a.get("title", "").replace("AAPL", ticker),
+             "reason": a.get("reason", "").replace("AAPL", ticker)}
+            for a in MOCK_BBS_DATA["news_analysis"]["articles"]
+        ]
+        shadow_news = {**MOCK_BBS_DATA["news_analysis"], "ticker": ticker, "articles": articles}
+        _write_shadow_mock("news_analysis", "NewsAgent", shadow_news)
     else:
         articles = [
             {**a, "ticker": ticker, "company": ticker,
@@ -1073,6 +1106,10 @@ def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = No
         _log("  ⚠️  [アブレーション] MacroAgent を除外 → NEUTRAL エントリを書き込み")
         bbs.write("MacroAgent", "macro_analysis",
                   {"trend": "neutral", "excluded": True, "trend_reason": "MacroAgent 除外済"})
+    elif "macro" in suspended_keys:
+        _log("  🔴 [SUSPENDED] MacroAgent — Shadow Mode (本番スコア影響なし)")
+        shadow_macro = {**MOCK_BBS_DATA["macro_analysis"]}
+        _write_shadow_mock("macro_analysis", "MacroAgent", shadow_macro)
     else:
         data = {**MOCK_BBS_DATA["macro_analysis"]}
         _log("マクロ環境判定: ➡️  NEUTRAL")
@@ -1088,6 +1125,10 @@ def _run_mock_stage1(bbs: BBS, ticker: str, excluded_keys: list[str] | None = No
         bbs.write("SocialAgent", "social_analysis",
                   {"sentiment": "NEUTRAL", "hype_score": 0.0, "excluded": True,
                    "reason": "SocialAgent 除外済", "post_count": 0})
+    elif "social" in suspended_keys:
+        _log("  🔴 [SUSPENDED] SocialAgent — Shadow Mode (本番スコア影響なし)")
+        shadow_social = {**MOCK_BBS_DATA["social_analysis"], "ticker": ticker}
+        _write_shadow_mock("social_analysis", "SocialAgent", shadow_social)
     else:
         social_mock = {**MOCK_BBS_DATA["social_analysis"], "ticker": ticker}
         hype = social_mock["hype_score"]
@@ -1264,6 +1305,7 @@ def run_trade_cycle(
     mock_mode: bool         = False,
     hybrid_mode: bool       = False,
     excluded_agents: list[str] | None = None,
+    run_audit: bool         = False,
 ) -> dict:
     """
     AAPL スイングトレード分析サイクルをステージゲート方式で実行する。
@@ -1282,16 +1324,42 @@ def run_trade_cycle(
         hybrid_mode:  True の場合、Stage 1〜4 すべてリアル市場データ・リアル分析を実行し、
                       発注のみスキップ。EDGAR 自律取得（allow_edgar_fetch=True）も有効。
                       学習データ品質向上・本番前検証に推奨。
+        run_audit:    True の場合、パイプライン開始前に AuditAgent で全エージェントを再評価し
+                      agent_status.json を更新する（デフォルト: False = 既存ステータスを読むだけ）。
     """
     excluded_agents = excluded_agents or []
     excluded_keys: list[str] = list({
         k for a in excluded_agents
         if (k := _agent_to_weight_key(a)) is not None
     })
-    eff_weights = _compute_effective_weights(excluded_keys)
+
+    # ── AuditAgent: 評価 & SUSPENDED エージェントのウェイト調整 ──
+    _audit = _AuditAgentImpl()
+    if run_audit:
+        _log("[AuditAgent] エージェント成績を評価中 (agent_status.json 更新)...")
+        _audit.run_evaluation()
+
+    _agent_status   = _load_agent_status()
+    _suspended_w, _suspended_keys = _apply_suspension_to_weights(
+        _compute_effective_weights(excluded_keys), _agent_status
+    )
+    # excluded_keys はウェイト 0 だが suspended_keys は処理を継続するため分離管理
+    # eff_weights には excluded + suspended 両方の 0.0 が含まれる
+    eff_weights = _suspended_w
 
     session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     _main_header(ticker, session_id)
+
+    # ── AuditAgent ステータスサマリー表示 ───────────────────────
+    _suspended_agents = [
+        name for name, info in _agent_status.items()
+        if info.get("status") == "SUSPENDED"
+    ]
+    if _suspended_agents:
+        _log(f"[AuditAgent] 🔴 SUSPENDED エージェント: {_suspended_agents}")
+        _log(f"[AuditAgent] Shadow Mode で処理 → 本番スコアへの影響なし")
+        _log(f"[AuditAgent] 有効ウェイト: { {k: f'{v:.3f}' for k, v in eff_weights.items()} }")
+
     if excluded_keys:
         _log(f"[アブレーション] 除外エージェント: {excluded_agents}  "
              f"→ 有効ウェイト: {eff_weights}")
@@ -1344,26 +1412,70 @@ def run_trade_cycle(
 
     # ── Stage 1: 安価シグナルスキャン ────────────────────────────
     _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
+
+    def _run_shadow_agent(
+        agent_name: str,
+        bbs_key: str,
+        run_fn,           # () -> None（エージェントを実行してBBSに書き込む関数）
+    ) -> None:
+        """SUSPENDED エージェントを Shadow Mode で実行する（直列処理）。"""
+        _log(f"  🔴 [SUSPENDED → Shadow Mode] {agent_name} を仮想判定で実行中...")
+        run_fn()
+        shadow_result = bbs.read(bbs_key) or {}
+        coaching = _COACHING_PROMPTS.get(agent_name, "")
+        bbs.write("AuditAgent", f"shadow_{bbs_key}", {
+            **shadow_result, "_shadow_mode": True, "_coaching_prompt": coaching,
+        })
+        bbs.write(agent_name, bbs_key, {
+            "trend": "neutral", "suspended": True,
+            "trend_reason": f"{agent_name} SUSPENDED (shadow mode) — ウェイト=0",
+        })
+        _log(f"  🔴 Shadow 結果を shadow_{bbs_key} に保存。本番 BBS は NEUTRAL で上書き。")
+
     if mock_mode:
-        _run_mock_stage1(bbs, ticker, excluded_keys=excluded_keys)
+        _run_mock_stage1(
+            bbs, ticker,
+            excluded_keys=excluded_keys,
+            suspended_keys=_suspended_keys,
+        )
     else:
         if "technical" in excluded_keys:
             _write_excluded("TechnicalAgent", "technical_analysis")
+        elif "technical" in _suspended_keys:
+            _run_shadow_agent(
+                "TechnicalAgent", "technical_analysis",
+                lambda: TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4-SHADOW"),
+            )
         else:
             TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
 
         if "news" in excluded_keys:
             _write_excluded("NewsAgent", "news_analysis")
+        elif "news" in _suspended_keys:
+            _run_shadow_agent(
+                "NewsAgent", "news_analysis",
+                lambda: NewsAgent(bbs).run(ticker, phase_tag="S1-2/4-SHADOW"),
+            )
         else:
             NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
 
         if "macro" in excluded_keys:
             _write_excluded("MacroAgent", "macro_analysis")
+        elif "macro" in _suspended_keys:
+            _run_shadow_agent(
+                "MacroAgent", "macro_analysis",
+                lambda: MacroAgent(bbs).run(phase_tag="S1-3/4-SHADOW"),
+            )
         else:
             MacroAgent(bbs).run(phase_tag="S1-3/4")
 
         if "social" in excluded_keys:
             _write_excluded("SocialAgent", "social_analysis")
+        elif "social" in _suspended_keys:
+            _run_shadow_agent(
+                "SocialAgent", "social_analysis",
+                lambda: SocialAgent(bbs).run(ticker, phase_tag="S1-4/4-SHADOW"),
+            )
         else:
             SocialAgent(bbs).run(ticker, phase_tag="S1-4/4")
 
@@ -1444,6 +1556,22 @@ def run_trade_cycle(
         _log("  ⚠️  [アブレーション] FundamentalAgent を除外 → NEUTRAL エントリを書き込み")
         bbs.write("FundamentalAgent", "fundamental_analysis",
                   {"trend": "neutral", "excluded": True, "trend_reason": "FundamentalAgent 除外済"})
+    elif "fundamental" in _suspended_keys:
+        _log("  🔴 [SUSPENDED] FundamentalAgent — Shadow Mode (本番スコア影響なし)")
+        if mock_mode:
+            _run_mock_stage2(bbs, ticker)
+            _shadow_fa = bbs.read("fundamental_analysis") or {}
+        else:
+            FundamentalAgent(bbs).run(ticker, phase_tag="S2-SHADOW", allow_edgar_fetch=False)
+            _shadow_fa = bbs.read("fundamental_analysis") or {}
+        bbs.write("AuditAgent", "shadow_fundamental_analysis", {
+            **_shadow_fa, "_shadow_mode": True,
+            "_coaching_prompt": _COACHING_PROMPTS.get("FundamentalAgent", ""),
+        })
+        bbs.write("FundamentalAgent", "fundamental_analysis", {
+            "trend": "neutral", "suspended": True,
+            "trend_reason": "FundamentalAgent SUSPENDED (shadow mode) — ウェイト=0",
+        })
     elif mock_mode:
         # mock_mode: 完全モック（API/EDGAR 呼び出しゼロ）
         _run_mock_stage2(bbs, ticker)
@@ -1717,6 +1845,7 @@ def run_watchlist_cycle(
     mock_mode:       bool = False,
     hybrid_mode:     bool = False,
     excluded_agents: list[str] | None = None,
+    run_audit:       bool = False,
 ) -> list[dict]:
     """
     複数銘柄を順番に run_trade_cycle() で分析し、結果を集約して返す。
@@ -1728,6 +1857,7 @@ def run_watchlist_cycle(
         mock_mode:       True の場合、全 LLM/API 呼び出しをスキップ
         hybrid_mode:     True の場合、発注のみスキップ（リアル分析）
         excluded_agents: 除外するエージェント名のリスト
+        run_audit:       True の場合、最初の銘柄処理前に AuditAgent 評価を実行
 
     Returns:
         各銘柄の judgment dict のリスト（ticker キーを付与済み）
@@ -1741,6 +1871,8 @@ def run_watchlist_cycle(
         print(f"    {i}. {t}")
     print(f"{bar}\n")
 
+    # AuditAgent 評価は最初の銘柄のみで実行（以降は更新済み status を読む）
+    _first_run_audit = run_audit
     for ticker in tickers:
         try:
             result = run_trade_cycle(
@@ -1750,7 +1882,9 @@ def run_watchlist_cycle(
                 mock_mode       = mock_mode,
                 hybrid_mode     = hybrid_mode,
                 excluded_agents = excluded_agents,
+                run_audit       = _first_run_audit,
             )
+            _first_run_audit = False  # 2銘柄目以降は再評価しない
         except Exception as e:
             _log(f"[Watchlist] {ticker} の分析中にエラー: {e} — スキップします")
             result = {"decision": "HOLD", "score": 0.0, "rationale": f"エラー: {e}"}
@@ -1990,6 +2124,14 @@ if __name__ == "__main__":
         help="除外するエージェント名（例: SocialAgent TechnicalAgent）。"
              "アブレーション実験用。",
     )
+    parser.add_argument(
+        "--run-audit", action="store_true",
+        help=(
+            "AuditAgent によるエージェント成績評価を実行し agent_status.json を更新する。"
+            "勝率 40%% 未満のエージェントを SUSPENDED に設定し、"
+            "本番スコアのウェイトを 0.0 にミュートする。"
+        ),
+    )
 
     # ── デーモンモード ───────────────────────────────────────────
     parser.add_argument(
@@ -2022,6 +2164,12 @@ if __name__ == "__main__":
         for i, r in enumerate(results, 1):
             print(f"  {i}. {r['ticker']:<6}  スコア {r['score']:>2}  {r['reason']}")
         raise SystemExit(0)
+
+    # ── --run-audit のみ: 評価レポートを表示して終了 ─────────────
+    _run_audit_flag = getattr(args, "run_audit", False)
+    if _run_audit_flag and not (args.daemon or args.screen or args.tickers):
+        # audit のみ単独実行（サイクルなし）の場合
+        pass  # run_trade_cycle 内で評価される
 
     # ── daemon モード ─────────────────────────────────────────────
     if args.daemon:
@@ -2056,6 +2204,7 @@ if __name__ == "__main__":
             mock_mode       = args.mock,
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
+            run_audit       = _run_audit_flag,
         )
 
     # ── tickers モード（複数銘柄固定ウォッチリスト） ──────────────
@@ -2067,6 +2216,7 @@ if __name__ == "__main__":
             mock_mode       = args.mock,
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
+            run_audit       = _run_audit_flag,
         )
 
     # ── 単一銘柄モード（従来動作） ────────────────────────────────
@@ -2078,4 +2228,5 @@ if __name__ == "__main__":
             mock_mode       = args.mock,
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
+            run_audit       = _run_audit_flag,
         )

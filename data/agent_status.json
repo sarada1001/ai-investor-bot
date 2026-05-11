@@ -1,0 +1,62 @@
+{
+  "ManagerAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.7,
+    "total_trades": 10,
+    "winning_trades": 7,
+    "losing_trades": 3,
+    "suspension_reason": "勝率 70.0% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】最終判断でリスク許容度を引き上げてください。加重スコアが 0.50〜0.60 の場合でも、FA・テクニカル両方が POSITIVE ならSTRONG BUY を積極的に検討してください。過去の慎重すぎる判断が機会損失を生んでいます。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  },
+  "TechnicalAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.8333,
+    "total_trades": 6,
+    "winning_trades": 5,
+    "losing_trades": 1,
+    "suspension_reason": "勝率 83.3% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】テクニカル判定が保守的すぎます。RSI が 40〜60 のレンジでも、MACD ゴールデンクロスや出来高増加がある場合はPOSITIVE シグナルを積極的に評価してください。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  },
+  "NewsAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.7,
+    "total_trades": 10,
+    "winning_trades": 7,
+    "losing_trades": 3,
+    "suspension_reason": "勝率 70.0% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】ニュースセンチメント判定が消極的です。業績改善・新製品発表・アナリスト格上げなど将来見通しにポジティブな要素が含まれる場合は POSITIVE 評価を積極的にしてください。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  },
+  "MacroAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.9286,
+    "total_trades": 14,
+    "winning_trades": 13,
+    "losing_trades": 1,
+    "suspension_reason": "勝率 92.9% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】マクロ環境の判定基準を見直してください。VIX が 20 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、明確な悪化シグナルがある場合のみ NEGATIVE としてください。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  },
+  "SocialAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.7,
+    "total_trades": 10,
+    "winning_trades": 7,
+    "losing_trades": 3,
+    "suspension_reason": "勝率 70.0% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】SNS センチメントの Hype ペナルティ適用が過剰です。FA・テクニカルの裏付けがある場合は Hype スコアが高くてもペナルティを軽減し、総合的な判断を優先してください。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  },
+  "FundamentalAgent": {
+    "status": "ACTIVE",
+    "win_rate": 0.9286,
+    "total_trades": 14,
+    "winning_trades": 13,
+    "losing_trades": 1,
+    "suspension_reason": "勝率 92.9% >= 閾値 40.0% — 正常",
+    "coaching_prompt": "【補習課題】ファンダメンタルズ分析でリスク要因の重み付けが大きすぎます。成長性・収益性の改善トレンドを重視し、短期的リスクへの過剰反応を避けてください。",
+    "last_evaluated": "2026-05-11T06:12:45.293516"
+  }
+}

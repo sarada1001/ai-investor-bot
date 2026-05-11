@@ -9,18 +9,6 @@
   ],
   "AAPL": [
     {
-      "record_id": "b0ddec43-5acf-4877-871b-b68b4e84fff0",
-      "session_id": "20260502_093254",
-      "entry_date": "2026-05-02",
-      "entry_price": null
-    },
-    {
-      "record_id": "a6e3e197-1aa7-4263-aa7e-eb647980f155",
-      "session_id": "20260502_093427",
-      "entry_date": "2026-05-02",
-      "entry_price": null
-    },
-    {
       "record_id": "4af7e445-36cb-4859-b211-98c5ab3d46c4",
       "session_id": "20260502_093427",
       "entry_date": "2026-05-02",
@@ -121,6 +109,60 @@
       "session_id": "20260507_193332",
       "entry_date": "2026-05-07",
       "entry_price": null
+    },
+    {
+      "record_id": "8c05ba67-da1f-4463-8e7f-5b13be7a6cbb",
+      "session_id": "20260508_143116",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "0b16c655-c11e-4da9-9c80-f284f653a577",
+      "session_id": "20260508_153205",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "a2a94fc3-c239-494d-8c7a-6541afdb0b90",
+      "session_id": "20260508_163253",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "55cf34e0-54af-4f5a-a741-9e2a18890b5f",
+      "session_id": "20260508_173342",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "dba1ab37-4747-4579-8ae5-27c7e6529e9b",
+      "session_id": "20260508_183426",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "d8d04b8c-7d85-4d45-b592-5d739972085b",
+      "session_id": "20260508_193514",
+      "entry_date": "2026-05-08",
+      "entry_price": null
+    },
+    {
+      "record_id": "053c9e53-d29a-43b1-9d24-70af00bc6d2d",
+      "session_id": "20260509_085033",
+      "entry_date": "2026-05-09",
+      "entry_price": null
+    },
+    {
+      "record_id": "ebc19b1f-a934-4127-b819-4d7f9ad21f5f",
+      "session_id": "20260511_061121",
+      "entry_date": "2026-05-11",
+      "entry_price": null
+    },
+    {
+      "record_id": "5c96316f-0a69-496b-9ab7-223652f3797f",
+      "session_id": "20260511_061150",
+      "entry_date": "2026-05-11",
+      "entry_price": null
     }
   ],
   "HSY": [
@@ -140,6 +182,14 @@
       "record_id": "936d5548-eeb9-42fa-8511-ad667acc353a",
       "session_id": "20260507_223049",
       "entry_date": "2026-05-07",
+      "entry_price": null
+    }
+  ],
+  "NVDA": [
+    {
+      "record_id": "dcc9af5b-3170-470d-8627-cbe5d12309d3",
+      "session_id": "20260509_085121",
+      "entry_date": "2026-05-09",
       "entry_price": null
     }
   ]
