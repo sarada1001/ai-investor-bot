@@ -25,7 +25,10 @@ class BBS:
         }
         self._save()
 
-    def write(self, agent_name: str, key: str, data: dict | str) -> None:
+    def write(self, agent_name: str, key: str, data: object) -> None:
+        # BBSスキーマのdataclassは自動的にdictに変換する
+        if hasattr(data, "to_dict") and callable(data.to_dict):
+            data = data.to_dict()
         entry = {
             "agent":     agent_name,
             "key":       key,

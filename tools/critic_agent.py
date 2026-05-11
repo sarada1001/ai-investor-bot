@@ -3,6 +3,11 @@ critic_agent.py — Reflexion フェーズ2: 過去の教訓に基づくManagerA
 
 ManagerAgentの推論をRAGで取得した過去の失敗ルールと照合し、
 APPROVE / OVERRIDE を判定して返す。
+
+LLMバックエンド（優先順）:
+  1. Ollama (llama3.1) — ローカル LLM
+  2. Gemini API (gemini-2.0-flash) — Ollamaが接続エラー/タイムアウト時に自動切替
+  3. _FALLBACK_RESPONSE — 両方が失敗した場合の安全フォールバック
 """
 
 from __future__ import annotations
@@ -19,11 +24,15 @@ OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api
 OLLAMA_MODEL    = "llama3.1"
 OLLAMA_TIMEOUT  = 60  # seconds
 
-# フォールバック値（API障害時にシステムを止めない）
+GEMINI_MODEL    = "gemini-2.0-flash"
+GEMINI_TIMEOUT  = 30  # seconds
+
+# フォールバック値（Ollama・Gemini 両方が失敗した場合にシステムを止めない）
 _FALLBACK_RESPONSE = {
     "critic_decision": "HOLD",
     "revised_action":  "HOLD",
     "critique_reason": "CriticAgent API障害のためフォールバック。手動確認を推奨。",
+    "llm_source":      "fallback",
 }
 
 _PROMPT_TEMPLATE = """\
@@ -130,15 +139,17 @@ class CriticAgent:
 
         logger.info("  [CriticAgent] %s の評価を開始 (ManagerAction=%s)", ticker, manager_action)
 
-        raw = self._call_ollama(prompt)
+        # バックエンド優先順: Ollama → Gemini → fallback
+        raw, source = self._call_with_fallback(prompt)
         if raw is None:
+            logger.warning("  [CriticAgent] 全バックエンド失敗 → フォールバック応答を返します")
             return _FALLBACK_RESPONSE.copy()
 
         result = self._parse_response(raw)
+        result["llm_source"] = source
         logger.info(
-            "  [CriticAgent] 判定完了 → %s / 修正アクション: %s",
-            result.get("critic_decision"),
-            result.get("revised_action"),
+            "  [CriticAgent] 判定完了 [%s] → %s / 修正アクション: %s",
+            source, result.get("critic_decision"), result.get("revised_action"),
         )
         return result
 
@@ -146,8 +157,31 @@ class CriticAgent:
     # Internal helpers
     # ----------------------------------------------------------
 
+    def _call_with_fallback(self, prompt: str) -> tuple[str | None, str]:
+        """
+        Ollama を試み、失敗した場合は Gemini にフォールバックする。
+
+        Returns:
+            (raw_text, source)
+            source: "ollama" | "gemini" | None（全失敗時は None）
+        """
+        raw = self._call_ollama(prompt)
+        if raw is not None:
+            return raw, "ollama"
+
+        logger.warning("  [CriticAgent] Ollama 失敗 → Gemini API にフォールバック")
+        raw = self._call_gemini(prompt)
+        if raw is not None:
+            return raw, "gemini"
+
+        return None, "none"
+
     def _call_ollama(self, prompt: str) -> str | None:
-        """Ollama API を呼び出し、レスポンス文字列を返す。失敗時は None。"""
+        """
+        Ollama API を呼び出し、レスポンス文字列を返す。
+
+        接続エラー・タイムアウト時は None を返し、呼び出し元が Gemini にフォールバックする。
+        """
         payload = {
             "model":  self.model,
             "prompt": prompt,
@@ -163,13 +197,48 @@ class CriticAgent:
             resp.raise_for_status()
             return resp.json().get("response", "")
         except requests.exceptions.ConnectionError as e:
-            logger.error("  [CriticAgent] 接続エラー: Ollamaサーバーに到達できません — %s", e)
+            logger.warning("  [CriticAgent] Ollama 接続エラー（Geminiへ切替）: %s", e)
         except requests.exceptions.Timeout:
-            logger.error("  [CriticAgent] タイムアウト: %d秒以内に応答なし", self.timeout)
+            logger.warning(
+                "  [CriticAgent] Ollama タイムアウト %ds（Geminiへ切替）", self.timeout,
+            )
         except requests.exceptions.HTTPError as e:
-            logger.error("  [CriticAgent] HTTPエラー: %s", e)
+            logger.warning("  [CriticAgent] Ollama HTTPエラー（Geminiへ切替）: %s", e)
         except Exception as e:
-            logger.error("  [CriticAgent] 予期しないエラー: %s", e)
+            logger.error("  [CriticAgent] Ollama 予期しないエラー: %s", e)
+        return None
+
+    def _call_gemini(self, prompt: str) -> str | None:
+        """
+        Gemini API を呼び出し、レスポンス文字列を返す。Ollama フォールバック専用。
+
+        langchain_google_genai を使用し、JSON形式の応答を要求する。
+        失敗時は None を返す。
+        """
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm  = ChatGoogleGenerativeAI(
+                model       = GEMINI_MODEL,
+                temperature = 0,
+                request_timeout = GEMINI_TIMEOUT,
+            )
+            # JSON出力を明示指示してプロンプトを補強
+            json_hint = (
+                "\n\nIMPORTANT: Respond with a JSON object only. No markdown. No explanation outside JSON."
+            )
+            response = llm.invoke(prompt + json_hint)
+            raw = response.content.strip()
+
+            # ```json ... ``` ブロックを除去
+            if raw.startswith("```"):
+                lines = raw.splitlines()
+                raw = "\n".join(
+                    ln for ln in lines
+                    if not ln.strip().startswith("```")
+                )
+            return raw
+        except Exception as e:
+            logger.error("  [CriticAgent] Gemini 呼び出しエラー: %s", e)
         return None
 
     def _parse_response(self, raw: str) -> dict:

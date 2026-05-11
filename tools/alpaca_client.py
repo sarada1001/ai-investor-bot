@@ -7,13 +7,24 @@ alpaca_client.py — Alpaca Paper Trading 統合クライアント
   AlpacaClient.has_open_order(symbol)— 未決済注文チェック（二重注文防止）
   AlpacaClient.get_position_qty(sym) — 保有株数取得
   AlpacaClient.get_positions()       — 全保有ポジションを dict リストで返す
-  AlpacaClient.place_buy(sym, qty)   — 買い成行注文（安全チェック付き）
-  AlpacaClient.place_sell(sym, qty)  — 売り成行注文（安全チェック付き）
+  AlpacaClient.place_buy(sym, qty)   — 買い指値注文（安全チェック・部分約定対応）
+  AlpacaClient.place_sell(sym, qty)  — 売り指値注文（安全チェック・部分約定対応）
   AlpacaClient.get_account()         — 口座情報取得
   AlpacaClient.sync_portfolio(path)  — Alpaca 保有 ↔ portfolio.json を同期
 
+注文方式:
+  - 成行注文から指値注文（Limit Order）に変更
+  - 買い: limit_price = 現在価格 × (1 + LIMIT_SPREAD_PCT) = +0.5%
+  - 売り: limit_price = 現在価格 × (1 − LIMIT_SPREAD_PCT) = −0.5%
+  - 現在価格取得失敗時は成行注文にフォールバック
+
+部分約定対応:
+  - filled_qty < requested_qty の場合 partial_fill=True を返す
+  - 当日中に残数量の約定を Alpaca (time_in_force=DAY) に委ねる
+
 エラー応答の形式 (place_buy / place_sell 共通):
-  成功: {"success": True,  "order_id": ..., "status": ..., "qty": ..., "fill_price": ...}
+  成功: {"success": True, "order_type": "limit"|"market", "limit_price": ...,
+         "requested_qty": ..., "filled_qty": ..., "partial_fill": bool, ...}
   スキップ: {"success": False, "skipped": True,  "skip_reason": "..."}
   失敗:     {"success": False, "skipped": False, "error": "..."}
 """
@@ -35,6 +46,8 @@ logger = logging.getLogger(__name__)
 _API_KEY    = os.getenv("APCA_API_KEY_ID", "")
 _SECRET_KEY = os.getenv("APCA_API_SECRET_KEY", "")
 _PAPER      = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
+
+LIMIT_SPREAD_PCT = 0.005  # 指値価格のスプレッド: 現在価格 ±0.5%
 
 # 遅延インポート: 循環参照を避けるため関数内でインポートする
 def _live_gate_check(sym: str, side: str) -> dict | None:
@@ -227,7 +240,7 @@ class AlpacaClient:
             return {"success": False, "skipped": True, "skip_reason": f"{sym} に未決済の注文があります（二重注文防止）",
                     "symbol": sym, "qty": qty, "side": "buy"}
 
-        return self._submit_market_order(sym, qty, "buy")
+        return self._submit_limit_order(sym, qty, "buy")
 
     def place_sell(self, symbol: str, qty: int | None = None) -> dict:
         """
@@ -263,42 +276,161 @@ class AlpacaClient:
             return {"success": False, "skipped": True, "skip_reason": f"{sym} に未決済の注文があります（二重注文防止）",
                     "symbol": sym, "qty": actual_qty, "side": "sell"}
 
-        return self._submit_market_order(sym, actual_qty, "sell")
+        return self._submit_limit_order(sym, actual_qty, "sell")
 
-    def _submit_market_order(self, symbol: str, qty: int | float, side: str) -> dict:
-        """成行注文を Alpaca に送信する（内部共通メソッド）。"""
+    # ----------------------------------------------------------
+    # 現在価格取得
+    # ----------------------------------------------------------
+
+    def _fetch_current_price(self, symbol: str) -> float | None:
+        """現在価格を yfinance から取得する。取得失敗時は None。"""
+        try:
+            import yfinance as yf
+            hist = yf.Ticker(symbol).history(period="1d")
+            if not hist.empty:
+                return float(hist["Close"].iloc[-1])
+        except Exception as e:
+            logger.warning("  [AlpacaClient] %s 現在価格取得失敗 (yfinance): %s", symbol, e)
+        return None
+
+    # ----------------------------------------------------------
+    # 指値注文（メイン）
+    # ----------------------------------------------------------
+
+    def _submit_limit_order(self, symbol: str, qty: int | float, side: str) -> dict:
+        """
+        指値注文を Alpaca に送信する（内部共通メソッド）。
+
+        指値価格:
+          buy  → current_price × (1 + LIMIT_SPREAD_PCT)   (+0.5%)
+          sell → current_price × (1 − LIMIT_SPREAD_PCT)   (−0.5%)
+
+        現在価格取得失敗時は成行注文にフォールバックする。
+        部分約定の場合は partial_fill=True を返し、残数量は当日中に Alpaca が約定を試みる。
+        """
+        current_price = self._fetch_current_price(symbol)
+        if current_price is None:
+            logger.warning(
+                "  [AlpacaClient] %s 現在価格取得失敗 → 成行注文にフォールバック", symbol,
+            )
+            return self._submit_market_order_fallback(symbol, qty, side)
+
+        spread = LIMIT_SPREAD_PCT if side == "buy" else -LIMIT_SPREAD_PCT
+        limit_price = round(current_price * (1.0 + spread), 2)
+
+        from alpaca.trading.requests import LimitOrderRequest
+        from alpaca.trading.enums import OrderSide, TimeInForce
+
+        side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
+        try:
+            req = LimitOrderRequest(
+                symbol          = symbol,
+                qty             = qty,
+                side            = side_enum,
+                time_in_force   = TimeInForce.DAY,
+                limit_price     = limit_price,
+            )
+            order = self._tc.submit_order(req)
+
+            requested_qty = float(qty)
+            filled_qty    = float(order.filled_qty or 0)
+            partial_fill  = 0 < filled_qty < requested_qty
+
+            result = {
+                "success":       True,
+                "skipped":       False,
+                "order_id":      str(order.id),
+                "status":        str(order.status),
+                "symbol":        order.symbol,
+                "order_type":    "limit",
+                "limit_price":   limit_price,
+                "current_price": current_price,
+                "side":          side,
+                "requested_qty": requested_qty,
+                "filled_qty":    filled_qty,
+                "qty":           requested_qty,
+                "partial_fill":  partial_fill,
+                "fill_price":    float(order.filled_avg_price) if order.filled_avg_price else None,
+                "submitted_at":  order.submitted_at.isoformat() if order.submitted_at else None,
+            }
+
+            if partial_fill:
+                logger.warning(
+                    "  [AlpacaClient] %s 部分約定: %.0f/%.0f 株 @ 指値 $%.2f"
+                    " — 残 %.0f 株は当日中に約定待ち",
+                    symbol, filled_qty, requested_qty, limit_price,
+                    requested_qty - filled_qty,
+                )
+            else:
+                logger.info(
+                    "  [AlpacaClient] %s 指値注文送信完了: id=%s  status=%s  qty=%.0f  limit=$%.2f",
+                    side.upper(), result["order_id"], result["status"],
+                    result["qty"], limit_price,
+                )
+            return result
+
+        except Exception as e:
+            logger.error(
+                "  [AlpacaClient] %s 指値注文エラー (%s): %s", side.upper(), symbol, e,
+            )
+            return {
+                "success": False, "skipped": False, "error": str(e),
+                "symbol": symbol, "qty": qty, "side": side,
+            }
+
+    # ----------------------------------------------------------
+    # 成行注文（フォールバック専用）
+    # ----------------------------------------------------------
+
+    def _submit_market_order_fallback(self, symbol: str, qty: int | float, side: str) -> dict:
+        """
+        成行注文を送信する。現在価格取得失敗時のフォールバックとしてのみ使用する。
+        通常の発注には _submit_limit_order() を使用すること。
+        """
         from alpaca.trading.requests import MarketOrderRequest
         from alpaca.trading.enums import OrderSide, TimeInForce
 
         side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
         try:
             req = MarketOrderRequest(
-                symbol=symbol,
-                qty=qty,
-                side=side_enum,
-                time_in_force=TimeInForce.DAY,
+                symbol        = symbol,
+                qty           = qty,
+                side          = side_enum,
+                time_in_force = TimeInForce.DAY,
             )
             order = self._tc.submit_order(req)
+            requested_qty = float(qty)
+            filled_qty    = float(order.filled_qty or 0)
             result = {
-                "success":      True,
-                "skipped":      False,
-                "order_id":     str(order.id),
-                "status":       str(order.status),
-                "symbol":       order.symbol,
-                "qty":          float(order.qty),
-                "side":         side,
-                "fill_price":   float(order.filled_avg_price) if order.filled_avg_price else None,
-                "submitted_at": order.submitted_at.isoformat() if order.submitted_at else None,
+                "success":       True,
+                "skipped":       False,
+                "order_id":      str(order.id),
+                "status":        str(order.status),
+                "symbol":        order.symbol,
+                "order_type":    "market",
+                "limit_price":   None,
+                "current_price": None,
+                "side":          side,
+                "requested_qty": requested_qty,
+                "filled_qty":    filled_qty,
+                "qty":           requested_qty,
+                "partial_fill":  False,
+                "fill_price":    float(order.filled_avg_price) if order.filled_avg_price else None,
+                "submitted_at":  order.submitted_at.isoformat() if order.submitted_at else None,
             }
             logger.info(
-                "  [AlpacaClient] %s 注文送信完了: id=%s  status=%s  qty=%s",
+                "  [AlpacaClient] %s 成行注文（フォールバック）送信完了: id=%s  status=%s  qty=%.0f",
                 side.upper(), result["order_id"], result["status"], result["qty"],
             )
             return result
         except Exception as e:
-            logger.error("  [AlpacaClient] %s 注文エラー (%s): %s", side.upper(), symbol, e)
-            return {"success": False, "skipped": False, "error": str(e),
-                    "symbol": symbol, "qty": qty, "side": side}
+            logger.error(
+                "  [AlpacaClient] %s 成行注文エラー (%s): %s", side.upper(), symbol, e,
+            )
+            return {
+                "success": False, "skipped": False, "error": str(e),
+                "symbol": symbol, "qty": qty, "side": side,
+            }
 
     # ----------------------------------------------------------
     # portfolio.json 同期
