@@ -320,5 +320,6 @@ python main.py --screen --dry-run --top-n 3
 - [ ] FinanceBench評価 — RAG検索品質の体系的ベンチマーク
 
 ## 🔄 Development History
+- 📅 **2026-05-11 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-11 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/bee744929dc3721eb030f2103d21f3f14c51dd32)
 - 📅 **2026-05-08 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-08 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/acff6fedf8a1a7c9b1f6c828b044e557a4de51ff)
 - 📅 **2026-05-07 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-07 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/105e1349850b71854bdfca75bd82323d50eab0df)
