@@ -1,0 +1,212 @@
+"""engine/runner.py — ウォッチリストサイクル & デーモンモード"""
+
+from __future__ import annotations
+
+import datetime
+import time
+
+import skills.screener as _screener_mod
+from tools.alpaca_client import AlpacaClient as _AlpacaClient
+
+from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, _W
+from engine.display     import _log
+from engine.notify      import send_line_message
+from engine.trade_cycle import run_trade_cycle
+
+
+def _watchlist_summary(results: list[dict]) -> None:
+    """全銘柄の判断を一覧テーブルで表示する。"""
+    print(f"\n╔{'═' * _W}╗")
+    print(f"║  {'ウォッチリスト 分析サマリー':^{_W - 2}}  ║")
+    print(f"╠{'═' * _W}╣")
+    print(f"║  {'#':>3}  {'Ticker':<6}  {'Decision':<14}  {'Score':>7}  {'根拠 (60文字)':}")
+    print(f"╠{'═' * _W}╣")
+    icons = {"STRONG BUY": "🚀", "HOLD": "⏸", "SELL": "📉"}
+    for i, r in enumerate(results, 1):
+        decision  = r.get("decision", "HOLD")
+        score     = r.get("score", 0.0)
+        rationale = r.get("rationale", "")[:45]
+        ticker    = r.get("ticker", "-")
+        icon      = icons.get(decision, "❓")
+        line = f"║  {i:>3}  {ticker:<6}  {icon} {decision:<12}  {score:>+7.4f}  {rationale}"
+        print(line.ljust(_W + 1) + "║")
+    print(f"╚{'═' * _W}╝\n")
+
+
+def run_watchlist_cycle(
+    tickers:          list[str],
+    dry_run:          bool             = False,
+    notify_line:      bool             = False,
+    mock_mode:        bool             = False,
+    hybrid_mode:      bool             = False,
+    excluded_agents:  list[str] | None = None,
+    run_audit:        bool             = False,
+) -> list[dict]:
+    """複数銘柄を順番に run_trade_cycle() で分析し、結果を集約して返す。"""
+    results: list[dict] = []
+
+    bar = "◆" * (_W + 2)
+    print(f"\n{bar}")
+    print(f"  📋  [WATCHLIST]  {len(tickers)} 銘柄を順番に分析します")
+    for i, t in enumerate(tickers, 1):
+        print(f"    {i}. {t}")
+    print(f"{bar}\n")
+
+    _first_run_audit = run_audit
+    for ticker in tickers:
+        try:
+            result = run_trade_cycle(
+                ticker          = ticker,
+                dry_run         = dry_run,
+                notify_line     = False,
+                mock_mode       = mock_mode,
+                hybrid_mode     = hybrid_mode,
+                excluded_agents = excluded_agents,
+                run_audit       = _first_run_audit,
+            )
+            _first_run_audit = False
+        except Exception as e:
+            _log(f"[Watchlist] {ticker} の分析中にエラー: {e} — スキップします")
+            result = {"decision": "HOLD", "score": 0.0, "rationale": f"エラー: {e}"}
+
+        result["ticker"] = ticker
+        results.append(result)
+
+    _watchlist_summary(results)
+
+    if notify_line:
+        buy_list  = [r for r in results if r.get("decision") == "STRONG BUY"]
+        hold_list = [r for r in results if r.get("decision") == "HOLD"]
+        lines = ["【ECC ウォッチリスト 分析完了】"]
+        if buy_list:
+            lines.append("🚀 STRONG BUY:")
+            for r in buy_list:
+                lines.append(f"  {r['ticker']}  スコア {r.get('score', 0):+.4f}")
+        lines.append(f"⏸ HOLD: {', '.join(r['ticker'] for r in hold_list)}")
+        send_line_message("\n".join(lines))
+        print("\n[LINE] ウォッチリストサマリー通知送信完了。")
+
+    return results
+
+
+def _daemon_header(
+    tickers:        list[str],
+    interval_secs:  int,
+    use_screener:   bool,
+    screener_top_n: int,
+) -> None:
+    bar = "◆" * (_W + 2)
+    h   = interval_secs // 3600
+    m   = (interval_secs % 3600) // 60
+    print(f"\n{bar}")
+    print(f"  🤖  [DAEMON MODE]  24時間自動取引ボット起動  🤖")
+    if use_screener:
+        print(f"  モード              : S&P500 スクリーニング → 上位 {screener_top_n} 銘柄を AI 分析")
+    else:
+        print(f"  対象ティッカー      : {', '.join(tickers)}")
+    print(f"  開場中インターバル  : {h}h {m:02d}m  ({interval_secs}秒)")
+    print(f"  停止方法            : Ctrl+C")
+    print(f"{bar}\n")
+
+
+def run_daemon(
+    ticker:           str             = TARGET_TICKER,
+    tickers:          list[str] | None = None,
+    notify_line:      bool             = False,
+    mock_mode:        bool             = False,
+    hybrid_mode:      bool             = False,
+    excluded_agents:  list[str] | None = None,
+    interval_secs:    int              = DAEMON_INTERVAL_SECS,
+    use_screener:     bool             = False,
+    screener_top_n:   int              = 5,
+) -> None:
+    """デーモンモード: 市場開閉に合わせて自動でスリープ/実行を繰り返す無限ループ。"""
+    _fixed_tickers: list[str] | None = tickers
+    _daemon_header(
+        tickers        = _fixed_tickers or [f"S&P500 Top-{screener_top_n}"],
+        interval_secs  = interval_secs,
+        use_screener   = use_screener and not _fixed_tickers,
+        screener_top_n = screener_top_n,
+    )
+
+    while True:
+        try:
+            _alpaca_chk = _AlpacaClient()
+            is_open, market_msg = _alpaca_chk.is_market_open()
+        except Exception as e:
+            _log(f"[Daemon] Alpaca 接続エラー: {e} → 60秒後にリトライ")
+            time.sleep(60)
+            continue
+
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\n{'━' * (_W + 2)}")
+        print(f"  [Daemon] {now_str}  市場状態: {market_msg}")
+        print(f"{'━' * (_W + 2)}")
+
+        if is_open:
+            if _fixed_tickers:
+                effective_tickers = _fixed_tickers
+            elif use_screener:
+                _log("[Daemon] S&P500 日中動的スクリーニングを実行します...")
+                try:
+                    screened = _screener_mod.screen_sp500_intraday(
+                        top_n   = screener_top_n,
+                        verbose = True,
+                    )
+                    effective_tickers = [s["ticker"] for s in screened]
+                except Exception as e:
+                    _log(f"[Daemon] スクリーナーエラー: {e} → {TARGET_TICKER} にフォールバック")
+                    effective_tickers = [TARGET_TICKER]
+                if not effective_tickers:
+                    _log(f"[Daemon] スクリーナー結果 0 件 → {TARGET_TICKER} にフォールバック")
+                    effective_tickers = [TARGET_TICKER]
+            else:
+                effective_tickers = [ticker]
+
+            try:
+                if len(effective_tickers) == 1:
+                    run_trade_cycle(
+                        ticker          = effective_tickers[0],
+                        dry_run         = False,
+                        notify_line     = notify_line,
+                        mock_mode       = mock_mode,
+                        hybrid_mode     = hybrid_mode,
+                        excluded_agents = excluded_agents,
+                    )
+                else:
+                    run_watchlist_cycle(
+                        tickers         = effective_tickers,
+                        dry_run         = False,
+                        notify_line     = notify_line,
+                        mock_mode       = mock_mode,
+                        hybrid_mode     = hybrid_mode,
+                        excluded_agents = excluded_agents,
+                    )
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                _log(f"[Daemon] パイプライン実行エラー: {e}")
+
+            next_check = datetime.datetime.now() + datetime.timedelta(seconds=interval_secs)
+            h = interval_secs // 3600
+            m = (interval_secs % 3600) // 60
+            _log(
+                f"[Daemon] 次回評価まで {h}h {m:02d}m スリープします "
+                f"(再開: {next_check.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            time.sleep(interval_secs)
+
+        else:
+            sleep_secs = _alpaca_chk.get_next_open_seconds()
+            wake_dt    = datetime.datetime.now() + datetime.timedelta(seconds=sleep_secs)
+            wake_str   = wake_dt.strftime("%Y-%m-%d %H:%M:%S")
+            h = sleep_secs // 3600
+            m = (sleep_secs % 3600) // 60
+            print(f"\n╔{'═' * _W}╗")
+            print(f"║  [Daemon] 市場閉場中。".ljust(_W + 1) + "║")
+            print(f"║  次回開場時刻の {wake_str} までスリープします。".ljust(_W + 1) + "║")
+            print(f"║  ({h}h {m:02d}m 後に自動起動)".ljust(_W + 1) + "║")
+            print(f"╚{'═' * _W}╝\n")
+            time.sleep(sleep_secs)
+            if use_screener and not _fixed_tickers:
+                _screener_mod.invalidate_cache()
