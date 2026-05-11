@@ -133,9 +133,12 @@ def save_training_record(
     with open(TRAINING_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    # STRONG BUY なら EXIT 待ちポジションインデックスに登録
-    if judgment.get("is_strong_buy"):
-        _register_open_position(record_id, ticker, session_id, judgment)
+    # STRONG BUY かつ実際に発注した場合のみ EXIT 待ちポジションインデックスに登録
+    # dry_run / mock / hybrid では実際のポジションが存在しないので登録しない
+    if judgment.get("is_strong_buy") and not mock_mode and not hybrid_mode:
+        order = judgment.get("order") or {}
+        if not order.get("dry_run") and not order.get("skipped"):
+            _register_open_position(record_id, ticker, session_id, judgment)
 
     return record_id
 
@@ -215,11 +218,16 @@ def _register_open_position(
         index[ticker] = []
 
     order = judgment.get("order") or {}
+    entry_price = (
+        order.get("fill_price")
+        or order.get("filled_avg_price")
+        or order.get("price")
+    )
     index[ticker].append({
         "record_id": record_id,
         "session_id": session_id,
         "entry_date": datetime.date.today().isoformat(),
-        "entry_price": order.get("price"),
+        "entry_price": entry_price,
     })
     _save_positions_index(index)
 

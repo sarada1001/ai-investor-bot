@@ -62,7 +62,9 @@ def _gate_check(bbs: BBS, ticker: str) -> dict:
 
     tech_sig             = _trend_to_signal(tech_data.get("trend", "neutral"))
     news_sig, _          = _extract_news_signal(news_data, ticker)
-    macro_sig            = _trend_to_signal(macro_data.get("trend", "neutral"))
+    # MacroAgent が SUSPENDED (shadow mode) の場合はブレーキを発動させない
+    macro_is_shadow = bool(macro_data.get("suspended"))
+    macro_sig       = 0.0 if macro_is_shadow else _trend_to_signal(macro_data.get("trend", "neutral"))
 
     macro_brake  = macro_sig < 0.0
     signals_flat = tech_sig <= 0.0 and news_sig <= 0.0
@@ -76,12 +78,13 @@ def _gate_check(bbs: BBS, ticker: str) -> dict:
         reason = "少なくとも 1 シグナルが POSITIVE → Stage 2 (Fundamental) へ進む"
 
     return {
-        "tech_signal":      tech_sig,
-        "news_signal":      news_sig,
-        "macro_signal":     macro_sig,
-        "macro_brake":      macro_brake,
-        "skip_fundamental": skip,
-        "reason":           reason,
+        "tech_signal":        tech_sig,
+        "news_signal":        news_sig,
+        "macro_signal":       macro_sig,
+        "macro_brake":        macro_brake,
+        "macro_is_suspended": macro_is_shadow,
+        "skip_fundamental":   skip,
+        "reason":             reason,
     }
 
 
@@ -98,7 +101,11 @@ def _gate_display(gate: dict) -> None:
     def _label(v: float) -> str:
         return "positive" if v > 0 else "negative" if v < 0 else "neutral"
 
-    macro_note = "  ← ⚠ ブレーキ発動！" if macro_brake else ""
+    macro_is_suspended = gate.get("macro_is_suspended", False)
+    macro_note = (
+        "  ← 🔴 SUSPENDED (neutral 扱い)" if macro_is_suspended
+        else ("  ← ⚠ ブレーキ発動！" if macro_brake else "")
+    )
     verdict    = (
         "⛔ SKIP  → HOLD で終了（Fundamental をスキップ）"
         if skip else
