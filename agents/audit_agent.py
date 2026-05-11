@@ -31,9 +31,11 @@ logger = logging.getLogger(__name__)
 # パス定数
 # =========================================================
 
-AGENT_STATUS_PATH  = Path("data/agent_status.json")
-OBSIDIAN_LOGS_DIR  = Path("data/knowledge_base/obsidian_logs")
-TRAINING_DATA_PATH = Path("data/training/training_data.jsonl")
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+AGENT_STATUS_PATH  = _PROJECT_ROOT / "data" / "agent_status.json"
+OBSIDIAN_LOGS_DIR  = _PROJECT_ROOT / "data" / "knowledge_base" / "obsidian_logs"
+TRAINING_DATA_PATH = _PROJECT_ROOT / "data" / "training" / "training_data.jsonl"
 
 # =========================================================
 # 評価パラメータ

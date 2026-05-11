@@ -375,7 +375,7 @@ class FundamentalAgent:
 
         # Ensure the project root is on sys.path when this module is imported
         # from a subdirectory (e.g. agents/fundamental_agent.py → skills/)
-        project_root = str(_Path(__file__).parent.parent)
+        project_root = str(_Path(__file__).resolve().parent.parent)
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 

@@ -29,7 +29,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_INTENT_PATH  = Path("data/live_trading_enabled.json")
+_INTENT_PATH  = Path(__file__).resolve().parent.parent / "data" / "live_trading_enabled.json"
 _EXPIRY_HOURS = 24
 _IS_PAPER     = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
 _KEY_SUFFIX   = os.getenv("APCA_API_KEY_ID", "")[-4:] or "????"

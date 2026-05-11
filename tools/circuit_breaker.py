@@ -26,7 +26,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_STATE_PATH = Path("data/circuit_breaker_state.json")
+_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "circuit_breaker_state.json"
 
 DAILY_DRAWDOWN_LIMIT = -0.05   # -5%  → SOFT_TRIP
 TOTAL_DRAWDOWN_LIMIT = -0.10   # -10% → HARD_TRIP

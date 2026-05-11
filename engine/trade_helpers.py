@@ -7,6 +7,8 @@ from pathlib import Path
 
 from engine.constants import WEIGHTS
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def _agent_to_weight_key(agent_name: str) -> str | None:
     """エージェント名をウェイトキーに変換する。"""
@@ -39,7 +41,7 @@ def _fetch_past_lessons(ticker: str, max_rules: int = 5) -> str:
     Obsidian ログから過去の失敗・成功教訓を抽出し、CriticAgent 用テキストを返す。
     対象: outcome=CLOSED かつ action=SELL のログ（負の損益を優先）
     """
-    logs_dir = Path("data/knowledge_base/obsidian_logs")
+    logs_dir = _PROJECT_ROOT / "data" / "knowledge_base" / "obsidian_logs"
     if not logs_dir.exists():
         return "（過去ログなし）"
 
@@ -69,7 +71,7 @@ def _fetch_wiki_context(ticker: str, max_trades: int = 5) -> str:
     Wiki ティッカーページから直近 SELL 実績と関連コンセプトを抽出し、
     ManagerAgent の rationale 生成に注入するコンテキストを返す。
     """
-    ticker_file = Path("data/knowledge_base/wiki/tickers") / f"{ticker.upper()}.md"
+    ticker_file = _PROJECT_ROOT / "data" / "knowledge_base" / "wiki" / "tickers" / f"{ticker.upper()}.md"
     if not ticker_file.exists():
         return ""
 

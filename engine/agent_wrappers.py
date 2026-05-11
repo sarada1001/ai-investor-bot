@@ -23,7 +23,7 @@ from engine.constants import (
 from engine.display import _log, _sep, _phase_header, _phase_footer
 
 _RISK_PCT    = 2  # リスク割合表示用（固定値）
-_PROJECT_ROOT = Path(__file__).parent.parent  # engine/ → プロジェクトルート
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent  # engine/ → プロジェクトルート
 
 
 def _load_agent_config(agent_name: str) -> dict:

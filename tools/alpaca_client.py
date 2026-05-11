@@ -55,7 +55,7 @@ def _live_gate_check(sym: str, side: str) -> dict | None:
         }
     return None
 
-PORTFOLIO_PATH = Path("data/portfolio.json")
+PORTFOLIO_PATH = Path(__file__).resolve().parent.parent / "data" / "portfolio.json"
 
 
 # ============================================================

@@ -35,8 +35,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_CONFIG_PATH = Path("data/trade_guards.json")
-_STATE_PATH  = Path("data/trade_guard_state.json")
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_CONFIG_PATH  = _PROJECT_ROOT / "data" / "trade_guards.json"
+_STATE_PATH   = _PROJECT_ROOT / "data" / "trade_guard_state.json"
 
 _DEFAULT_CONFIG: dict = {
     "max_daily_buys":   3,     # 1 日あたり最大 BUY 発注回数
