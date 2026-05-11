@@ -39,9 +39,9 @@ TRAINING_DATA_PATH = Path("data/training/training_data.jsonl")
 # 評価パラメータ
 # =========================================================
 
-SUSPENSION_THRESHOLD  = 0.40  # 勝率がこれ未満 → SUSPENDED
-MIN_TRADES_FOR_EVAL   = 3     # この取引数未満はデータ不足でスキップ
-RECOVERY_THRESHOLD    = 0.50  # SUSPENDED → ACTIVE への復帰勝率
+SUSPENSION_THRESHOLD      = 0.40  # 勝率がこれ未満 → SUSPENDED
+MIN_TRADES_FOR_EVALUATION = 20    # 統計的有意水準: この取引数未満は Grace Period（評価保留）
+RECOVERY_THRESHOLD        = 0.50  # SUSPENDED → ACTIVE への復帰勝率
 
 # ウェイトキー（main.py の WEIGHTS と同じキー）とエージェント名の対応
 AGENT_WEIGHT_MAP: dict[str, str] = {
@@ -285,8 +285,9 @@ def evaluate_and_update_status() -> dict[str, dict]:
     """
     全エージェントを評価し、agent_status.json を更新する。
 
-    勝率 < SUSPENSION_THRESHOLD かつ総取引数 >= MIN_TRADES_FOR_EVAL の場合に SUSPENDED。
-    勝率 >= RECOVERY_THRESHOLD の場合は ACTIVE に復帰。
+    Grace Period: 取引数 < MIN_TRADES_FOR_EVALUATION のエージェントは勝率不問で ACTIVE を維持。
+    SUSPENDED 判定: 取引数 >= MIN_TRADES_FOR_EVALUATION かつ勝率 < SUSPENSION_THRESHOLD。
+    ACTIVE 復帰: SUSPENDED 状態から勝率 >= RECOVERY_THRESHOLD に改善した場合。
 
     Returns:
         更新後の status dict（エージェント名 → info dict）
@@ -304,29 +305,29 @@ def evaluate_and_update_status() -> dict[str, dict]:
     for agent_name, st in stats_map.items():
         prev = existing.get(agent_name, {})
 
-        if (st.total_trades >= MIN_TRADES_FOR_EVAL
-                and st.win_rate < SUSPENSION_THRESHOLD):
+        if st.total_trades < MIN_TRADES_FOR_EVALUATION:
+            # Grace Period: 統計的有意水準に達していないため評価保留・本番ウェイト維持
+            new_status = "ACTIVE"
+            reason = (
+                f"取引回数不足のため評価を保留（{st.total_trades}/{MIN_TRADES_FOR_EVALUATION}回）"
+                f" — 勝率 {st.win_rate:.1%} は参考値"
+            )
+        elif st.win_rate < SUSPENSION_THRESHOLD:
             new_status = "SUSPENDED"
             reason = (
                 f"勝率 {st.win_rate:.1%} < 閾値 {SUSPENSION_THRESHOLD:.1%} "
                 f"（{st.total_trades}取引中{st.winning_trades}勝）"
             )
-        elif (st.total_trades >= MIN_TRADES_FOR_EVAL
-              and st.win_rate >= RECOVERY_THRESHOLD
-              and prev.get("status") == "SUSPENDED"):
+        elif st.win_rate >= RECOVERY_THRESHOLD and prev.get("status") == "SUSPENDED":
             new_status = "ACTIVE"
             reason = (
                 f"勝率 {st.win_rate:.1%} >= 復帰閾値 {RECOVERY_THRESHOLD:.1%} — ACTIVE 復帰"
             )
-        elif st.total_trades < MIN_TRADES_FOR_EVAL:
-            new_status = prev.get("status", "ACTIVE")
-            reason = (
-                f"取引数 {st.total_trades} < 最低評価数 {MIN_TRADES_FOR_EVAL} — 評価スキップ"
-            )
         else:
             new_status = "ACTIVE"
             reason = (
-                f"勝率 {st.win_rate:.1%} >= 閾値 {SUSPENSION_THRESHOLD:.1%} — 正常"
+                f"勝率 {st.win_rate:.1%} >= 閾値 {SUSPENSION_THRESHOLD:.1%} — 正常 "
+                f"（{st.total_trades}取引中{st.winning_trades}勝）"
             )
 
         status_dict[agent_name] = {
@@ -454,17 +455,26 @@ class AuditAgent:
         w = 64
         print(f"\n{'━' * w}")
         print(f"  ◆ AuditAgent — エージェント成績レポート")
+        print(f"  ◇ 評価基準: 勝率 {SUSPENSION_THRESHOLD:.0%} 未満 かつ "
+              f"{MIN_TRADES_FOR_EVALUATION}取引以上 → SUSPENDED")
         print(f"{'━' * w}")
-        print(f"  {'エージェント':<22} {'ステータス':<14} {'勝率':>6}  {'取引数':>5}")
+        print(f"  {'エージェント':<22} {'ステータス':<16} {'勝率':>6}  {'取引数':>14}")
         print(f"  {'─' * (w - 4)}")
         for agent_name in ALL_EVAL_AGENTS:
-            info    = status_dict.get(agent_name, {})
-            status  = info.get("status", "ACTIVE")
-            wr      = info.get("win_rate", 0.0)
-            trades  = info.get("total_trades", 0)
-            icon    = "🔴 SUSPENDED" if status == "SUSPENDED" else "🟢 ACTIVE   "
-            print(f"  {agent_name:<22} {icon}  {wr:>5.1%}  {trades:>5}取引")
+            info   = status_dict.get(agent_name, {})
+            status = info.get("status", "ACTIVE")
+            wr     = info.get("win_rate", 0.0)
+            trades = info.get("total_trades", 0)
+            in_grace = trades < MIN_TRADES_FOR_EVALUATION and status == "ACTIVE"
             if status == "SUSPENDED":
-                reason = info.get("suspension_reason", "")[:55]
-                print(f"    ↳ 理由: {reason}")
+                icon = "🔴 SUSPENDED  "
+            elif in_grace:
+                icon = "🟡 GRACE PERIOD"
+            else:
+                icon = "🟢 ACTIVE     "
+            trade_str = f"{trades:>3}/{MIN_TRADES_FOR_EVALUATION}取引"
+            print(f"  {agent_name:<22} {icon}  {wr:>5.1%}  {trade_str}")
+            if status == "SUSPENDED" or in_grace:
+                reason = info.get("suspension_reason", "")[:58]
+                print(f"    ↳ {reason}")
         print(f"{'━' * w}\n")
