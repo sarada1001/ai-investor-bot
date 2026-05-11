@@ -36,6 +36,25 @@ _API_KEY    = os.getenv("APCA_API_KEY_ID", "")
 _SECRET_KEY = os.getenv("APCA_API_SECRET_KEY", "")
 _PAPER      = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
 
+# 遅延インポート: 循環参照を避けるため関数内でインポートする
+def _live_gate_check(sym: str, side: str) -> dict | None:
+    """ライブモード時に LiveTradingGate を確認する。ブロック時は skipped dict を返す。"""
+    if _PAPER:
+        return None  # ペーパーモードは常に通過
+    from tools.live_trading_gate import LiveTradingGate
+    result = LiveTradingGate().check()
+    if not result.allowed:
+        logger.error(
+            "  [AlpacaClient] 🚫 LiveTradingGate ブロック (%s %s): %s",
+            side.upper(), sym, result.reason.split("\n")[0],
+        )
+        return {
+            "success": False, "skipped": True,
+            "skip_reason": f"LiveTradingGate: {result.reason}",
+            "symbol": sym, "side": side,
+        }
+    return None
+
 PORTFOLIO_PATH = Path("data/portfolio.json")
 
 
@@ -189,6 +208,11 @@ class AlpacaClient:
         """
         sym = symbol.upper()
 
+        # ── LiveTradingGate: 最終防壁 ──────────────────────────
+        _blocked = _live_gate_check(sym, "buy")
+        if _blocked is not None:
+            return _blocked
+
         is_open, market_msg = self.is_market_open()
         if not is_open:
             logger.info("  [AlpacaClient] 閉場中のため寄り付き注文として送信 (%s): %s", sym, market_msg)
@@ -218,6 +242,11 @@ class AlpacaClient:
           3. 注文送信
         """
         sym = symbol.upper()
+
+        # ── LiveTradingGate: 最終防壁 ──────────────────────────
+        _blocked = _live_gate_check(sym, "sell")
+        if _blocked is not None:
+            return _blocked
 
         is_open, market_msg = self.is_market_open()
         if not is_open:

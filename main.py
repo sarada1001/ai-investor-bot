@@ -259,6 +259,26 @@ def _hybrid_banner(sub: str = "") -> None:
     print(f"{bar}\n")
 
 
+def _live_gate_banner(dry_run: bool = False) -> None:
+    from tools.live_trading_gate import LiveTradingGate, _IS_PAPER
+    if _IS_PAPER or dry_run:
+        return  # ペーパーモード / dry_run は目立つ警告不要
+    result = LiveTradingGate().check()
+    bar    = "🔴" * ((_W + 2) // 2)
+    if result.allowed:
+        print(f"\n{bar}")
+        print(f"  💰  [LIVE TRADING]  実弾取引モード  💰")
+        print(f"  認証期限 : {result.expires_at[:16] if result.expires_at else 'N/A'}")
+        print(f"  API Key  : ****{result.key_suffix}")
+        print(f"{bar}\n")
+    else:
+        print(f"\n{bar}")
+        print(f"  🚫  [LIVE TRADING GATE]  発注ブロック中  🚫")
+        for line in result.reason.splitlines():
+            print(f"  {line}")
+        print(f"{bar}\n")
+
+
 def _main_header(ticker: str, session_id: str) -> None:
     print(f"\n╔{'═' * _W}╗")
     print(f"║  ECC スイングトレード自律エンジン  [{ticker}]".ljust(_W + 1) + "║")
@@ -1369,6 +1389,8 @@ def run_trade_cycle(
         _mock_banner()
     elif hybrid_mode:
         _hybrid_banner()
+    else:
+        _live_gate_banner(dry_run=dry_run)
 
     bbs = BBS(session_id)
 
@@ -2236,6 +2258,32 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    # ── ライブ取引二段階認証 ──────────────────────────────────────
+    parser.add_argument(
+        "--enable-live", action="store_true",
+        help=(
+            "ライブ取引有効化ウィザードを起動。"
+            "ALPACA_PAPER_TRADING=false の状態で実行すると 24 時間有効な認証トークンを生成する。"
+        ),
+    )
+    parser.add_argument(
+        "--disable-live", action="store_true",
+        help="ライブ取引を即座に無効化する（意思ファイルを削除）。",
+    )
+
+    args = parser.parse_args()
+
+    # ── enable-live / disable-live: 他のフローより先に処理して終了 ─
+    if getattr(args, "enable_live", False):
+        from tools.live_trading_gate import LiveTradingGate
+        LiveTradingGate.enable_wizard()
+        raise SystemExit(0)
+
+    if getattr(args, "disable_live", False):
+        from tools.live_trading_gate import LiveTradingGate
+        LiveTradingGate.disable()
+        raise SystemExit(0)
 
     # ── 組み合わせバリデーション ──────────────────────────────────
     if args.screen_only and args.daemon:
