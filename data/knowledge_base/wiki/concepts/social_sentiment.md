@@ -1,7 +1,7 @@
 ---
 concept: social_sentiment
 title: SNSセンチメント
-last_updated: 2026-05-07
+last_updated: 2026-05-11
 linked_tickers: [AAPL]
 ---
 
@@ -16,6 +16,7 @@ SNS・ソーシャルメディアのセンチメントを投資判断の材料�
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-11 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/AAPL]] | 中立 | データ不足のため保留 |
 

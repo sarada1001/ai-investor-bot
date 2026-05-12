@@ -2,7 +2,7 @@
 ticker: NVDA
 name: NVIDIA Corporation
 sector: Technology
-last_updated: 2026-05-07
+last_updated: 2026-05-11
 assessment: BUY
 assessment_score: 0.0
 ---
@@ -18,6 +18,7 @@ assessment_score: 0.0
 
 | 日付 | アクション | 価格 | スコア | 結果 | ログ |
 |---|---|---|---|---|---|
+| 2026-05-09 | BUY |  |  | 未確定 | [[Log_20260509_NVDA_BUY]] |
 | 2026-05-05 | BUY |  |  | +5.2% | [[Log_20260505_NVDA_SUCCESS]] |
 | 2026-05-05 | SELL |  |  | -77.19% | [[Log_20260505_NVDA_SELL]] |
 | 2026-05-05 | BUY |  |  | 未確定 | [[Log_20260505_NVDA_BUY_2]] |
@@ -28,6 +29,7 @@ assessment_score: 0.0
 | 2026-05-05 | BUY |  |  | 未確定 | [[Log_20260505_NVDA_BUY_2]] |
 
 ## 評価変遷
+- 2026-05-09: BUY (score=, P&L=未確定)
 - 2026-05-05: BUY (score=, P&L=+5.2%)
 - 2026-05-05: HOLD (score=, P&L=-77.19%)
 - 2026-05-05: BUY (score=, P&L=未確定)
@@ -38,6 +40,8 @@ assessment_score: 0.0
 - 2026-05-05: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
+- [[concepts/sns_sentiment_risk]] — SNSセンチメントリスク
+- [[concepts/multiple_factors_analysis]] — 複合的要因分析
 - [[concepts/vix_filtering]] — ボラティリティフィルタ
 - [[concepts/earnings_beat]] — 決算プレイ
 - [[concepts/entry_strategy]] — エントリー基準

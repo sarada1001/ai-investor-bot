@@ -1,8 +1,8 @@
 ---
 concept: social_media_hype
 title: SNS煽り
-last_updated: 2026-05-08
-linked_tickers: [AAPL]
+last_updated: 2026-05-11
+linked_tickers: [AAPL, COR]
 ---
 
 # [[concepts/social_media_hype|SNS煽り]]
@@ -15,6 +15,7 @@ linked_tickers: [AAPL]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-11 | [[tickers/COR]] | 注意 | |
 | 2026-05-07 | [[tickers/AAPL]] | 中立 | |
 
 ## 教訓

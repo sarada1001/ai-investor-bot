@@ -2,8 +2,8 @@
 ticker: AAPL
 name: Apple Inc.
 sector: Technology
-last_updated: 2026-05-08
-assessment: BUY
+last_updated: 2026-05-11
+assessment: HOLD
 assessment_score: 0.0
 ---
 
@@ -18,6 +18,18 @@ assessment_score: 0.0
 
 | 日付 | アクション | 価格 | スコア | 結果 | ログ |
 |---|---|---|---|---|---|
+| 2026-05-11 | SELL |  |  | ++58.55% | [[Log_20260511_AAPL_SELL_5]] |
+| 2026-05-11 | SELL |  |  | ++58.55% | [[Log_20260511_AAPL_SELL_4]] |
+| 2026-05-11 | SELL |  |  | ++58.55% | [[Log_20260511_AAPL_SELL_3]] |
+| 2026-05-11 | SELL |  |  | ++58.55% | [[Log_20260511_AAPL_SELL_2]] |
+| 2026-05-11 | SELL |  |  | ++58.55% | [[Log_20260511_AAPL_SELL]] |
+| 2026-05-11 | BUY |  |  | 未確定 | [[Log_20260511_AAPL_BUY_6]] |
+| 2026-05-11 | BUY |  |  | +58.55% | [[Log_20260511_AAPL_BUY_5]] |
+| 2026-05-11 | BUY |  |  | +58.55% | [[Log_20260511_AAPL_BUY_4]] |
+| 2026-05-11 | BUY |  |  | +58.55% | [[Log_20260511_AAPL_BUY_3]] |
+| 2026-05-11 | BUY |  |  | +58.55% | [[Log_20260511_AAPL_BUY_2]] |
+| 2026-05-11 | BUY |  |  | +58.55% | [[Log_20260511_AAPL_BUY]] |
+| 2026-05-09 | BUY |  |  | 未確定 | [[Log_20260509_AAPL_BUY]] |
 | 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY_3]] |
 | 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY_2]] |
 | 2026-05-07 | BUY |  |  | 未確定 | [[Log_20260507_AAPL_BUY]] |
@@ -45,6 +57,18 @@ assessment_score: 0.0
 | 2026-05-05 | BUY |  |  | 未確定 | [[Log_20260505_AAPL_BUY_4]] |
 
 ## 評価変遷
+- 2026-05-11: HOLD (score=, P&L=++58.55%)
+- 2026-05-11: HOLD (score=, P&L=++58.55%)
+- 2026-05-11: HOLD (score=, P&L=++58.55%)
+- 2026-05-11: HOLD (score=, P&L=++58.55%)
+- 2026-05-11: HOLD (score=, P&L=++58.55%)
+- 2026-05-11: BUY (score=, P&L=未確定)
+- 2026-05-11: BUY (score=, P&L=+58.55%)
+- 2026-05-11: BUY (score=, P&L=+58.55%)
+- 2026-05-11: BUY (score=, P&L=+58.55%)
+- 2026-05-11: BUY (score=, P&L=+58.55%)
+- 2026-05-11: BUY (score=, P&L=+58.55%)
+- 2026-05-09: BUY (score=, P&L=未確定)
 - 2026-05-07: BUY (score=, P&L=未確定)
 - 2026-05-07: BUY (score=, P&L=未確定)
 - 2026-05-07: BUY (score=, P&L=未確定)
@@ -72,6 +96,22 @@ assessment_score: 0.0
 - 2026-05-05: BUY (score=, P&L=未確定)
 
 ## 関連コンセプト
+- [[concepts/percentage_based_profit]] — パーセンテージベースの利益
+- [[concepts/atr]] — ATR (Average True Range)
+- [[concepts/rule_based_trading]] — ルールに基づいた取引
+- [[concepts/atr_based_target_price]] — ATRベース目標株価
+- [[concepts/fundamental_technical_analysis_confirmation]] — ファンダメンタルズとテクニカル分析の確認
+- [[concepts/multi_signal_score]] — 複合シグナルスコア
+- [[concepts/social_sentiment_analysis]] — ソーシャルセンチメント分析
+- [[concepts/atr_based_take_profit]] — ATRベースの利確
+- [[concepts/fundamental_technical_analysis_confirmation]] — ファンダメンタルズ・テクニカル分析確認
+- [[concepts/social_hype_consideration]] — SNSの煽りの考慮
+- [[concepts/fundamental_technical_analysis_combination]] — ファンダメンタルズ・テクニカル分析の組み合わせ
+- [[concepts/social_media_sentiment_analysis]] — ソーシャルメディアセンチメント分析
+- [[concepts/take_profit_strategy]] — 利益確定戦略
+- [[concepts/fundamental_technical_analysis_fusion]] — ファンダメンタルズ・テクニカル分析の融合
+- [[concepts/risk_on_attitude]] — リスクオン姿勢
+- [[concepts/sns_sentiment_analysis]] — SNSセンチメント分析
 - [[concepts/social_hype_factor]] — SNS煽り要因
 - [[concepts/market_sentiment_analysis]] — 市場センチメント分析
 - [[concepts/technical_analysis]] — テクニカル分析

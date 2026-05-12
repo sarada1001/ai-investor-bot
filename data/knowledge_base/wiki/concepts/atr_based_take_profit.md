@@ -1,15 +1,15 @@
 ---
-concept: take_profit_strategy
-title: 利確戦略
+concept: atr_based_take_profit
+title: ATRベースの利確
 last_updated: 2026-05-11
 linked_tickers: [AAPL]
 ---
 
-# [[concepts/take_profit_strategy|利確戦略]]
+# [[concepts/atr_based_take_profit|ATRベースの利確]]
 
 ## 定義
 
-事前に設定した目標株価に到達した場合に利益確定を行う戦略
+ATR（Average True Range）に基づいて目標株価を設定し、到達時に利益確定を行った。
 
 ## 観測事例
 
@@ -19,7 +19,6 @@ linked_tickers: [AAPL]
 | 2026-05-11 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-11 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-11 | [[tickers/AAPL]] | 成功 | |
-| 2026-05-05 | [[tickers/AAPL]] | 成功 | |
 
 ## 教訓
 

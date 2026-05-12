@@ -1,8 +1,8 @@
 ---
 concept: risk_management
 title: リスク管理
-last_updated: 2026-05-07
-linked_tickers: [AAPL, NKE, NVDA]
+last_updated: 2026-05-11
+linked_tickers: [AAPL, NKE, NVDA, TEST]
 ---
 
 # [[concepts/risk_management|リスク管理]]
@@ -15,6 +15,8 @@ linked_tickers: [AAPL, NKE, NVDA]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-09 | [[tickers/TEST]] | 成功 | |
+| 2026-05-09 | [[tickers/NVDA]] | 中立 | |
 | 2026-05-06 | [[tickers/NKE]] | 失敗 | |
 | 2026-05-06 | [[tickers/AAPL]] | 成功 | |
 | 2026-05-05 | [[tickers/NVDA]] | 失敗 | |

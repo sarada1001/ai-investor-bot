@@ -6,5 +6,13 @@
       "entry_date": "2026-05-07",
       "entry_price": 186.5
     }
+  ],
+  "AAPL": [
+    {
+      "record_id": "2fe99471-ce07-4b6f-bf79-8f2f961a6131",
+      "session_id": "20260511_183506",
+      "entry_date": "2026-05-11",
+      "entry_price": null
+    }
   ]
 }

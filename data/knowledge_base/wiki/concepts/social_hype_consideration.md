@@ -1,22 +1,21 @@
 ---
-concept: technical_analysis
-title: テクニカル分析
+concept: social_hype_consideration
+title: SNSの煽りの考慮
 last_updated: 2026-05-11
 linked_tickers: [AAPL]
 ---
 
-# [[concepts/technical_analysis|テクニカル分析]]
+# [[concepts/social_hype_consideration|SNSの煽りの考慮]]
 
 ## 定義
 
-過去の株価や取引量などのデータに基づいて投資判断を行う。
+Social Hypeの値が0であり、SNSの煽りが少ないことを確認した上で投資判断を行った。
 
 ## 観測事例
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
 | 2026-05-11 | [[tickers/AAPL]] | 中立 | |
-| 2026-05-07 | [[tickers/AAPL]] | 中立 | |
 
 ## 教訓
 
