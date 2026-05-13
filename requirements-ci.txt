@@ -1,0 +1,7 @@
+# CI requirements — adds test tooling on top of production deps
+# Heavy ML packages (sentence-transformers/torch) are installed but cached.
+-r requirements.txt
+
+# Test tooling
+pytest-cov>=5.0.0
+rich>=13.0.0

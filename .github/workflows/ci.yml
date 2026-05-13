@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 毎朝 00:00 UTC (09:00 JST) ナイトリー実行
+    - cron: "0 0 * * *"
+
+jobs:
+  test:
+    name: pytest (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # pip ダウンロードキャッシュ（requirements.txt が変わると再インストール）
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-py${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-py${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+
+      # ダミー .env（APIキー不要テスト用）
+      - name: Create dummy .env
+        run: |
+          cat > .env << 'EOF'
+          GOOGLE_API_KEY=dummy-ci-key
+          ALPACA_API_KEY=dummy-ci-key
+          ALPACA_SECRET_KEY=dummy-ci-secret
+          LINE_CHANNEL_ACCESS_TOKEN=dummy-ci-token
+          LINE_USER_ID=dummy-ci-user
+          SEC_USER_AGENT_NAME=CI-Bot
+          SEC_USER_AGENT_EMAIL=ci@example.com
+          ALPACA_PAPER=true
+          EOF
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/ \
+            -m "not integration and not slow" \
+            --cov=agents \
+            --cov=engine \
+            --cov=skills \
+            --cov=tools \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=30
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7

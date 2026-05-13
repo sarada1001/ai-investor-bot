@@ -103,6 +103,8 @@ def _calc_rsi(close: pd.Series, period: int = 14) -> float:
     try:
         import pandas_ta as ta
         result = ta.rsi(close, length=period)
+        if result is None:
+            return 50.0
         val = result.dropna()
         if val.empty:
             return 50.0
