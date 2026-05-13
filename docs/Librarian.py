@@ -5,11 +5,10 @@ import glob
 from datetime import datetime
 
 # === 設定エリア ===
-DESKTOP_IP = "100.105.163.75"
-OLLAMA_URL = f"http://{DESKTOP_IP}:11434/api/generate"
+OLLAMA_URL = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api/generate"
 
-# クラウド環境でのプロジェクトルート
-PROJECT_ROOT = "/home/naito/ai-investor-bot"
+# プロジェクトルート
+PROJECT_ROOT = "/home/komek/ai-investor-bot"
 
 # 保存先: Obsidian用フォルダ (後で手元のPCと同期)
 VAULT_PATH = os.path.join(PROJECT_ROOT, "docs")

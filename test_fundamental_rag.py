@@ -8,7 +8,7 @@ agents/fundamental_agent.py の FundamentalAgent.analyze() をテストする。
   2. AAPL            — 事前に DB から削除 → EDGAR 自律取得 → RAG 経路
 
 実行方法:
-    cd /home/naito/exa-investor
+    cd /home/komek/ai-investor-bot
     python test_fundamental_rag.py
 """
 
