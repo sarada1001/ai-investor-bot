@@ -8,13 +8,15 @@ ECC スイングトレード自律エンジン — 投資判断ダッシュボ�
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import yfinance as yf
 
 # ================================================================
 # ページ設定（最初に呼ぶ）
@@ -177,6 +179,59 @@ def load_raw_data(path: Path) -> list[dict]:
     return records
 
 
+PORTFOLIO_PATH    = Path("data/portfolio.json")
+AGENT_STATUS_PATH = Path("data/agent_status.json")
+_AGENT_STALE_MINUTES = 30
+
+
+@st.cache_data(ttl=30)
+def load_portfolio() -> list[dict]:
+    if not PORTFOLIO_PATH.exists():
+        return []
+    try:
+        data = json.loads(PORTFOLIO_PATH.read_text(encoding="utf-8"))
+        return [p for p in data.get("positions", []) if p.get("status") == "OPEN"]
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=30)
+def load_agent_status() -> dict:
+    if not AGENT_STATUS_PATH.exists():
+        return {}
+    try:
+        return json.loads(AGENT_STATUS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=60)
+def fetch_current_prices(tickers: tuple[str, ...]) -> dict[str, float]:
+    """yfinance で現在の終値を取得する。失敗した銘柄は除外。"""
+    if not tickers:
+        return {}
+    prices: dict[str, float] = {}
+    try:
+        raw = yf.download(
+            list(tickers), period="1d", progress=False, auto_adjust=True
+        )
+        close = raw["Close"] if "Close" in raw.columns else raw
+        if hasattr(close, "columns"):
+            for t in tickers:
+                if t in close.columns:
+                    val = close[t].dropna()
+                    if not val.empty:
+                        prices[t] = float(val.iloc[-1])
+        else:
+            t = tickers[0]
+            val = close.dropna()
+            if not val.empty:
+                prices[t] = float(val.iloc[-1])
+    except Exception:
+        pass
+    return prices
+
+
 df_all  = load_data(DATA_PATH)
 raw_all = load_raw_data(DATA_PATH)
 
@@ -196,6 +251,10 @@ with st.sidebar:
     if st.button("🔄 最新データを取得", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+
+    auto_refresh    = st.checkbox("⏱ 自動更新", value=False)
+    refresh_secs    = st.slider("更新間隔（秒）", 30, 300, 60, step=10,
+                                disabled=not auto_refresh)
 
     st.divider()
 
@@ -288,11 +347,139 @@ def _decision_callout(decision: str, score: float, rationale: str = "") -> None:
 # メインタブ
 # ================================================================
 
-tab1, tab2, tab3 = st.tabs([
+tab0, tab1, tab2, tab3 = st.tabs([
+    "💼 ポートフォリオ & エージェント健全性",
     "📊 総合評価（サマリー）",
     "🤖 エージェント会議録",
     "⚙️ システムログ・生データ",
 ])
+
+# ────────────────────────────────────────────────────────────────
+# Tab 0 : ポートフォリオ P&L & エージェント健全性
+# ────────────────────────────────────────────────────────────────
+
+with tab0:
+    # ── ライブ P&L ────────────────────────────────────────────────
+    st.markdown('<div class="section-title">💼 ライブポートフォリオ P&L</div>',
+                unsafe_allow_html=True)
+
+    open_positions = load_portfolio()
+    if not open_positions:
+        st.info("現在 OPEN ポジションはありません。")
+    else:
+        tickers_open = tuple(p["ticker"] for p in open_positions)
+        current_prices = fetch_current_prices(tickers_open)
+
+        pnl_rows = []
+        total_pnl = 0.0
+        total_cost = 0.0
+        for pos in open_positions:
+            ticker      = pos["ticker"]
+            entry       = float(pos.get("entry_price", 0))
+            shares      = int(pos.get("shares", 0))
+            current     = current_prices.get(ticker, entry)
+            cost_basis  = entry * shares
+            market_val  = current * shares
+            unreal_pnl  = market_val - cost_basis
+            unreal_pct  = (current - entry) / entry * 100 if entry else 0.0
+            target      = pos.get("target_price")
+            stop        = pos.get("stop_loss_price")
+
+            total_pnl  += unreal_pnl
+            total_cost += cost_basis
+
+            pnl_rows.append({
+                "銘柄":     ticker,
+                "エントリ": f"${entry:.2f}",
+                "現在値":   f"${current:.2f}",
+                "株数":     shares,
+                "コスト":   f"${cost_basis:,.0f}",
+                "時価":     f"${market_val:,.0f}",
+                "含み損益": f"{unreal_pnl:+,.0f}",
+                "損益%":    f"{unreal_pct:+.2f}%",
+                "目標値":   f"${target:.2f}" if target else "—",
+                "損切値":   f"${stop:.2f}"   if stop   else "—",
+            })
+
+        total_pct = total_pnl / total_cost * 100 if total_cost else 0.0
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("保有ポジション数", f"{len(open_positions)} 件")
+        c2.metric("総コスト",         f"${total_cost:,.0f}")
+        c3.metric("含み損益合計",
+                  f"${total_pnl:+,.0f}",
+                  delta=f"{total_pct:+.2f}%",
+                  delta_color="normal" if total_pnl >= 0 else "inverse")
+
+        def _color_pnl(val: str) -> str:
+            v = val.replace(",", "").replace("$", "").replace("%", "")
+            try:
+                return ("color:#00c49f; font-weight:bold" if float(v) >= 0
+                        else "color:#f38ba8; font-weight:bold")
+            except ValueError:
+                return ""
+
+        pnl_df = pd.DataFrame(pnl_rows)
+        st.dataframe(
+            pnl_df.style.map(_color_pnl, subset=["含み損益", "損益%"]),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown('<div class="divider-line"></div>', unsafe_allow_html=True)
+
+    # ── エージェント健全性 ────────────────────────────────────────
+    st.markdown('<div class="section-title">🤖 エージェント健全性ステータス</div>',
+                unsafe_allow_html=True)
+
+    agent_status = load_agent_status()
+    if not agent_status:
+        st.info("data/agent_status.json が見つかりません。")
+    else:
+        now_utc = datetime.now(timezone.utc)
+        cols = st.columns(len(agent_status))
+        for col, (agent_name, info) in zip(cols, agent_status.items()):
+            status     = info.get("status", "UNKNOWN")
+            win_rate   = info.get("win_rate")
+            last_eval  = info.get("last_evaluated", "")
+
+            # 30分以上評価されていない場合は STALE 扱い
+            is_stale = False
+            if last_eval:
+                try:
+                    le_dt = datetime.fromisoformat(last_eval)
+                    if le_dt.tzinfo is None:
+                        le_dt = le_dt.replace(tzinfo=timezone.utc)
+                    delta_min = (now_utc - le_dt).total_seconds() / 60
+                    is_stale = delta_min > _AGENT_STALE_MINUTES
+                except Exception:
+                    is_stale = True
+
+            badge_color = (
+                "🔴" if status == "SUSPENDED" or is_stale
+                else "🟢" if status == "ACTIVE"
+                else "🟡"
+            )
+            label = f"{badge_color} {agent_name.replace('Agent', '')}"
+            wr    = f"{win_rate:.1%}" if win_rate is not None else "N/A"
+            delta_label = ("⚠️ STALE" if is_stale
+                           else status)
+
+            col.metric(label, wr, delta=delta_label,
+                       delta_color="off" if not is_stale else "inverse")
+
+        # 詳細テーブル
+        rows = []
+        for agent_name, info in agent_status.items():
+            rows.append({
+                "エージェント": agent_name,
+                "ステータス":   info.get("status", "?"),
+                "勝率":         f"{info['win_rate']:.1%}" if info.get("win_rate") is not None else "N/A",
+                "取引数":       info.get("total_trades", 0),
+                "最終評価":     (info.get("last_evaluated") or "")[:16],
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
 
 # ────────────────────────────────────────────────────────────────
 # Tab 1 : 総合評価
@@ -868,8 +1055,19 @@ with tab3:
 # ================================================================
 
 st.markdown("---")
+_now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 st.caption(
     f"🤖 Exa-Investor Dashboard  |  "
     f"表示レコード: {len(df):,} / {len(df_all):,}  |  "
-    f"データソース: `{DATA_PATH}`"
+    f"データソース: `{DATA_PATH}`  |  "
+    f"最終更新: {_now_str}"
 )
+
+# ================================================================
+# 自動更新（60秒デフォルト）
+# ================================================================
+
+if auto_refresh:
+    time.sleep(refresh_secs)
+    st.cache_data.clear()
+    st.rerun()
