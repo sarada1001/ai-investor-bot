@@ -52,7 +52,7 @@ def run_trade_cycle(
     run_audit:        bool            = False,
 ) -> dict:
     """
-    AAPL スイングトレード分析サイクルをステージゲート方式で実行する。
+    スイングトレード分析サイクルをステージゲート方式で実行する。
 
     Stage 1: TechnicalAgent + NewsAgent + MacroAgent（安価スキャン）
     Gate   : マクロ NEGATIVE → ブレーキ HOLD / Tech・News 双方 NEUTRAL → HOLD

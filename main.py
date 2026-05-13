@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # ── 銘柄指定 ─────────────────────────────────────────────────
     ticker_group = parser.add_mutually_exclusive_group()
     ticker_group.add_argument(
-        "--ticker", default=TARGET_TICKER, help="単一銘柄の分析対象ティッカー",
+        "--ticker", default=None, help="単一銘柄の分析対象ティッカー（例: --ticker MSFT）",
     )
     ticker_group.add_argument(
         "--tickers", nargs="+", metavar="TICKER",
@@ -182,6 +182,13 @@ if __name__ == "__main__":
 
     # ── 単一銘柄モード（従来動作） ────────────────────────────────
     else:
+        if args.ticker is None:
+            parser.error(
+                "銘柄が指定されていません。\n"
+                "  単一銘柄: --ticker MSFT\n"
+                "  複数銘柄: --tickers MSFT NVDA\n"
+                "  スクリーニング: --screen"
+            )
         run_trade_cycle(
             ticker          = args.ticker,
             dry_run         = args.dry_run,

@@ -198,16 +198,17 @@ def run_daemon(
                     )
                     effective_tickers = [s["ticker"] for s in screened]
                 except Exception as e:
-                    _log(f"[Daemon] スクリーナーエラー: {e} → {TARGET_TICKER} にフォールバック")
-                    effective_tickers = [TARGET_TICKER]
+                    _log(f"[Daemon] スクリーナーエラー: {e} → このサイクルをスキップします")
+                    effective_tickers = []
                 if not effective_tickers:
-                    _log(f"[Daemon] スクリーナー結果 0 件 → {TARGET_TICKER} にフォールバック")
-                    effective_tickers = [TARGET_TICKER]
+                    _log("[Daemon] スクリーナー結果 0 件 → このサイクルをスキップします")
             else:
-                effective_tickers = [ticker]
+                effective_tickers = _fixed_tickers or []
 
             try:
-                if len(effective_tickers) == 1:
+                if not effective_tickers:
+                    _log("[Daemon] 有効な銘柄がないためトレード評価をスキップします")
+                elif len(effective_tickers) == 1:
                     run_trade_cycle(
                         ticker          = effective_tickers[0],
                         dry_run         = False,
