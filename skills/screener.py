@@ -403,21 +403,26 @@ def invalidate_cache() -> None:
 
 
 # ------------------------------------------------------------------ #
-# セッション（時間単位）キャッシュ管理                                    #
+# セッション（15分単位）キャッシュ管理                                    #
 # ------------------------------------------------------------------ #
 
-_INTRADAY_CACHE_FILE = _CACHE_DIR / "intraday_cache.json"
+_INTRADAY_CACHE_FILE      = _CACHE_DIR / "intraday_cache.json"
+_INTRADAY_CACHE_TTL_MINUTES = 15
+
+
+def _intraday_cache_key(dt: datetime.datetime | None = None) -> str:
+    now = dt or datetime.datetime.now()
+    slot = (now.minute // _INTRADAY_CACHE_TTL_MINUTES) * _INTRADAY_CACHE_TTL_MINUTES
+    return f"{now.date().isoformat()}_{now.hour:02d}_{slot:02d}"
 
 
 def _load_intraday_cache() -> list[dict] | None:
-    """当時間のキャッシュがあれば返す。なければ None。"""
+    """当15分枠のキャッシュがあれば返す。なければ None。"""
     if not _INTRADAY_CACHE_FILE.exists():
         return None
     try:
         data = json.loads(_INTRADAY_CACHE_FILE.read_text(encoding="utf-8"))
-        now = datetime.datetime.now()
-        cache_key = f"{now.date().isoformat()}_{now.hour:02d}"
-        if data.get("session_key") == cache_key:
+        if data.get("session_key") == _intraday_cache_key():
             return data.get("results", [])
     except Exception:
         pass
@@ -425,10 +430,8 @@ def _load_intraday_cache() -> list[dict] | None:
 
 
 def _save_intraday_cache(results: list[dict]) -> None:
-    now = datetime.datetime.now()
-    cache_key = f"{now.date().isoformat()}_{now.hour:02d}"
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {"session_key": cache_key, "results": results}
+    payload = {"session_key": _intraday_cache_key(), "results": results}
     _INTRADAY_CACHE_FILE.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -693,3 +696,91 @@ def _print_intraday_results(results: list[dict]) -> None:
         )
         print(line)
     print(f"  └{bar}┘\n")
+
+
+# ------------------------------------------------------------------ #
+# 急落エントリー検知                                                    #
+# ------------------------------------------------------------------ #
+
+def detect_dip_entries(
+    watchlist:         list[str],
+    dip_threshold_pct: float = -3.0,
+    interval:          str   = "15m",
+) -> list[dict]:
+    """
+    ウォッチリスト銘柄の当日足 (interval 足) をスキャンし、
+    当日始値から dip_threshold_pct% 以上下落している銘柄を返す。
+
+    Args:
+        watchlist:         スキャン対象ティッカーリスト
+        dip_threshold_pct: 急落判定の閾値 (負の値。デフォルト -3.0%)
+        interval:          yfinance の interval 指定 (デフォルト "15m")
+
+    Returns:
+        [{"ticker": str, "momentum_pct": float,
+          "current_price": float, "day_open": float}, ...]
+        モメンタムが最も大きい急落順（昇順）にソート済み。
+        急落なしの場合は空リストを返す。
+    """
+    if not watchlist:
+        return []
+
+    ticker_str = " ".join(watchlist)
+    try:
+        raw = yf.download(
+            ticker_str,
+            period      = "1d",
+            interval    = interval,
+            group_by    = "ticker",
+            auto_adjust = True,
+            progress    = False,
+            threads     = True,
+        )
+    except Exception as e:
+        print(f"  [DipDetector] データ取得エラー: {e}")
+        return []
+
+    if raw.empty:
+        return []
+
+    _ticker_level: int | None = None
+    if isinstance(raw.columns, pd.MultiIndex):
+        sample = watchlist[0]
+        if sample in raw.columns.get_level_values(0):
+            _ticker_level = 0
+        elif sample in raw.columns.get_level_values(1):
+            _ticker_level = 1
+
+    dips: list[dict] = []
+    for ticker in watchlist:
+        try:
+            if isinstance(raw.columns, pd.MultiIndex) and _ticker_level is not None:
+                if ticker not in raw.columns.get_level_values(_ticker_level):
+                    continue
+                df_one = raw.xs(ticker, axis=1, level=_ticker_level)
+            else:
+                df_one = raw
+
+            if df_one.empty or len(df_one) < 2:
+                continue
+
+            close  = df_one["Close"].squeeze().dropna()
+            open_s = df_one["Open"].squeeze().dropna()
+
+            if close.empty or open_s.empty:
+                continue
+
+            momentum = _calc_intraday_momentum(close, open_s)
+            if momentum <= dip_threshold_pct:
+                dips.append({
+                    "ticker":        ticker,
+                    "momentum_pct":  momentum,
+                    "current_price": round(float(close.iloc[-1]), 4),
+                    "day_open":      round(float(open_s.iloc[0]), 4),
+                })
+        except Exception as exc:
+            print(f"  [DipDetector] {ticker} 処理エラー: {exc}")
+            continue
+
+    dips.sort(key=lambda x: x["momentum_pct"])  # 最も急落したものを先頭に
+    return dips

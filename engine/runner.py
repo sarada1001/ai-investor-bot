@@ -13,6 +13,49 @@ from engine.display     import _log
 from engine.notify      import send_line_message
 from engine.trade_cycle import run_trade_cycle
 
+_DIP_SCAN_INTERVAL_SECS = 900  # 15分ごとに急落スキャン
+
+
+def _run_dip_scan_subloop(
+    effective_tickers: list[str],
+    total_sleep_secs:  int,
+    notify_line:       bool,
+    dip_threshold_pct: float = -3.0,
+) -> None:
+    """メインサイクルのスリープ中、15分ごとに急落エントリー機会をスキャンする。"""
+    remaining = total_sleep_secs
+    while remaining > _DIP_SCAN_INTERVAL_SECS:
+        time.sleep(_DIP_SCAN_INTERVAL_SECS)
+        remaining -= _DIP_SCAN_INTERVAL_SECS
+
+        _log(f"[DipScan] 急落エントリースキャン ({len(effective_tickers)} 銘柄)...")
+        try:
+            dips = _screener_mod.detect_dip_entries(
+                watchlist         = effective_tickers,
+                dip_threshold_pct = dip_threshold_pct,
+            )
+        except Exception as e:
+            _log(f"[DipScan] スキャンエラー: {e}")
+            continue
+
+        if dips:
+            _log(f"[DipScan] 急落候補 {len(dips)} 銘柄:")
+            msg_lines = ["【ECC 急落エントリーアラート】"]
+            for d in dips:
+                line = (
+                    f"  {d['ticker']}: {d['momentum_pct']:+.1f}%"
+                    f"  (始値 ${d['day_open']:.2f} → 現在 ${d['current_price']:.2f})"
+                )
+                _log(line)
+                msg_lines.append(line.strip())
+            if notify_line:
+                send_line_message("\n".join(msg_lines))
+        else:
+            _log(f"[DipScan] 急落候補なし（閾値: {dip_threshold_pct:+.1f}%）")
+
+    if remaining > 0:
+        time.sleep(remaining)
+
 
 def _watchlist_summary(results: list[dict]) -> None:
     """全銘柄の判断を一覧テーブルで表示する。"""
@@ -194,7 +237,11 @@ def run_daemon(
                 f"[Daemon] 次回評価まで {h}h {m:02d}m スリープします "
                 f"(再開: {next_check.strftime('%Y-%m-%d %H:%M:%S')})"
             )
-            time.sleep(interval_secs)
+            _run_dip_scan_subloop(
+                effective_tickers = effective_tickers,
+                total_sleep_secs  = interval_secs,
+                notify_line       = notify_line,
+            )
 
         else:
             sleep_secs = _alpaca_chk.get_next_open_seconds()
