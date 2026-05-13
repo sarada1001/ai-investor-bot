@@ -10,6 +10,7 @@ allowed_skills:
 
 params:
   account_balance: 100000.0  # フォールバック値（通常はAlpaca実残高を使用）
+  max_budget:      1300.0    # 実効残高の上限（USD）= 20万円 ÷ 153円/USD。実口座移行時に削除
   risk_fraction:   0.02       # 1トレードあたり最大リスク（口座の2%）
 
 system_prompt: |

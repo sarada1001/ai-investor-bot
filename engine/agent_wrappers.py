@@ -649,7 +649,10 @@ class RiskAgent:
         _phase_header(phase_tag, self.NAME)
         cfg             = _load_agent_config("risk_agent")
         _cfg_balance    = float(cfg.get("params", {}).get("account_balance", 100_000.0))
+        _max_budget     = cfg.get("params", {}).get("max_budget")
         account_balance = account_equity if account_equity and account_equity > 0 else _cfg_balance
+        if _max_budget:
+            account_balance = min(account_balance, float(_max_budget))
         _log(f"{ticker} のポジションサイジングを計算中 (口座残高: ${account_balance:,.0f})...")
         _sep()
 
