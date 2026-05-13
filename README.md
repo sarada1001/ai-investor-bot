@@ -556,28 +556,49 @@ Wikiヘルスチェック項目:
 
 ## インフラ構成
 
+本システムは3ノードの分散環境で稼働します。各ノードの役割は明確に分離されています。
+
 ```
-┌─────────────────────────────────────────────────────┐
-│  メインサーバー（uema2lab-search）                    │
-│                                                     │
-│  cron 09:00 JST → run_paper.sh --screen             │
-│  cron 23:00 JST → auto_push.sh（git自動コミット）    │
-│                                                     │
-│  • S&P500日次スクリーニング                           │
-│  • 5エージェント合意パイプライン                      │
-│  • ChromaDB永続ベクトルストア（chroma_db_saved/）     │
-│  • 訓練データ蓄積（data/training/training_data.jsonl）│
-│  • tmux monitor.py（常時監視 TUI）                   │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  ① 開発・監視ノード（ThinkPad E16 Gen 3 / WSL2）              │
+│     /home/komek/ai-investor-bot                              │
+│                                                              │
+│  役割: コード記述・テスト・ダッシュボード監視のみ               │
+│  ※ ローカルでの cron 定期実行は厳禁                           │
+│                                                              │
+│  • streamlit run dashboard.py（Web UI）                      │
+│  • python monitor.py（Rich TUI）                             │
+│  • pytest tests/（242件ユニットテスト）                        │
+│  • git push → GitHub Actions CI                              │
+└──────────────────────────────────────────────────────────────┘
+         │ git push / CD（最新コード同期）
+         ▼
+┌──────────────────────────────────────────────────────────────┐
+│  ② スケジューラーノード（uema2lab-search）                     │
+│     /home/naito/ai-investor-bot                              │
+│                                                              │
+│  役割: 定期実行トリガー ＆ GitHub からの CD 担当               │
+│                                                              │
+│  cron 09:00 JST → run_paper.sh --screen（日次スクリーニング）  │
+│  cron 23:00 JST → auto_push.sh（git自動コミット＆プッシュ）    │
+│                                                              │
+│  • S&P500日次スクリーニング                                   │
+│  • 5エージェント合意パイプライン（フルサイクル）                │
+│  • ChromaDB永続ベクトルストア（chroma_db_saved/）              │
+│  • 訓練データ蓄積（data/training/training_data.jsonl）         │
+│  • tmux monitor.py（常時監視 TUI）                            │
+└──────────────────────────────────────────────────────────────┘
                         │ Ollama API（CriticAgent）
                         ▼
-┌─────────────────────────────────────────────────────┐
-│  GPU推論サーバー（ASRock / Radeon RX 5700 XT）        │
-│                                                     │
-│  • Ollama — CriticAgent用ローカルLLM独立審査          │
-│  • RTCアラームで早朝自動電源ON                        │
-│  • 処理完了後は自動スリープ                           │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  ③ 推論・実行ノード（uema2lab-gpu）                            │
+│                                                              │
+│  役割: LLM推論・重いデータ処理など実メイン処理を担当            │
+│                                                              │
+│  • Ollama — CriticAgent用ローカルLLM独立審査                  │
+│  • RTCアラームで早朝自動電源ON                                 │
+│  • 処理完了後は自動スリープ                                    │
+└──────────────────────────────────────────────────────────────┘
                         │ git push
                         ▼
               github.com/sarada1001/ai-investor-bot
@@ -587,7 +608,7 @@ Wikiヘルスチェック項目:
 ### CI/CD（GitHub Actions）
 
 - **トリガー**: `main`/`dev` へのpush、PR、毎朝00:00 UTC（ナイトリー）
-- **テスト**: `pytest tests/ -m "not integration and not slow"`
+- **テスト**: `pytest tests/ -m "not integration and not slow"`（242件）
 - **カバレッジ**: `--cov-fail-under=30`（最低30%）
 - **成果物**: `coverage.xml`（7日間保持）
 
@@ -716,10 +737,22 @@ ai-investor-bot/
 - [ ] HARD_TRIP自動通知 — サーキットブレーカー発動時のLINE即時アラート
 
 ## 🔄 Development History
-- 📅 **2026-05-14 00:15:16** | 🛠️ **内容:** `auto-backup: 2026-05-14 00:15:16 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/79a7f2a30e25e0d5a08d493c25fccee11c572610)
-- 📅 **2026-05-14 00:03:49** | 🛠️ **内容:** `auto-backup: 2026-05-14 00:03:49 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/d5f1c302a5c9b3748d8bd72698e85f27fe594e72)
-- 📅 **2026-05-13 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-13 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/77dfa3b8c4d57152502bd7348341b641af32f673)
-- 📅 **2026-05-12 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-12 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/b6fc1f72b42bdd24414d8b82938ef65f1dabd0ce)
-- 📅 **2026-05-11 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-11 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/bee744929dc3721eb030f2103d21f3f14c51dd32)
-- 📅 **2026-05-08 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-08 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/acff6fedf8a1a7c9b1f6c828b044e557a4de51ff)
-- 📅 **2026-05-07 14:00:01** | 🛠️ **内容:** `auto-backup: 2026-05-07 14:00:01 (定期バックアップ)` | [🔍 変更箇所を確認](https://github.com/sarada1001/ai-investor-bot/commit/105e1349850b71854bdfca75bd82323d50eab0df)
+
+### 2026-05-14 — ペーパートレード本番体制確立
+
+- **fix: ペーパートレード基準を20万円（$1,300）にリセット** — 実運用ベースに合わせたポートフォリオ初期化
+- **fix: RiskAgentをAlpaca実残高でポジションサイジング** — $1,300固定値バグを修正し、口座残高取得APIから動的算出に変更
+- **fix: LINE通知簡素化 + BUY約定通知追加 + CircuitBreaker HARD_TRIP手動解除** — 通知フォーマット整理・HARD_TRIPからの正常復帰
+- **feat(Track-C): Streamlit 60秒自動リフレッシュ + ポートフォリオP&L + エージェント健全性 + Rich TUI** — dashboard.py・monitor.pyを本番品質に刷新
+- **feat(Track-B): 15分インターバル急落エントリー検知 + ダッシュボード統合** — DipScanをデーモンサイクルに組み込み
+- **ci(Track-A): GitHub Actions CI/CDパイプライン + スクリーナー/スコアラーユニットテスト追加** — nightly CI・PR自動テスト・カバレッジレポート整備
+
+### 2026-05-13 — 安定性・精度向上
+
+- **fix(H-5,M-2): EDGAR四半期データ自動更新 + ExitAgentルールベースフォールバック** — LLM障害時でも損切・利確が確実に動作
+- **fix(H-2): MacroAgent SUSPENDED解消** — Exam評価軸を全トレードベースに変更し、正常稼働を回復
+
+### 2026-05-12 — アーキテクチャ基盤整備
+
+- **feat: リミット注文・LLMフォールバック・BBSデータクラス実装** — 注文精度向上と型安全なエージェント間通信
+- **fix: ライブ口座残高反映 + フォールバック除去 + デフォルトティッカー廃止** — ハードコード値を排除し実口座データのみ使用
