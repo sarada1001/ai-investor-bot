@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 
 import requests
 from dotenv import load_dotenv
@@ -20,6 +21,8 @@ def send_line_message(text: str) -> None:
     if not LINE_ACCESS_TOKEN or not LINE_USER_ID:
         _log("[LINE] スキップ: LINE_ACCESS_TOKEN または LINE_USER_ID が未設定 (.env を確認)")
         return
+    hostname = socket.gethostname()
+    tagged_text = f"[{hostname}]\n{text}"
     try:
         requests.post(
             "https://api.line.me/v2/bot/message/push",
@@ -28,7 +31,7 @@ def send_line_message(text: str) -> None:
                 "Authorization": f"Bearer {LINE_ACCESS_TOKEN}",
             },
             data=json.dumps({"to": LINE_USER_ID,
-                             "messages": [{"type": "text", "text": text}]}),
+                             "messages": [{"type": "text", "text": tagged_text}]}),
             timeout=10,
         )
     except Exception as e:

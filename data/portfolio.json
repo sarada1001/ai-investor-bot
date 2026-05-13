@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "updated_at": "2026-05-13T13:31:00.738338",
+  "updated_at": "2026-05-14T00:26:18.064249",
   "_doc": {
     "positions[].id": "pos_{YYYYMMDD}_{TICKER} — 一意識別子",
     "positions[].ticker": "銘柄コード（大文字）",

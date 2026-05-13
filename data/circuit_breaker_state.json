@@ -1,11 +1,11 @@
 {
-  "status": "HARD_TRIP",
-  "daily_baseline_equity": 1300.0,
-  "high_water_mark": 1300.0,
-  "last_reset_date": "2026-05-13",
-  "last_updated": "2026-05-13T06:21:43.958590",
-  "trip_reason": "高値比ドローダウン -100.00% が閾値 -10% を超過 (HWM=$1300.00 → 現在=$0.00)",
-  "trip_time": "2026-05-13T06:21:40.043448",
-  "daily_pnl_pct": -1.0,
-  "total_drawdown_pct": -1.0
+  "status": "OPEN",
+  "daily_baseline_equity": 101580.67,
+  "high_water_mark": 101580.67,
+  "last_reset_date": "2026-05-14",
+  "last_updated": "2026-05-14T00:26:23.185242",
+  "trip_reason": null,
+  "trip_time": null,
+  "daily_pnl_pct": 0.0,
+  "total_drawdown_pct": 0.0
 }

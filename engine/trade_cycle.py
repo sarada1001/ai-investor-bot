@@ -188,10 +188,8 @@ def run_trade_cycle(
                 if notify_line:
                     send_line_message(
                         f"【ECC {ticker} 判断】⏸ HOLD\n"
-                        f"⚠️ CircuitBreaker {_cb_result.status}\n"
-                        f"日次損益: {_cb_result.daily_pnl_pct:+.2f}%  "
-                        f"高値比DD: {_cb_result.total_drawdown_pct:+.2f}%\n"
-                        f"理由: {_cb_result.reason[:80]}"
+                        f"⚠️ CB: {_cb_result.status}\n"
+                        f"日次損益: {_cb_result.daily_pnl_pct:+.2f}%  DD: {_cb_result.total_drawdown_pct:+.2f}%"
                     )
                 record_id = _training_mod.save_training_record(
                     session_id=session_id, ticker=ticker,
@@ -331,7 +329,7 @@ def run_trade_cycle(
 
         if notify_line:
             send_line_message(
-                f"【ECC {ticker} 判断】⏸ HOLD\n理由: {gate['reason']}"
+                f"【ECC {ticker} 判断】⏸ HOLD\nスコア: {score:+.4f}"
             )
         if mock_mode:
             _mock_banner("テスト実行完了（Gate: HOLD）。実際のAPIは一切呼び出されていません。")
@@ -465,6 +463,12 @@ def run_trade_cycle(
                 _log(f"     status  : {order_result.get('status')}")
                 _log(f"     symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
                 _TradeGuard().record_buy(ticker)
+                if notify_line:
+                    _buy_price = order_result.get("fill_price") or risk_data.get("current_price", 0.0)
+                    send_line_message(
+                        f"【ECC {ticker} BUY約定】\n"
+                        f"{rec_shares}株 @ ${_buy_price:.2f}"
+                    )
             elif order_result.get("skipped"):
                 _log(f"  ⏭  注文スキップ: {order_result.get('skip_reason')}")
             else:
@@ -596,12 +600,10 @@ def run_trade_cycle(
     _decision_box(box_lines)
 
     if notify_line:
-        msg = (
+        send_line_message(
             f"【ECC {ticker} 判断】{icon} {decision}\n"
-            f"スコア: {score:+.4f}\n"
-            f"根拠: {judgment.get('rationale', '')[:100]}"
+            f"スコア: {score:+.4f}"
         )
-        send_line_message(msg)
         print("\n[LINE] 通知送信完了。")
 
     if mock_mode:
