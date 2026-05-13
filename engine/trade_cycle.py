@@ -388,7 +388,7 @@ def run_trade_cycle(
         if mock_mode:
             _run_mock_risk(bbs, ticker)
         else:
-            RiskAgent(bbs).run(ticker)
+            RiskAgent(bbs).run(ticker, account_equity=_account_equity or None)
 
         risk_data  = bbs.read("risk_analysis") or {}
         rec_shares = risk_data.get("recommended_shares", 1)

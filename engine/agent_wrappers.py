@@ -644,10 +644,12 @@ class RiskAgent:
     def __init__(self, bbs: BBS):
         self.bbs = bbs
 
-    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S4") -> dict:
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S4",
+            account_equity: float | None = None) -> dict:
         _phase_header(phase_tag, self.NAME)
         cfg             = _load_agent_config("risk_agent")
-        account_balance = float(cfg.get("params", {}).get("account_balance", 100_000.0))
+        _cfg_balance    = float(cfg.get("params", {}).get("account_balance", 100_000.0))
+        account_balance = account_equity if account_equity and account_equity > 0 else _cfg_balance
         _log(f"{ticker} のポジションサイジングを計算中 (口座残高: ${account_balance:,.0f})...")
         _sep()
 

@@ -9,7 +9,7 @@ allowed_skills:
   - risk_calculator
 
 params:
-  account_balance: 1300.0   # ライブ口座残高（USD）= 20万円 ÷ 153円/USD
+  account_balance: 100000.0  # フォールバック値（通常はAlpaca実残高を使用）
   risk_fraction:   0.02       # 1トレードあたり最大リスク（口座の2%）
 
 system_prompt: |
