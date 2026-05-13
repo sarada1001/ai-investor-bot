@@ -88,7 +88,7 @@ COACHING_PROMPTS: dict[str, str] = {
     ),
     "MacroAgent": (
         "【補習課題】マクロ環境の判定基準を見直してください。"
-        "VIX が 20 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、"
+        "VIX が 25 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、"
         "明確な悪化シグナルがある場合のみ NEGATIVE としてください。"
     ),
     "SocialAgent": (

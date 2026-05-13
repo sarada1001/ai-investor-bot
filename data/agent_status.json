@@ -42,7 +42,7 @@
     "winning_trades": 7,
     "losing_trades": 12,
     "suspension_reason": "仮想取引数不足: 19 < 20 — 検定データ不足のため評価保留",
-    "coaching_prompt": "【補習課題】マクロ環境の判定基準を見直してください。VIX が 20 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、明確な悪化シグナルがある場合のみ NEGATIVE としてください。",
+    "coaching_prompt": "【補習課題】マクロ環境の判定基準を見直してください。VIX が 25 以下かつ SPY が 200 日移動平均上の場合は POSITIVE をデフォルトとし、明確な悪化シグナルがある場合のみ NEGATIVE としてください。",
     "last_evaluated": "2026-05-11T18:35:04.800472",
     "exam_mode": true,
     "exam_period": "90d"

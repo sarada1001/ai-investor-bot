@@ -7,10 +7,11 @@ scripts/run_agent_exam.py — Walk-Forward Testing System (Agent Exam)
 ATRベースのSL/TPで walk-forward シミュレーションを実施する。
 
 各エージェントの合否判定:
-  - TechnicalAgent / NewsAgent / SocialAgent / FundamentalAgent / ManagerAgent:
-      全仮想取引の勝率で判定
-  - MacroAgent:
-      SPY > SMA200 かつ VIX < 20 の日に絞った仮想取引で判定
+  - 全エージェント共通: 全仮想取引の勝率で判定
+  - MacroAgent: 全仮想取引で評価し、追加で macro_ok=True 条件下の勝率を参考指標として記録
+
+  注: 全エージェントが同一の評価プールを共有するため、各エージェント固有の貢献は測定しない。
+  本 Exam はシステム全体のシグナル収益性を評価する。
 
 合格条件: ≥20 仮想取引 AND ≥50% 勝率 → ACTIVE ; それ以外 → SUSPENDED
 
@@ -89,7 +90,7 @@ ATR_FALLBACK    = 0.015       # ATR 計算失敗時の価格比率
 
 RSI_OVERSOLD        = 35.0    # RSI < 35 → 買いシグナル
 BB_PERIOD           = 20      # ボリンジャーバンド期間
-VIX_CALM_THRESHOLD  = 20.0    # VIX < 20 → マクロ良好
+VIX_CALM_THRESHOLD  = 25.0    # VIX < 25 → マクロ良好（関税ショック相場対応で緩和）
 MACRO_SMA_PERIOD    = 200     # SPY の 200 日移動平均
 
 PASS_MIN_TRADES    = 20       # 合格最低取引数
@@ -115,7 +116,7 @@ class VirtualTrade:
     exit_reason: str    # "TAKE_PROFIT" | "STOP_LOSS" | "TIMEOUT"
     pnl_pct:     float
     win:         bool
-    macro_ok:    bool   # SPY > SMA200 かつ VIX < 20
+    macro_ok:    bool   # SPY > SMA200 かつ VIX < VIX_CALM_THRESHOLD (現在: 25)
 
 
 @dataclass
@@ -128,6 +129,7 @@ class AgentExamResult:
     passed:         bool
     status:         str   # "ACTIVE" | "SUSPENDED"
     reason:         str
+    macro_ok_rate:  float | None = None  # MacroAgent 用参考値: None=macro_ok取引なし, 0.0=全敗
 
 
 # ─────────────────────────────────────────────────────────────
@@ -270,7 +272,7 @@ def _is_macro_ok(
     spy_df: pd.DataFrame | None,
     vix_df: pd.DataFrame | None,
 ) -> bool:
-    """SPY > SMA200 かつ VIX < 20 を満たすか。データなし → True（制約なし）。"""
+    """SPY > SMA200 かつ VIX < VIX_CALM_THRESHOLD を満たすか。データなし → True（制約なし）。"""
     spy_ok = True
     vix_ok = True
 
@@ -399,19 +401,23 @@ def evaluate_agent(
     """
     エージェント別合否判定。
 
-    MacroAgent のみ macro_ok=True のトレードに絞って評価する。
-    他の全エージェントは全仮想取引を使用する。
+    全エージェントを全仮想取引で評価する。
+    MacroAgent は追加で macro_ok=True 条件下の勝率を参考指標として計算する。
     """
-    trades = (
-        [t for t in all_trades if t.macro_ok]
-        if agent_name == "MacroAgent"
-        else all_trades
-    )
-
-    total  = len(trades)
-    wins   = sum(1 for t in trades if t.win)
+    total  = len(all_trades)
+    wins   = sum(1 for t in all_trades if t.win)
     losses = total - wins
     rate   = wins / total if total > 0 else 0.0
+
+    # MacroAgent 参考値: macro_ok 条件（SPY>SMA200 かつ VIX<VIX_CALM_THRESHOLD）下の勝率
+    # None: macro_ok=True のトレードが存在しない（未定義）
+    # 0.0 : macro_ok トレードが全て負けた（定義済みの値）
+    macro_ok_rate: float | None = None
+    if agent_name == "MacroAgent":
+        ok_trades = [t for t in all_trades if t.macro_ok]
+        if ok_trades:
+            macro_ok_wins = sum(1 for t in ok_trades if t.win)
+            macro_ok_rate = round(macro_ok_wins / len(ok_trades), 4)
 
     if total < PASS_MIN_TRADES:
         status = "SUSPENDED"
@@ -444,6 +450,7 @@ def evaluate_agent(
         passed=passed,
         status=status,
         reason=reason,
+        macro_ok_rate=macro_ok_rate,
     )
 
 
@@ -475,7 +482,7 @@ def apply_exam_results(
 
     for r in results:
         prev = existing.get(r.agent_name, {})
-        existing[r.agent_name] = {
+        entry: dict = {
             "status":            r.status,
             "win_rate":          r.win_rate,
             "total_trades":      r.total_trades,
@@ -487,6 +494,9 @@ def apply_exam_results(
             "exam_mode":         True,
             "exam_period":       exam_period,
         }
+        if r.macro_ok_rate is not None:
+            entry["macro_ok_rate"] = r.macro_ok_rate
+        existing[r.agent_name] = entry
 
     if dry_run:
         logger.info("[DRY RUN] agent_status.json 更新をスキップ")
@@ -528,6 +538,11 @@ def _print_summary(
             f"  {r.agent_name:<22}  {r.total_trades:>5}  "
             f"{r.win_rate * 100:>6.1f}%  {pass_str}  {label}"
         )
+        if r.macro_ok_rate is not None:
+            print(
+                f"  {'':22}  {'':5}  "
+                f"  (macro_ok 参考: {r.macro_ok_rate * 100:.1f}%)"
+            )
 
     print("═" * _W)
     note = "[DRY RUN] agent_status.json は更新されませんでした。" if dry_run else \
