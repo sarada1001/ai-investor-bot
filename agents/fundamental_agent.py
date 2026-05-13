@@ -20,6 +20,8 @@ import os
 import re
 import time
 import warnings
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -29,15 +31,36 @@ from langchain_huggingface import HuggingFaceEmbeddings
 warnings.filterwarnings("ignore")
 load_dotenv()
 
-_PERSIST_DIR     = "chroma_db_saved"
-_COLLECTION      = "financial_filings"
-_EMBED_MODEL     = "intfloat/multilingual-e5-small"
-_LLM_MODEL       = "gemini-2.0-flash"
-_RETRY_DELAYS    = (15, 30, 60)
+_PERSIST_DIR          = "chroma_db_saved"
+_COLLECTION           = "financial_filings"
+_EMBED_MODEL          = "intfloat/multilingual-e5-small"
+_LLM_MODEL            = "gemini-2.0-flash"
+_RETRY_DELAYS         = (15, 30, 60)
+_EDGAR_STALENESS_DAYS = 90   # re-fetch after ~one quarter
+_FETCH_LOG_PATH       = Path("data/edgar_fetch_log.json")
 
 
 def _is_japanese(text: str) -> bool:
     return bool(re.search(r"[぀-ヿ一-鿿]", text))
+
+
+def _load_fetch_log() -> dict:
+    try:
+        if _FETCH_LOG_PATH.exists():
+            return json.loads(_FETCH_LOG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _save_fetch_log(log: dict) -> None:
+    try:
+        _FETCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _FETCH_LOG_PATH.write_text(
+            json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except Exception as e:
+        print(f"  [FundamentalAgent] フェッチログ保存エラー: {e}")
 
 
 class FundamentalAgent:
@@ -355,7 +378,33 @@ class FundamentalAgent:
         return result
 
     # ------------------------------------------------------------------ #
-    # Step 1b: EDGAR self-healing fetch                                   #
+    # Step 1b: EDGAR staleness helpers                                    #
+    # ------------------------------------------------------------------ #
+
+    def _is_edgar_stale(self, ticker: str) -> bool:
+        """Return True if EDGAR data for ticker is older than _EDGAR_STALENESS_DAYS."""
+        entry = _load_fetch_log().get(ticker.upper())
+        if not entry:
+            return False  # never fetched — handled by the 0-chunks path
+        try:
+            fetched_at = datetime.fromisoformat(entry["fetched_at"])
+            if fetched_at.tzinfo is None:
+                fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - fetched_at).days >= _EDGAR_STALENESS_DAYS
+        except Exception:
+            return False
+
+    def _record_edgar_fetch(self, ticker: str, form: str) -> None:
+        """Record a successful EDGAR fetch (or freshness check) in the fetch log."""
+        log = _load_fetch_log()
+        log[ticker.upper()] = {
+            "form":       form,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _save_fetch_log(log)
+
+    # ------------------------------------------------------------------ #
+    # Step 1c: EDGAR self-healing fetch                                   #
     # ------------------------------------------------------------------ #
 
     def _fetch_from_edgar(self, ticker: str) -> dict[str, Any]:
@@ -386,11 +435,6 @@ class FundamentalAgent:
             collection_name=self.collection_name,
         )
         result = loader.fetch_from_edgar(ticker, prefer_quarterly=True)
-
-        if result.get("chunks_added", 0) > 0:
-            # Invalidate cached DB connection so the next _get_db() reloads
-            self._db = None
-
         return result
 
     # ------------------------------------------------------------------ #
@@ -564,6 +608,28 @@ class FundamentalAgent:
 
         print(f"  [FundamentalAgent] ChromaDB ({self.collection_name}): {len(chunks)} チャンク取得 (初回)")
 
+        # ── Staleness: re-fetch if data is older than one quarter ────────
+        if chunks and not _is_japanese(ticker) and self._is_edgar_stale(ticker):
+            print(
+                f"  [FundamentalAgent] EDGAR データが {_EDGAR_STALENESS_DAYS} 日超 → "
+                "最新四半期データを再確認..."
+            )
+            edgar_triggered = True
+            try:
+                fetch_result = self._fetch_from_edgar(ticker)
+            except Exception as exc:
+                print(f"  [FundamentalAgent] EDGAR 再取得エラー (既存データ継続): {exc}")
+                fetch_result = {"chunks_added": 0, "form": "", "error": str(exc)}
+            if fetch_result.get("chunks_added", 0) > 0:
+                self._record_edgar_fetch(ticker, fetch_result.get("form", ""))
+                self._db = None
+                chunks = self.retrieve_chunks(ticker)
+                print(f"  [FundamentalAgent] 最新データ取得後: {len(chunks)} チャンク")
+            else:
+                # No newer filing → still update the check timestamp
+                self._record_edgar_fetch(ticker, fetch_result.get("form", ""))
+                print("  [FundamentalAgent] 新しいファイリングなし — 既存データを使用")
+
         # ── Self-healing: US ticker with no local data → try EDGAR ──────
         if not chunks and not _is_japanese(ticker):
             print(f"  [FundamentalAgent] 該当データなし → EDGAR 自律取得を開始...")
@@ -571,8 +637,10 @@ class FundamentalAgent:
             edgar_triggered = True
 
             if fetch_result.get("chunks_added", 0) > 0:
+                self._record_edgar_fetch(ticker, fetch_result.get("form", ""))
                 print(f"  [FundamentalAgent] EDGAR 取得完了 "
                       f"({fetch_result['chunks_added']} チャンク) — 再検索します...")
+                self._db = None
                 chunks = self.retrieve_chunks(ticker)
                 print(f"  [FundamentalAgent] 再検索結果: {len(chunks)} チャンク")
             else:

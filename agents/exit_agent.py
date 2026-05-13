@@ -43,6 +43,45 @@ OBSIDIAN_LOGS   = Path(__file__).parent.parent / "data" / "knowledge_base" / "ob
 TAKE_PROFIT_PCT = 10.0   # 固定利確フォールバック（ATR価格未設定時のみ適用）
 STOP_LOSS_PCT   = -5.0   # 固定損切りフォールバック（ATR価格未設定時のみ適用）
 
+# LLM 停止時のルールベースフォールバック用キーワード
+_THESIS_BREAK_KEYWORDS: frozenset[str] = frozenset({
+    # English — earnings / guidance
+    "earnings miss", "missed expectations", "below expectations",
+    "guidance cut", "guidance reduced", "guidance lowered", "cut guidance",
+    "profit warning", "revenue miss", "revenue decline",
+    # English — corporate events
+    "fraud", "investigation", "lawsuit", "accounting irregulari",
+    "recall", "downgrade", "ceo resign", "ceo fired", "layoffs",
+    # Japanese
+    "下方修正", "業績悪化", "赤字転落", "不正", "リコール",
+    "訴訟", "格下げ", "減収", "大幅減益",
+})
+
+
+def _rule_based_thesis_break(news_text: str) -> bool:
+    """
+    Conservative rule-based thesis break detection used when LLM is unavailable.
+
+    Returns True only when:
+      1. Every article in news_text carries negative sentiment, AND
+      2. At least one strong thesis-break keyword appears in the text.
+
+    Deliberately conservative to avoid spurious SELL signals.
+    """
+    if not news_text:
+        return False
+
+    lines = [ln for ln in news_text.splitlines() if ln.strip().startswith("-")]
+    if not lines:
+        return False
+
+    neg_count = sum(1 for ln in lines if "[negative]" in ln.lower())
+    all_negative = neg_count == len(lines)
+
+    has_break_keyword = any(kw in news_text.lower() for kw in _THESIS_BREAK_KEYWORDS)
+
+    return all_negative and has_break_keyword
+
 
 def _safe_log_path(base: Path, filename: str) -> Path | None:
     """base ディレクトリの外に出ないことを resolve() で保証してパスを返す。"""
@@ -351,8 +390,14 @@ class ExitAgent:
             response = self._llm.invoke(prompt).content.strip().upper()
             return response.startswith("YES")
         except Exception as e:
-            logger.error("  [ExitAgent] thesis LLM 判定エラー: %s → フォールバック: NO", e)
-            return False
+            logger.warning(
+                "  [ExitAgent] %s thesis LLM 判定エラー: %s → ルールベースフォールバック",
+                ticker, e,
+            )
+            result = _rule_based_thesis_break(news)
+            if result:
+                logger.warning("  [ExitAgent] %s ルールベース判定: THESIS_BROKEN", ticker)
+            return result
 
 
 # ============================================================
