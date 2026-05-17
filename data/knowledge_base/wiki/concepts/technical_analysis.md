@@ -1,8 +1,8 @@
 ---
 concept: technical_analysis
 title: テクニカル分析
-last_updated: 2026-05-11
-linked_tickers: [AAPL]
+last_updated: 2026-05-17
+linked_tickers: [AAPL, RTX]
 ---
 
 # [[concepts/technical_analysis|テクニカル分析]]
@@ -15,6 +15,7 @@ linked_tickers: [AAPL]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-14 | [[tickers/RTX]] | 中立 | |
 | 2026-05-11 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-07 | [[tickers/AAPL]] | 中立 | |
 

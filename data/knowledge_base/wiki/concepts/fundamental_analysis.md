@@ -1,8 +1,8 @@
 ---
 concept: fundamental_analysis
 title: ファンダメンタルズ分析
-last_updated: 2026-05-11
-linked_tickers: [AAPL, COR, HSY]
+last_updated: 2026-05-17
+linked_tickers: [AAPL, COR, HSY, IP, RTX]
 ---
 
 # [[concepts/fundamental_analysis|ファンダメンタルズ分析]]
@@ -15,6 +15,8 @@ linked_tickers: [AAPL, COR, HSY]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-14 | [[tickers/RTX]] | 中立 | |
+| 2026-05-14 | [[tickers/IP]] | 中立 | |
 | 2026-05-11 | [[tickers/COR]] | 中立 | |
 | 2026-05-11 | [[tickers/AAPL]] | 中立 | |
 | 2026-05-09 | [[tickers/AAPL]] | 中立 | |

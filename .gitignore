@@ -42,6 +42,9 @@ bbs/
 # ポートフォリオ実行状態（ローカル実行環境に依存）
 portfolio_state.json
 
+# ライブ取引認証状態（24h有効期限付き・コミット不要）
+data/live_trading_enabled.json
+
 # 決算PDF・ZIPなど（著作権・容量の観点から除外）
 unzipped_docs/
 *.zip

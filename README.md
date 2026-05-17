@@ -253,14 +253,24 @@ python -c "from agents.exit_agent import run_exit_cycle; run_exit_cycle()"
 | 含み損 ≤ -5% | 損切り |
 | THESIS_BROKEN | FundamentalAgentが投資根拠崩壊を判定 → 即売り |
 
-### 4. 急落エントリースキャン（DipScan）
+### 4. 本番切り替え用データリセット
+
+ペーパートレードからライブ取引に切り替える直前に実行します。ポートフォリオ・サーキットブレーカー・TradeGuardをクリーンな初期状態に戻します。
+
+```bash
+python scripts/live_reset.py
+```
+
+実行前に確認ダイアログが表示されます（`yes` と入力して確定）。詳細な切り替え手順は [ライブ取引をオンにする手順](#ライブ取引をオンにする手順) を参照してください。
+
+### 5. 急落エントリースキャン（DipScan）
 
 デーモンモード稼働中、メインサイクルのスリープ間（15分ごと）に急落エントリー機会を自動スキャンします:
 - 対象: 当日スクリーニング上位銘柄
 - 閾値: 当日始値から -3% 以上の下落
 - アラート: LINE通知（`--notify-line` 指定時）
 
-### 5. 日報・Wiki更新
+### 6. 日報・Wiki更新
 
 ```bash
 # 日報生成（latest_summary.md に出力）
@@ -273,7 +283,7 @@ python server_librarian.py --ingest
 python scripts/lint_wiki.py
 ```
 
-### 6. アブレーション実験（エージェント除外）
+### 7. アブレーション実験（エージェント除外）
 
 ```bash
 # FundamentalAgentを除外してパフォーマンス比較
@@ -692,6 +702,7 @@ ai-investor-bot/
 ├── scripts/
 │   ├── preflight_check.py       # 本番前プリフライトチェック
 │   ├── lint_wiki.py             # Wikiヘルスチェック
+│   ├── live_reset.py            # 本番切り替え用データリセット
 │   ├── run_ablation_test.py     # アブレーションテスト
 │   ├── run_agent_exam.py        # エージェント試験
 │   ├── run_backtest.py          # バックテスト
@@ -729,6 +740,8 @@ ai-investor-bot/
 
 ## ロードマップ
 
+- [x] ライブ取引移行ウィザード（`--enable-live` 二段階認証 + `live_reset.py`）
+- [ ] Alpaca Live口座への入金確認 → ライブ本番稼働
 - [ ] セマンティックチャンキング — 段落レベルのチャンク分割でRAG精度向上
 - [ ] 推論ログフィードバックループ — エージェントトレースをローカルLLMで蒸留してナレッジベースに反映
 - [ ] バックテスト強化 — 過去データでのシミュレーション精度向上
@@ -737,6 +750,16 @@ ai-investor-bot/
 - [ ] HARD_TRIP自動通知 — サーキットブレーカー発動時のLINE即時アラート
 
 ## 🔄 Development History
+
+### 2026-05-17 — ライブ取引移行準備 & バグ修正
+
+- **feat: scripts/live_reset.py 追加** — ペーパー→ライブ切り替え時にportfolio/circuit_breaker/trade_guardをクリーンリセットするウィザード
+- **fix(trade_cycle): entry_price 検証ガード追加** — 無効なentry_priceでのportfolio.json登録を防止し、TradeGuard.record_buy()を登録成功後に移動
+- **fix(trade_cycle): AlpacaClient未初期化時のフォールバック発注を削除** — サイレント失敗を明示的エラーに変更
+- **fix(alpaca_client): has_position()の予期せぬエラーを握り潰さずre-raise** — 「ポジションなし」以外のAPIエラーを上位に伝播
+- **fix(lint_wiki): 孤児ページ検出にINDEX.mdを含める** — INDEX.mdからのリンクを参照済みとして正しく計上
+- **fix(lint_wiki): 矛盾検出で歴史的エントリをスキップ** — ticker.last_updatedより古いコンセプトエントリは誤検知対象外に
+- **wiki: IP・RTX BUYトレードログ記録** — 2026-05-14の実取引をObsidianログ・Wikiページに反映
 
 ### 2026-05-14 — ペーパートレード本番体制確立
 

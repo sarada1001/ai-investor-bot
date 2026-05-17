@@ -114,8 +114,12 @@ class AlpacaClient:
         try:
             self._tc.get_open_position(symbol.upper())
             return True
-        except Exception:
-            return False
+        except Exception as e:
+            err = str(e).lower()
+            if "not found" in err or "does not exist" in err or "position does not exist" in err:
+                return False
+            logger.error("  [AlpacaClient] has_position(%s) 予期せぬエラー: %s", symbol, e)
+            raise
 
     def get_position_qty(self, symbol: str) -> int:
         """保有株数を返す（保有していなければ 0）。"""

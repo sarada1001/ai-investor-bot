@@ -83,10 +83,10 @@ def check_broken_links(wiki_files: dict) -> list[str]:
 
 def check_orphan_pages(wiki_files: dict) -> list[str]:
     issues = []
-    # どのページから参照されているかを集計
+    # どのページから参照されているかを集計（INDEX.mdも含む）
     referenced: set[str] = set()
     for stem, path in wiki_files.items():
-        if "/" in stem:
+        if "/" in stem or stem == "INDEX":
             text  = path.read_text(encoding="utf-8")
             links = collect_links(text)
             for link in links:
@@ -122,6 +122,18 @@ def check_contradictions(wiki_files: dict) -> list[str]:
         if ticker and assessment:
             ticker_assessments[ticker] = assessment
 
+    # tickers/ の last_updated を収集（日付比較用）
+    ticker_last_updated: dict[str, datetime] = {}
+    for stem, path in wiki_files.items():
+        if not stem.startswith("tickers/"):
+            continue
+        fm = parse_frontmatter(path.read_text(encoding="utf-8"))
+        lu = fm.get("last_updated", "")
+        try:
+            ticker_last_updated[fm.get("ticker", path.stem)] = datetime.strptime(lu, "%Y-%m-%d")
+        except ValueError:
+            pass
+
     # concepts/ の観測事例テーブルと照合（BUY vs SELL の食い違いを検出）
     for stem, path in wiki_files.items():
         if not stem.startswith("concepts/"):
@@ -129,11 +141,19 @@ def check_contradictions(wiki_files: dict) -> list[str]:
         text = path.read_text(encoding="utf-8")
         # 観測事例テーブルの行を解析: | 日付 | [[tickers/TICKER]] | 成功/失敗 |
         for line in text.splitlines():
-            m = re.search(r"\[\[tickers/([A-Z]+)\]\].*?\|\s*(成功|失敗)", line)
+            m = re.search(r"\|\s*(\d{4}-\d{2}-\d{2}).*?\[\[tickers/([A-Z]+)\]\].*?\|\s*(成功|失敗)", line)
             if not m:
                 continue
-            ticker, concept_outcome = m.group(1), m.group(2)
+            entry_date_str, ticker, concept_outcome = m.group(1), m.group(2), m.group(3)
             page_assessment = ticker_assessments.get(ticker, "")
+            # コンセプトエントリが ticker の last_updated より古い場合はスキップ（歴史的記録）
+            try:
+                entry_date = datetime.strptime(entry_date_str, "%Y-%m-%d")
+                last_upd   = ticker_last_updated.get(ticker)
+                if last_upd and entry_date < last_upd:
+                    continue
+            except ValueError:
+                pass
             # 概念ページで「成功」なのにティッカーページが SELL → 矛盾の可能性
             if concept_outcome == "成功" and page_assessment == "SELL":
                 issues.append(

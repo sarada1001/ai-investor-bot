@@ -462,7 +462,6 @@ def run_trade_cycle(
                 _log(f"  ✅ 注文完了: order_id={order_result.get('order_id')}")
                 _log(f"     status  : {order_result.get('status')}")
                 _log(f"     symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
-                _TradeGuard().record_buy(ticker)
                 if notify_line:
                     _buy_price = order_result.get("fill_price") or risk_data.get("current_price", 0.0)
                     send_line_message(
@@ -474,12 +473,8 @@ def run_trade_cycle(
             else:
                 _log(f"  ❌ 発注エラー: {order_result.get('error')}")
         else:
-            try:
-                order_result = _alpaca_mod.place_market_order(ticker, rec_shares, "buy")
-                _log(f"  注文完了 (fallback): order_id={order_result.get('order_id')}")
-            except Exception as e:
-                order_result = {"error": str(e)}
-                _log(f"  発注エラー: {e}")
+            order_result = {"error": "AlpacaClient 未初期化 — 発注不可"}
+            _log(f"  ❌ AlpacaClient 未初期化: 設定を確認してください")
 
         judgment["order"] = order_result
         judgment["current_price"] = risk_data.get("current_price")
@@ -496,35 +491,39 @@ def run_trade_cycle(
                 _stop_price   = risk_data.get("stop_loss_price")
                 _fill_price   = order_result.get("fill_price")
                 _actual_entry = _fill_price or _entry_price
-                _buy_log = _ObsidianLogger().save_log({
-                    "ticker":  ticker,
-                    "action":  "BUY",
-                    "context": (
-                        f"{judgment.get('rationale', '(根拠なし)')}\n"
-                        + (
-                            f"--- Alpaca 注文 ---\n"
-                            f"注文ID: {order_result.get('order_id', 'N/A')}\n"
-                            f"ステータス: {order_result.get('status', 'N/A')}\n"
-                            f"約定価格: ${_fill_price:.2f}" if _fill_price else ""
-                        )
-                    ),
-                    "tags": ["entry", ticker.lower(), session_id],
-                })
-                _log(f"  [Obsidian] 購入ログ保存: {_buy_log.name}")
-                _atr_tp = risk_data.get("take_profit_price")
-                _target = _atr_tp if _atr_tp else (
-                    round(_actual_entry * 1.10, 2) if _actual_entry else None
-                )
-                _portfolio_add(
-                    ticker          = ticker,
-                    entry_price     = _actual_entry,
-                    shares          = rec_shares,
-                    target_price    = _target,
-                    stop_loss_price = _stop_price,
-                    buy_log_file    = _buy_log.name,
-                    thesis          = judgment.get("rationale", ""),
-                )
-                _log(f"  [Portfolio] {ticker} ×{rec_shares} を portfolio.json に登録しました")
+                if not _actual_entry or _actual_entry <= 0:
+                    _log(f"  [Portfolio] ❌ entry_price が無効 ({_actual_entry}) — portfolio.json への登録をスキップします")
+                else:
+                    _buy_log = _ObsidianLogger().save_log({
+                        "ticker":  ticker,
+                        "action":  "BUY",
+                        "context": (
+                            f"{judgment.get('rationale', '(根拠なし)')}\n"
+                            + (
+                                f"--- Alpaca 注文 ---\n"
+                                f"注文ID: {order_result.get('order_id', 'N/A')}\n"
+                                f"ステータス: {order_result.get('status', 'N/A')}\n"
+                                f"約定価格: ${_fill_price:.2f}" if _fill_price else ""
+                            )
+                        ),
+                        "tags": ["entry", ticker.lower(), session_id],
+                    })
+                    _log(f"  [Obsidian] 購入ログ保存: {_buy_log.name}")
+                    _atr_tp = risk_data.get("take_profit_price")
+                    _target = _atr_tp if _atr_tp else (
+                        round(_actual_entry * 1.10, 2) if _actual_entry else None
+                    )
+                    _portfolio_add(
+                        ticker          = ticker,
+                        entry_price     = _actual_entry,
+                        shares          = rec_shares,
+                        target_price    = _target,
+                        stop_loss_price = _stop_price,
+                        buy_log_file    = _buy_log.name,
+                        thesis          = judgment.get("rationale", ""),
+                    )
+                    _log(f"  [Portfolio] {ticker} ×{rec_shares} を portfolio.json に登録しました")
+                    _TradeGuard().record_buy(ticker)
             except Exception as e:
                 _log(f"  [Portfolio] 登録エラー（ログは保存済）: {e}")
 

@@ -1,9 +1,9 @@
 {
   "status": "OPEN",
-  "daily_baseline_equity": 101580.67,
-  "high_water_mark": 101580.67,
-  "last_reset_date": "2026-05-14",
-  "last_updated": "2026-05-14T00:26:23.185242",
+  "daily_baseline_equity": 1300.0,
+  "high_water_mark": 1300.0,
+  "last_reset_date": "2026-05-17",
+  "last_updated": "2026-05-17T16:44:31.956030",
   "trip_reason": null,
   "trip_time": null,
   "daily_pnl_pct": 0.0,

@@ -32,5 +32,13 @@
       "entry_date": "2026-05-13",
       "entry_price": null
     }
+  ],
+  "RTX": [
+    {
+      "record_id": "1772d563-be2c-448d-a3f4-cd27830da3a9",
+      "session_id": "20260514_010239",
+      "entry_date": "2026-05-14",
+      "entry_price": 178.91
+    }
   ]
 }

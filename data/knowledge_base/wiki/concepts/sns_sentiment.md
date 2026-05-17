@@ -1,8 +1,8 @@
 ---
 concept: sns_sentiment
 title: SNSセンチメント
-last_updated: 2026-05-08
-linked_tickers: [HSY]
+last_updated: 2026-05-17
+linked_tickers: [HSY, IP, RTX]
 ---
 
 # [[concepts/sns_sentiment|SNSセンチメント]]
@@ -15,6 +15,8 @@ linked_tickers: [HSY]
 
 | 日付 | 銘柄 | 結果 | 備考 |
 |---|---|---|---|
+| 2026-05-14 | [[tickers/RTX]] | 中立 | |
+| 2026-05-14 | [[tickers/IP]] | 中立 | |
 | 2026-05-07 | [[tickers/HSY]] | 注意 | |
 
 ## 教訓
