@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import socket
@@ -36,3 +37,35 @@ def send_line_message(text: str) -> None:
         )
     except Exception as e:
         _log(f"[LINE] 送信失敗: {e}")
+
+
+def send_line_notification(results: list[dict]) -> None:
+    """スクリーニング結果をLINEに送信する。全銘柄HOLDでも必ず1通送信する。"""
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    total = len(results)
+
+    buy_results  = [r for r in results if r.get("decision") in ("BUY", "STRONG BUY")]
+    hold_results = [r for r in results if r.get("decision") not in ("BUY", "STRONG BUY")]
+
+    lines = [f"【ECC スクリーニング結果】{today}"]
+
+    if buy_results:
+        lines.append(f"{total}銘柄を分析 | 通過: {len(buy_results)}銘柄\n")
+        for r in buy_results:
+            decision  = r.get("decision", "BUY")
+            ticker    = r.get("ticker", "?")
+            score     = r.get("score", 0.0)
+            rationale = r.get("rationale", "")[:60]
+            icon      = "🚀" if decision == "STRONG BUY" else "📈"
+            lines.append(f"{icon} {ticker}  {decision}  スコア {score:+.4f}")
+            if rationale:
+                lines.append(f"   理由: {rationale}")
+        if hold_results:
+            hold_tickers = ", ".join(r.get("ticker", "?") for r in hold_results)
+            lines.append(f"\n⏸ HOLD ({len(hold_results)}銘柄): {hold_tickers}")
+    else:
+        lines.append(f"{total}銘柄を分析 | 本日は全銘柄HOLD（見送り）\n")
+        hold_tickers = ", ".join(r.get("ticker", "?") for r in results)
+        lines.append(f"⏸ HOLD ({total}銘柄): {hold_tickers}")
+
+    send_line_message("\n".join(lines))

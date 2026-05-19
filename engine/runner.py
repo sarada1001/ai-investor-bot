@@ -10,7 +10,7 @@ from tools.alpaca_client import AlpacaClient as _AlpacaClient
 
 from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, _W
 from engine.display     import _log
-from engine.notify      import send_line_message
+from engine.notify      import send_line_message, send_line_notification
 from engine.trade_cycle import run_trade_cycle
 
 _DIP_SCAN_INTERVAL_SECS = 900  # 15分ごとに急落スキャン
@@ -118,15 +118,7 @@ def run_watchlist_cycle(
     _watchlist_summary(results)
 
     if notify_line:
-        buy_list  = [r for r in results if r.get("decision") == "STRONG BUY"]
-        hold_list = [r for r in results if r.get("decision") == "HOLD"]
-        lines = ["【ECC ウォッチリスト 分析完了】"]
-        if buy_list:
-            lines.append("🚀 STRONG BUY:")
-            for r in buy_list:
-                lines.append(f"  {r['ticker']}  スコア {r.get('score', 0):+.4f}")
-        lines.append(f"⏸ HOLD: {', '.join(r['ticker'] for r in hold_list)}")
-        send_line_message("\n".join(lines))
+        send_line_notification(results)
         print("\n[LINE] ウォッチリストサマリー通知送信完了。")
 
     return results
