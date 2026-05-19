@@ -25,7 +25,7 @@ def send_line_message(text: str) -> None:
     hostname = socket.gethostname()
     tagged_text = f"[{hostname}]\n{text}"
     try:
-        requests.post(
+        resp = requests.post(
             "https://api.line.me/v2/bot/message/push",
             headers={
                 "Content-Type": "application/json",
@@ -35,6 +35,8 @@ def send_line_message(text: str) -> None:
                              "messages": [{"type": "text", "text": tagged_text}]}),
             timeout=10,
         )
+        if resp.status_code != 200:
+            _log(f"[LINE] 送信失敗: HTTP {resp.status_code} — {resp.text}")
     except Exception as e:
         _log(f"[LINE] 送信失敗: {e}")
 
