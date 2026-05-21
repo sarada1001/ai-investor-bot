@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 TARGET_TICKER        = "AAPL"
-STRONG_BUY_SCORE     = 0.60    # 加重スコアの Strong Buy 閾値
+STRONG_BUY_SCORE     = 0.50    # 加重スコアの Strong Buy 閾値
 BUY_QTY              = 1.0     # 発注数量（株）
 SOCIAL_HYPE_THRESHOLD = 0.7    # このスコア以上を「高Hype」と判定
 DAEMON_INTERVAL_SECS = 3_600   # 開場中の次回評価までのデフォルト間隔（1時間）
