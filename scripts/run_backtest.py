@@ -61,6 +61,11 @@ TAKE_PROFIT_PCT       = 0.10 # +10% で利益確定
 MAX_HOLD_DAYS         = 10   # 最大保有日数（営業日）
 BUY_SCORE_THRESHOLD   = 0.40 # テクニカルスコアの BUY 閾値（-1〜+1）CLI の --threshold で上書き可
 
+# ── ニュートラルゾーン（不感帯）定数 ──────────────────────────────────
+# 0.0 にするとニュートラルゾーンなし（従来の厳格モード）
+MACD_NEUTRAL_RATIO = 0.20  # histogram/|macd_line| が -0.20 以上なら neutral(0)
+SMA_NEUTRAL_PCT    = 2.0   # diff_pct が -2.0% 以上（SMA を 2% 未満で下回る）なら neutral(0)
+
 _W = 72  # 表示幅
 
 
@@ -93,9 +98,19 @@ def _rsi_to_signal(rsi: float) -> float:
     return -1.0
 
 
-def calc_tech_score(close: pd.Series) -> tuple[float, dict]:
+def calc_tech_score(
+    close: pd.Series,
+    macd_neutral_ratio: float = 0.0,
+    sma_neutral_pct:    float = 0.0,
+) -> tuple[float, dict]:
     """
     RSI / MACD / SMA25 から [-1, +1] のテクニカルスコアを返す。
+
+    Args:
+        macd_neutral_ratio: histogram/|macd_line| が -ratio 以上なら neutral(0)。
+                            0.0 で従来の厳格モード（binary ±1）。
+        sma_neutral_pct:    diff_pct が -pct% 以上（0未満）なら neutral(0)。
+                            0.0 で従来の厳格モード（binary ±1）。
 
     Returns:
         (score, details_dict)
@@ -104,16 +119,37 @@ def calc_tech_score(close: pd.Series) -> tuple[float, dict]:
     macd = _calc_macd(close)
     sma  = _calc_sma25(close)
 
-    rsi_sig  = _rsi_to_signal(rsi)
-    macd_sig = +1.0 if macd["trend"] == "golden_cross" else -1.0
-    sma_sig  = +1.0 if sma["position"] == "above" else -1.0
+    rsi_sig = _rsi_to_signal(rsi)
+
+    # MACD シグナル（ニュートラルゾーン対応）
+    hist      = macd["histogram"]
+    macd_line = macd["macd"]
+    if hist >= 0:
+        macd_sig = +1.0
+    elif (
+        macd_neutral_ratio > 0
+        and abs(macd_line) > 1e-9
+        and hist / abs(macd_line) >= -macd_neutral_ratio
+    ):
+        macd_sig = 0.0   # 不感帯: わずかなデッドクロスは neutral
+    else:
+        macd_sig = -1.0
+
+    # SMA25 シグナル（ニュートラルゾーン対応）
+    diff_pct = sma["diff_pct"]
+    if diff_pct >= 0:
+        sma_sig = +1.0
+    elif sma_neutral_pct > 0 and diff_pct >= -sma_neutral_pct:
+        sma_sig = 0.0    # 不感帯: SMA を僅差で下回る場合は neutral
+    else:
+        sma_sig = -1.0
 
     # 均等ウェイトで合算
     score = round((rsi_sig + macd_sig + sma_sig) / 3, 4)
     details = {
         "rsi":       rsi,
         "rsi_sig":   rsi_sig,
-        "macd_hist": macd["histogram"],
+        "macd_hist": hist,
         "macd_sig":  macd_sig,
         "sma25":     sma["sma25"],
         "sma_sig":   sma_sig,
@@ -170,6 +206,8 @@ def run_simulation(
     initial_capital: float,
     use_critic: bool,
     buy_threshold: float = BUY_SCORE_THRESHOLD,
+    macd_neutral_ratio: float = 0.0,
+    sma_neutral_pct:    float = 0.0,
 ) -> tuple[list[dict], list[float]]:
     """
     Time Travel シミュレーション。
@@ -197,7 +235,7 @@ def run_simulation(
             continue
 
         price_today = float(df.loc[date, "Close"])
-        score, details = calc_tech_score(hist)
+        score, details = calc_tech_score(hist, macd_neutral_ratio, sma_neutral_pct)
 
         # ── 保有中ポジションの出口チェック
         if position is not None:
