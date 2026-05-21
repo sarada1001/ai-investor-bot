@@ -21,7 +21,8 @@
 12. [インフラ構成](#インフラ構成)
 13. [技術スタック](#技術スタック)
 14. [ディレクトリ構造](#ディレクトリ構造)
-15. [ロードマップ](#ロードマップ)
+15. [エンジニアリング実績](#エンジニアリング実績--データ駆動型の設計意思決定)
+16. [ロードマップ](#ロードマップ)
 
 ---
 
@@ -31,8 +32,8 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │                     ECC スイングトレードエンジン                    │
 │                                                                  │
-│  ① S&P500スクリーナー（LLM不使用・テクニカルスコア）                │
-│    → 503銘柄 → 上位5銘柄に絞込（当日キャッシュあり）               │
+│  ① PRODUCTION_UNIVERSE スクリーナー（LLM不使用・テクニカルスコア）   │
+│    → 100銘柄（バックテスト検証済み）→ 上位N銘柄（SQLiteキャッシュ） │
 │                                                                  │
 │  ② Phase 1 — 安価スキャン（全エージェント並列実行）                 │
 │                                                                  │
@@ -49,7 +50,7 @@
 │                               │                                  │
 │  ⑤ Phase 3 — 最終判断                                             │
 │                                                                  │
-│    ManagerAgent → CriticAgent（Ollama）→ 加重スコア算出            │
+│    ManagerAgent → CriticAgent（Ollama優先/Geminiフォールバック）→ 加重スコア算出  │
 │                               │                                  │
 │  ⑥ Phase 4 — リスク計算（STRONG BUY時のみ）                        │
 │                                                                  │
@@ -628,12 +629,15 @@ Wikiヘルスチェック項目:
 
 | カテゴリ | 技術 |
 |---|---|
-| LLM（クラウド） | Google Gemini 2.5 Flash（`langchain-google-genai`） |
-| LLM（ローカル） | Ollama（CriticAgent用独立審査） |
+| LLM ファクトリー | `skills/llm_factory.py` — Ollama優先 / Geminiフォールバック / `DISABLE_GEMINI=true` 課金ゼロ保証 |
+| LLM（クラウド） | Google Gemini 2.0 Flash（`langchain-google-genai`）— Ollamaダウン時のフォールバック |
+| LLM（ローカル） | Ollama / llama3.1（全エージェント優先使用 — `OLLAMA_BASE_URL` で GPUサーバー指定可） |
+| API 信頼性レイヤー | `skills/api_guard.py` — tenacity 指数バックオフ（4試行、5〜60s）、429/接続エラー自動リトライ |
+| OHLCVキャッシュ | `skills/ohlcv_cache.py` — SQLite 24h TTL、重複 yfinance 呼び出し排除 |
 | 埋め込み | `intfloat/multilingual-e5-small`（ChromaDB） |
 | ベクトルDB | ChromaDB（PersistentClient、`chroma_db_saved/`） |
 | RAG手法 | Multi-HyDE（複数仮説による仮説的ドキュメント埋め込み） |
-| 金融データ | yfinance（OHLCV + ファンダメンタルズ） |
+| 金融データ | yfinance（OHLCV + ファンダメンタルズ）+ `api_guard.py` によるリトライ保護 |
 | ニュース | Alpha Vantage / Finnhub |
 | 財務データ | SEC EDGAR（自律取得・自動更新） |
 | 取引執行 | Alpaca Markets API（`alpaca-py`） |
@@ -738,18 +742,155 @@ ai-investor-bot/
 
 ---
 
+## エンジニアリング実績 — データ駆動型の設計意思決定
+
+本プロジェクトでは「仮説 → バックテスト検証 → 数値で判断 → 本番適用」というサイクルを実践しています。以下はその具体的な記録です。
+
+---
+
+### 1. バックテスト検証による Universe 拡大（39銘柄 → 100銘柄）
+
+**問題**: 1銘柄（AAPL）固定運用から始めたシステムで、スクリーニング対象の拡大によりどの程度トレード機会が増えるかが不明だった。
+
+**アプローチ**: `scripts/universe_backtest.py` を構築し、2026-02〜05（3ヶ月）の過去データで段階的に Universe サイズを変化させ、勝率・取引数・スケール効率を計測。
+
+| 指標 | 5銘柄ベースライン | 39銘柄 | **100銘柄（本番採用）** |
+|---|---:|---:|---:|
+| 取引数（3ヶ月） | 8 | 70 | **189** |
+| 勝率 | 37.5% | 42.9% | **46.0%** |
+| 銘柄数倍率 | 1.0x | 7.8x | **20.0x** |
+| 取引数倍率 | 1.0x | 8.75x | **23.6x** |
+| スケール効率 | — | 1.12x/銘柄 | **1.18x/銘柄** |
+
+**発見**: 100銘柄では「銘柄数 2.56x（39→100）に対して取引数 2.70x」という**超線形スケール**を確認。Communication Services・Utilities/REIT セクターの追加が特に高品質シグナルを供給。
+
+**採用判断**: 勝率が悪化せず（42.9% → 46.0%）、取引機会が 2.70 倍増加したため、`engine/constants.py` に `PRODUCTION_UNIVERSE`（100銘柄）として確定し本番適用。
+
+```python
+# engine/constants.py — バックテスト検証済み (threshold=0.60, 勝率46.0%, 189取引/3mo)
+PRODUCTION_UNIVERSE: list[str] = [
+    # Technology (20): "AAPL", "MSFT", "NVDA", "GOOGL", "META", ...
+    # Healthcare (15): "UNH", "LLY", "ABBV", ...
+    # ... 計10セクター、100銘柄
+]
+```
+
+---
+
+### 2. ニュートラルゾーン A/B バックテスト — 「改善が不要」という発見
+
+**問題**: テクニカルスコアの不感帯（Neutral Zone: MACD比率・SMA乖離による曖昧シグナルをゼロ扱い）が取引数を増やせるか仮説を立てた。
+
+**実験**: `scripts/neutral_zone_backtest.py` で全 Universe を A（ゾーンなし）と B（ゾーンあり）の2パターンで実行・比較。
+
+**数学的発見**: threshold=0.60 では加重スコアの離散値 `{0.333, 0.567, 0.667, 0.833}` の構造上、ニュートラルゾーンが新規エントリーを増やせるのは RSI<30（極端な売られすぎ）のケースのみ。3ヶ月データセットでは A=B（取引数変化ゼロ）を確認。
+
+**副作用の発見**: ニュートラルゾーンが出口ロジック（`SIGNAL_REVERSAL`）を緩和してしまい、早期利確を抑制する問題を検出。`score_entry`（エントリー用）と `score_exit`（出口用、常に strict=0.0）に**分離**して修正。
+
+**採用判断**: 「データが改善を支持しない」という結果も正式に記録し、無闇な緩和を防止。
+
+---
+
+### 3. API 信頼性レイヤー — `skills/api_guard.py`
+
+**問題**: yfinance の `yf.download()` は HTTP 429（レート制限）や接続リセットで頻繁に失敗し、本番バックテストが途中停止していた。
+
+**解決策**: `tenacity` ライブラリで **指数バックオフ付きリトライラッパー**を実装。
+
+```python
+# skills/api_guard.py — yfinance 429 / 接続エラー自動リトライ
+@retry(
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=1, min=5, max=60),
+    retry=retry_if_exception_type((RateLimitError, ConnectionError, TimeoutError)),
+)
+def yf_download_safe(tickers: str, **kwargs) -> pd.DataFrame:
+    time.sleep(0.5)  # 呼び出しごとにスロットリング
+    return yf.download(tickers, **kwargs)
+```
+
+**適用範囲**: `skills/screener.py`（3箇所）、`scripts/run_backtest.py`、`skills/technical_calc.py`、`skills/ohlcv_cache.py`
+
+---
+
+### 4. SQLite OHLCV インテリジェントキャッシュ — `skills/ohlcv_cache.py`
+
+**問題**: バックテストで100銘柄 × 複数パターン比較を行うと、同一銘柄の OHLCV データを何度も yfinance から取得し、所要時間・API 負荷が増大していた。
+
+**解決策**: SQLite ベースの 24h TTL キャッシュを実装。TTL 切れのデータのみ再取得。
+
+```
+data/cache/ohlcv_cache.db
+  └── テーブル: ohlcv_cache
+       ├── ticker TEXT
+       ├── start_date TEXT
+       ├── end_date TEXT
+       ├── fetched_at TIMESTAMP  ← 24h TTL 判定
+       └── data BLOB             ← pickle 圧縮 DataFrame
+```
+
+**効果**: `neutral_zone_backtest.py` の A/B 比較では B パターンが A のキャッシュを完全再利用し、**API 呼び出し数を 50% 削減**。バックテスト全体の実行時間も短縮。
+
+---
+
+### 5. LLM コスト完全最適化 — `skills/llm_factory.py`
+
+**問題**: `TechnicalAgent`・`NewsAgent`・`MacroAgent`・`SocialAgent`・`FundamentalAgent`・`ManagerAgent`・`ExitAgent`・`RAGSearch` の計8コンポーネントが `ChatGoogleGenerativeAI` を**直接**インスタンス化しており、Gemini API 課金が分散・不透明だった。最悪ケース: デーモン起動中に最大 **26 calls/時間 × 24時間 = 624 calls/日**。
+
+**解決策**: 統一 LLM ファクトリー `skills/llm_factory.py` を実装。全コンポーネントが1箇所を経由する。
+
+```
+呼び出し優先順:
+  1. Ollama（OLLAMA_BASE_URL のサーバー、3秒以内に応答すれば使用）
+  2. Gemini API（Ollama 接続失敗時のフォールバック）
+  3. RuntimeError（DISABLE_GEMINI=true 時、フォールバック自体を封鎖）
+```
+
+**変更前 / 変更後の比較**:
+
+| 項目 | 変更前 | 変更後 |
+|---|---|---|
+| `gemini-2.5-pro` 呼び出し | `skills/rag_search.py` で使用 ⚠️ | `gemini-2.0-flash` に降格 |
+| Gemini 呼び出し分散 | 8ファイルに直書き | `llm_factory.py` 1箇所に集約 |
+| GPU サーバー稼働時 | 常に Gemini 課金 | **Ollama 100% / Gemini 課金ゼロ** |
+| 完全封鎖オプション | なし | `DISABLE_GEMINI=true` で RuntimeError |
+| バックエンド切替 | コード変更が必要 | 環境変数1行で完結 |
+
+```bash
+# GPU サーバー本番環境（.env 設定例）
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+DISABLE_GEMINI=true   # ← これだけで全エージェントの Gemini 課金がゼロになる
+```
+
+---
+
 ## ロードマップ
 
 - [x] ライブ取引移行ウィザード（`--enable-live` 二段階認証 + `live_reset.py`）
+- [x] バックテスト強化 — 39銘柄 → 100銘柄 Universe バックテスト（2.70x スケール検証済み）
+- [x] API 信頼性レイヤー — tenacity 指数バックオフ（`skills/api_guard.py`）
+- [x] OHLCV SQLite キャッシュ — 24h TTL でバックテスト高速化（`skills/ohlcv_cache.py`）
+- [x] LLM コスト最適化 — Ollama 完全オフロード + `DISABLE_GEMINI` 封鎖（`skills/llm_factory.py`）
 - [ ] Alpaca Live口座への入金確認 → ライブ本番稼働
 - [ ] セマンティックチャンキング — 段落レベルのチャンク分割でRAG精度向上
 - [ ] 推論ログフィードバックループ — エージェントトレースをローカルLLMで蒸留してナレッジベースに反映
-- [ ] バックテスト強化 — 過去データでのシミュレーション精度向上
 - [ ] ポートフォリオ最適化 — 複数銘柄間のリスク分散ロジック追加
 - [ ] FinanceBench評価 — RAG検索品質の体系的ベンチマーク
 - [ ] HARD_TRIP自動通知 — サーキットブレーカー発動時のLINE即時アラート
 
 ## 🔄 Development History
+
+### 2026-05-22 — 本番スケールアップ & LLM コスト完全最適化
+
+- **feat: PRODUCTION_UNIVERSE 100銘柄を本番適用** — `engine/constants.py` に S&P500+NASDAQ100 主要100銘柄リストを追加。バックテスト検証済み（勝率46.0%、取引数189/3ヶ月、2.70xスケール）
+- **feat: skills/api_guard.py — tenacity 指数バックオフ** — yfinance の 429/接続リセットエラーを自動リトライ（4試行、5〜60s バックオフ）。スクリーナー・バックテスト・OHLCV 取得の全 `yf.download()` を `yf_download_safe()` に置換
+- **feat: skills/ohlcv_cache.py — SQLite 24h TTL キャッシュ** — A/B バックテストで同一銘柄の重複 API 呼び出しを排除。バックテスト実行時間短縮・API 呼び出し 50% 削減
+- **feat: skills/llm_factory.py — 統一 LLM ファクトリー** — 8コンポーネントに直書きされていた `ChatGoogleGenerativeAI` を1箇所に集約。Ollama 優先 / Gemini フォールバック / `DISABLE_GEMINI=true` で課金ゼロ保証
+- **perf: skills/rag_search.py — `gemini-2.5-pro` → `gemini-2.0-flash` 降格** — 最高コストモデルを除去し、Ollama オフロード時のコスト完全ゼロを実現
+- **feat: screens/screener.py — `universe` 引数追加** — `screen_sp500()` / `screen_sp500_intraday()` が `PRODUCTION_UNIVERSE` を受け取れるよう改修
+
+---
 
 ### 2026-05-17 — ライブ取引移行準備 & バグ修正
 
