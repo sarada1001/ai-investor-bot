@@ -26,6 +26,35 @@ SIGNAL_MAP: dict[str, float] = {
     "negative": -1.0,
 }
 
+# ── 本番スクリーニング対象 Universe（100銘柄 / S&P500+NASDAQ100 主要銘柄）──────
+# バックテスト検証済み (threshold=0.60, 勝率46.0%, 取引数189/3ヶ月 @ 39→100銘柄比 2.70x)
+PRODUCTION_UNIVERSE: list[str] = [
+    # Technology (20)
+    "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMD",  "INTC", "QCOM", "AMAT", "LRCX",
+    "ORCL", "CRM",  "ADBE", "CSCO",  "AVGO", "TXN",  "NOW",  "PANW", "PLTR", "FTNT",
+    # Healthcare (15)
+    "DXCM", "UNH",  "JNJ",  "ABT",  "LLY",  "PFE",  "AMGN", "MDT",  "ABBV", "MRK",
+    "GILD", "VRTX", "ISRG", "SYK",  "ELV",
+    # Industrial / Defense (10)
+    "NOC",  "LMT",  "RTX",  "GE",   "CAT",  "BA",   "HON",  "UPS",  "DE",   "MMM",
+    # Financials (12)
+    "JPM",  "BAC",  "GS",   "V",    "MA",   "WFC",  "C",    "AXP",  "BLK",  "MS",
+    "SCHW", "COF",
+    # Consumer Discretionary (13)
+    "AMZN", "TSLA", "HD",   "NKE",  "COST", "WMT",  "MCD",  "SBUX", "TGT",  "LOW",
+    "BKNG", "ABNB", "DG",
+    # Consumer Staples (8)
+    "PG",   "KO",   "PEP",  "PM",   "MO",   "CL",   "KHC",  "GIS",
+    # Energy (6)
+    "XOM",  "CVX",  "OXY",  "COP",  "SLB",  "EOG",
+    # Communication Services (7)
+    "VZ",   "T",    "NFLX", "DIS",  "CMCSA","CHTR", "WBD",
+    # Utilities / REIT (5)
+    "NEE",  "AMT",  "DUK",  "PLD",  "O",
+    # Materials (4)
+    "LIN",  "APD",  "SHW",  "FCX",
+]
+
 # モックモード用ダミー BBS データ（API トークン消費ゼロでフローテスト）
 MOCK_BBS_DATA: dict[str, dict] = {
     "news_analysis": {

@@ -35,6 +35,7 @@ import io
 import requests
 import pandas as pd
 import yfinance as yf
+from skills.api_guard import yf_download_safe
 
 warnings.filterwarnings("ignore")
 
@@ -292,6 +293,7 @@ def screen_sp500(
     top_n:          int  = 5,
     use_cache:      bool = True,
     verbose:        bool = True,
+    universe:       list[str] | None = None,
 ) -> list[dict]:
     """
     S&P500 全銘柄をテクニカルスコアでスクリーニングし、上位 top_n 銘柄を返す。
@@ -325,16 +327,21 @@ def screen_sp500(
                 print(f"  [Screener] 当日キャッシュを使用 ({len(cached)} 件中上位 {top_n} 件)")
             return cached[:top_n]
 
-    if verbose:
-        print("  [Screener] S&P500 銘柄リストを取得中...")
-    tickers = get_sp500_tickers()
-    if verbose:
-        print(f"  [Screener] {len(tickers)} 銘柄を取得しました。テクニカルデータを一括ダウンロード中...")
+    if universe is not None:
+        tickers = universe
+        if verbose:
+            print(f"  [Screener] Universe {len(tickers)} 銘柄を使用。テクニカルデータを一括ダウンロード中...")
+    else:
+        if verbose:
+            print("  [Screener] S&P500 銘柄リストを取得中...")
+        tickers = get_sp500_tickers()
+        if verbose:
+            print(f"  [Screener] {len(tickers)} 銘柄を取得しました。テクニカルデータを一括ダウンロード中...")
 
     # yfinance 一括取得（スペース区切りのティッカー文字列）
     ticker_str = " ".join(tickers)
     try:
-        raw = yf.download(
+        raw = yf_download_safe(
             ticker_str,
             period=_FETCH_PERIOD,
             group_by="ticker",
@@ -537,6 +544,7 @@ def screen_sp500_intraday(
     pre_filter_n: int  = 50,
     use_cache:    bool = True,
     verbose:      bool = True,
+    universe:     list[str] | None = None,
 ) -> list[dict]:
     """
     S&P500 を日次スクリーニングでプレフィルタし、当日 1h 足データで
@@ -571,7 +579,7 @@ def screen_sp500_intraday(
         print(f"  [Screener/Intraday] 日次上位 {pre_filter_n} 銘柄をプレフィルタリング中...")
 
     # Step 1: 日次スクリーナーでプレフィルタ（当日キャッシュを積極利用して高速化）
-    daily_results = screen_sp500(top_n=pre_filter_n, use_cache=True, verbose=False)
+    daily_results = screen_sp500(top_n=pre_filter_n, use_cache=True, verbose=False, universe=universe)
     if not daily_results:
         if verbose:
             print("  [Screener/Intraday] 日次スクリーナー結果 0 件。フォールバック不可。")
@@ -586,7 +594,7 @@ def screen_sp500_intraday(
     # Step 2: 1時間足データを一括ダウンロード
     ticker_str = " ".join(candidate_tickers)
     try:
-        raw = yf.download(
+        raw = yf_download_safe(
             ticker_str,
             period      = "1d",
             interval    = "1h",
@@ -727,7 +735,7 @@ def detect_dip_entries(
 
     ticker_str = " ".join(watchlist)
     try:
-        raw = yf.download(
+        raw = yf_download_safe(
             ticker_str,
             period      = "1d",
             interval    = interval,

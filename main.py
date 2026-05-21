@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from engine.bbs         import BBS                           # noqa: F401
 from engine.trade_cycle import run_trade_cycle               # noqa: F401
 from engine.runner      import run_watchlist_cycle, run_daemon  # noqa: F401
-from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS  # noqa: F401
+from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, PRODUCTION_UNIVERSE  # noqa: F401
 
 import skills.screener as _screener_mod
 
@@ -125,6 +125,7 @@ if __name__ == "__main__":
             top_n     = args.top_n,
             use_cache = True,
             verbose   = True,
+            universe  = PRODUCTION_UNIVERSE,
         )
         print(f"\n上位 {len(results)} 銘柄:")
         for i, r in enumerate(results, 1):
@@ -151,8 +152,9 @@ if __name__ == "__main__":
     elif args.screen:
         print("\n[Screen モード] S&P500 日中動的スクリーニング中...\n")
         screened = _screener_mod.screen_sp500_intraday(
-            top_n   = args.top_n,
-            verbose = True,
+            top_n    = args.top_n,
+            verbose  = True,
+            universe = PRODUCTION_UNIVERSE,
         )
         if not screened:
             print("スクリーニング結果が 0 件でした。終了します。")

@@ -8,7 +8,7 @@ import time
 import skills.screener as _screener_mod
 from tools.alpaca_client import AlpacaClient as _AlpacaClient
 
-from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, _W
+from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, _W, PRODUCTION_UNIVERSE
 from engine.display     import _log
 from engine.notify      import send_line_message, send_line_notification
 from engine.trade_cycle import run_trade_cycle
@@ -185,8 +185,9 @@ def run_daemon(
                 _log("[Daemon] S&P500 日中動的スクリーニングを実行します...")
                 try:
                     screened = _screener_mod.screen_sp500_intraday(
-                        top_n   = screener_top_n,
-                        verbose = True,
+                        top_n    = screener_top_n,
+                        verbose  = True,
+                        universe = PRODUCTION_UNIVERSE,
                     )
                     effective_tickers = [s["ticker"] for s in screened]
                 except Exception as e:
