@@ -58,7 +58,7 @@ POSITION_SIZE_RATIO   = 0.20 # 1トレードあたり資金の20%を投入
 STOP_LOSS_PCT         = 0.05 # -5% でストップロス
 TAKE_PROFIT_PCT       = 0.10 # +10% で利益確定
 MAX_HOLD_DAYS         = 10   # 最大保有日数（営業日）
-BUY_SCORE_THRESHOLD   = 0.40 # テクニカルスコアの BUY 閾値（-1〜+1 の正規化スコア）
+BUY_SCORE_THRESHOLD   = 0.40 # テクニカルスコアの BUY 閾値（-1〜+1）CLI の --threshold で上書き可
 
 _W = 72  # 表示幅
 
@@ -181,6 +181,7 @@ def run_simulation(
     sim_end: datetime,
     initial_capital: float,
     use_critic: bool,
+    buy_threshold: float = BUY_SCORE_THRESHOLD,
 ) -> tuple[list[dict], list[float]]:
     """
     Time Travel シミュレーション。
@@ -249,7 +250,7 @@ def run_simulation(
                 position["hold_days"] += 1
 
         # ── エントリー判定（ポジションなし && スコアが閾値超え）
-        if position is None and score >= BUY_SCORE_THRESHOLD:
+        if position is None and score >= buy_threshold:
             critic_decision = "APPROVE"
             critic_reason   = "CriticAgent 無効（--no-critic）"
 
@@ -560,6 +561,7 @@ def main() -> None:
     parser.add_argument("--end",       default=default_end,    help="終了日 YYYY-MM-DD")
     parser.add_argument("--capital",   type=float, default=10000, help="初期資金（デフォルト: 10000）")
     parser.add_argument("--no-critic", action="store_true",    help="CriticAgent を呼び出さない")
+    parser.add_argument("--threshold", type=float, default=BUY_SCORE_THRESHOLD, help=f"BUY スコア閾値（デフォルト: {BUY_SCORE_THRESHOLD}）")
     args = parser.parse_args()
 
     ticker    = args.ticker.upper()
@@ -567,8 +569,8 @@ def main() -> None:
     sim_end   = datetime.strptime(args.end,   "%Y-%m-%d")
     use_critic = not args.no_critic
 
-    logger.info("バックテスト開始: %s  %s → %s  資金=$%.0f  CriticAgent=%s",
-                ticker, sim_start.date(), sim_end.date(), args.capital,
+    logger.info("バックテスト開始: %s  %s → %s  資金=$%.0f  閾値=%.2f  CriticAgent=%s",
+                ticker, sim_start.date(), sim_end.date(), args.capital, args.threshold,
                 "有効" if use_critic else "無効")
 
     # ── データ取得
@@ -582,6 +584,7 @@ def main() -> None:
         sim_end         = sim_end,
         initial_capital = args.capital,
         use_critic      = use_critic,
+        buy_threshold   = args.threshold,
     )
 
     # ── メトリクス
