@@ -5,7 +5,7 @@ from __future__ import annotations
 import yaml
 from pathlib import Path
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from skills.llm_factory import get_llm_instance
 
 import skills.news_monitor           as _news_mod
 import skills.technical_calc         as _tech_mod
@@ -430,7 +430,7 @@ class ManagerAgent:
 
     def __init__(self, bbs: BBS):
         self.bbs  = bbs
-        self._llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
+        self._llm = get_llm_instance()
 
     def _build_rationale(
         self,

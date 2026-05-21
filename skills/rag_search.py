@@ -18,15 +18,15 @@ import functools
 from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_google_genai import ChatGoogleGenerativeAI
+from skills.llm_factory import get_llm_instance
 
 warnings.filterwarnings("ignore")
 load_dotenv()
 
 _embeddings = None
 _db_cache: dict = {}
-_llm_flash = None   # gemini-1.5-flash  : HyDE 仮説生成（軽量・低コスト）
-_llm_pro   = None   # gemini-1.5-pro    : 深層分析・トレンド判定（高推論力）
+_llm_flash = None   # flash: HyDE 仮説生成（軽量）
+_llm_pro   = None   # pro  : 深層分析（gemini-2.5-pro → 2.0-flash に降格してコスト削減）
 
 _RETRY_DELAYS = (15, 30, 60)  # seconds, escalating backoff on 429
 
@@ -34,8 +34,8 @@ _RETRY_DELAYS = (15, 30, 60)  # seconds, escalating backoff on 429
 def _call_llm(prompt: str, flash: bool = False) -> str:
     """
     Call LLM with exponential backoff on 429 RESOURCE_EXHAUSTED.
-    flash=True  → gemini-1.5-flash（仮説生成など軽量タスク）
-    flash=False → gemini-1.5-pro  （深層分析・最終判定）
+    flash=True  → 軽量（Ollama or gemini-2.0-flash）
+    flash=False → 深層分析（Ollama or gemini-2.0-flash）
     """
     llm = _get_llm_flash() if flash else _get_llm_pro()
     for attempt, delay in enumerate((*_RETRY_DELAYS, None)):
@@ -58,19 +58,19 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
     return _embeddings
 
 
-def _get_llm_flash() -> ChatGoogleGenerativeAI:
+def _get_llm_flash():
     """軽量モデル: HyDE 仮説クエリ生成に使用"""
     global _llm_flash
     if _llm_flash is None:
-        _llm_flash = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
+        _llm_flash = get_llm_instance()
     return _llm_flash
 
 
-def _get_llm_pro() -> ChatGoogleGenerativeAI:
-    """高精度モデル: ファンダメンタルズ深層分析・トレンド最終判定に使用"""
+def _get_llm_pro():
+    """深層分析モデル: gemini-2.5-pro から 2.0-flash に降格してコスト削減"""
     global _llm_pro
     if _llm_pro is None:
-        _llm_pro = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0)
+        _llm_pro = get_llm_instance(gemini_model="gemini-2.0-flash")
     return _llm_pro
 
 

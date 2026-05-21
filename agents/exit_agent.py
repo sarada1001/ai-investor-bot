@@ -26,8 +26,6 @@ from datetime import date, datetime
 from pathlib import Path
 
 import yfinance as yf
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -105,7 +103,8 @@ class ExitAgent:
 
     def __init__(self, bbs, llm_model: str = "gemini-2.0-flash") -> None:
         self.bbs     = bbs
-        self._llm    = ChatGoogleGenerativeAI(model=llm_model, temperature=0)
+        from skills.llm_factory import get_llm_instance
+        self._llm    = get_llm_instance(gemini_model=llm_model)
         self._ob_log = ObsidianLogger()
 
     # ----------------------------------------------------------

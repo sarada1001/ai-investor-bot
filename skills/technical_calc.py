@@ -21,7 +21,7 @@ import pandas as pd
 import yfinance as yf
 from dotenv import load_dotenv
 from skills.api_guard import yf_download_safe
-from langchain_google_genai import ChatGoogleGenerativeAI
+from skills.llm_factory import get_llm_instance
 
 warnings.filterwarnings("ignore")
 load_dotenv()
@@ -35,10 +35,10 @@ except ImportError:
 _llm = None
 
 
-def _get_llm() -> ChatGoogleGenerativeAI:
+def _get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
+        _llm = get_llm_instance()
     return _llm
 
 

@@ -34,7 +34,6 @@ load_dotenv()
 _PERSIST_DIR          = "chroma_db_saved"
 _COLLECTION           = "financial_filings"
 _EMBED_MODEL          = "intfloat/multilingual-e5-small"
-_LLM_MODEL            = "gemini-2.0-flash"
 _RETRY_DELAYS         = (15, 30, 60)
 _EDGAR_STALENESS_DAYS = 90   # re-fetch after ~one quarter
 _FETCH_LOG_PATH       = Path("data/edgar_fetch_log.json")
@@ -113,8 +112,8 @@ class FundamentalAgent:
 
     def _get_llm(self):
         if self._llm is None:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            self._llm = ChatGoogleGenerativeAI(model=_LLM_MODEL, temperature=0)
+            from skills.llm_factory import get_llm_instance
+            self._llm = get_llm_instance()
         return self._llm
 
     def _call_llm(self, prompt: str) -> str:
