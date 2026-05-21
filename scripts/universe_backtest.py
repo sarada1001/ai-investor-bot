@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-scripts/universe_backtest.py — S&P500 Universe 拡張バックテスト
+scripts/universe_backtest.py — S&P500/NASDAQ100 Universe 大規模バックテスト
 
-STRONG_BUY_SCORE = 0.60 を維持したまま銘柄プールを 40 銘柄に拡張し、
-取引機会の総量と品質を検証する。
+STRONG_BUY_SCORE = 0.60 を維持したまま銘柄プールを 100 銘柄に拡大し、
+取引機会の絶対数とトータル利益のスケールを検証する。
 ボトルネック分析により、スコアが閾値に届かない主因指標を特定する。
 
 Usage:
@@ -42,17 +42,61 @@ from scripts.run_backtest import (  # noqa: E402
 _W = 82
 
 # ─────────────────────────────────────────────────────────────
-# 40銘柄 Universe（セクター別・ボラティリティ分散）
+# 100銘柄 Universe（S&P500/NASDAQ100 セクター別・分散）
 # ─────────────────────────────────────────────────────────────
 
 UNIVERSE: dict[str, list[str]] = {
-    "Technology":  ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMD", "INTC", "QCOM", "AMAT", "LRCX"],
-    "Healthcare":  ["DXCM", "UNH", "JNJ", "ABT", "LLY", "PFE", "AMGN", "MDT"],
-    "Defense/Ind": ["NOC", "LMT", "RTX", "GE", "CAT", "BA", "HON"],
-    "Financials":  ["JPM", "BAC", "GS", "V", "MA"],
-    "Consumer":    ["AMZN", "TSLA", "HD", "NKE", "COST"],
-    "Energy":      ["XOM", "CVX"],
-    "Utilities":   ["NEE", "AMT"],
+    # ── Technology (20) ──────────────────────────────────────
+    "Technology": [
+        "AAPL", "MSFT", "NVDA", "GOOGL", "META",
+        "AMD",  "INTC", "QCOM", "AMAT",  "LRCX",
+        "ORCL", "CRM",  "ADBE", "CSCO",  "AVGO",
+        "TXN",  "NOW",  "PANW", "PLTR",  "FTNT",
+    ],
+    # ── Healthcare (15) ──────────────────────────────────────
+    "Healthcare": [
+        "DXCM", "UNH",  "JNJ",  "ABT",  "LLY",
+        "PFE",  "AMGN", "MDT",  "ABBV", "MRK",
+        "GILD", "VRTX", "ISRG", "SYK",  "ELV",
+    ],
+    # ── Industrial / Defense (10) ────────────────────────────
+    "Industrial": [
+        "NOC", "LMT", "RTX", "GE",  "CAT",
+        "BA",  "HON", "UPS", "DE",  "MMM",
+    ],
+    # ── Financials (12) ──────────────────────────────────────
+    "Financials": [
+        "JPM", "BAC", "GS",   "V",    "MA",
+        "WFC", "C",   "AXP",  "BLK",  "MS",
+        "SCHW","COF",
+    ],
+    # ── Consumer Discretionary (13) ──────────────────────────
+    "Cons.Disc": [
+        "AMZN", "TSLA", "HD",   "NKE",  "COST",
+        "WMT",  "MCD",  "SBUX", "TGT",  "LOW",
+        "BKNG", "ABNB", "DG",
+    ],
+    # ── Consumer Staples (8) ─────────────────────────────────
+    "Cons.Staples": [
+        "PG",  "KO",  "PEP", "PM",
+        "MO",  "CL",  "KHC", "GIS",
+    ],
+    # ── Energy (6) ───────────────────────────────────────────
+    "Energy": [
+        "XOM", "CVX", "OXY", "COP", "SLB", "EOG",
+    ],
+    # ── Communication Services (7) ───────────────────────────
+    "Communication": [
+        "VZ", "T", "NFLX", "DIS", "CMCSA", "CHTR", "WBD",
+    ],
+    # ── Utilities / REIT (5) ─────────────────────────────────
+    "Utilities": [
+        "NEE", "AMT", "DUK", "PLD", "O",
+    ],
+    # ── Materials (4) ────────────────────────────────────────
+    "Materials": [
+        "LIN", "APD", "SHW", "FCX",
+    ],
 }
 
 BASELINE_5 = {
@@ -60,6 +104,14 @@ BASELINE_5 = {
     "n_trades": 11,
     "win_rate": 45.5,
     "avg_pnl":  0.15,
+}
+
+BASELINE_39 = {
+    "label":         "39銘柄ベースライン (threshold=0.60, 2026-02〜05)",
+    "n_trades":      70,
+    "win_rate":      42.9,
+    "avg_pnl_pct":   0.335,
+    "total_pnl_pct": 23.47,
 }
 
 
@@ -225,26 +277,43 @@ def print_universe_report(
     )
 
     # ── ベースライン比較
+    n_tickers = sum(len(v) for v in universe.values())
     print()
-    print("  ■ 5銘柄ベースライン vs 40銘柄 Universe 比較")
+    print(f"  ■ ベースライン比較（スケール検証）")
     print("─" * _W)
-    print(f"  {'':32}  {'取引数':>6}  {'勝率':>7}  {'平均P&L':>9}")
-    base_pnl_sign = "+" if BASELINE_5["avg_pnl"] >= 0 else ""
+    print(f"  {'':38}  {'取引数':>6}  {'勝率':>7}  {'平均P&L':>9}")
+
+    # 5銘柄ベースライン
     print(
-        f"  {BASELINE_5['label']:<32}  {BASELINE_5['n_trades']:>6} 件  "
-        f"{BASELINE_5['win_rate']:>6.1f}%  {base_pnl_sign}{BASELINE_5['avg_pnl']:>7.2f}%"
+        f"  {BASELINE_5['label']:<38}  {BASELINE_5['n_trades']:>6} 件  "
+        f"{BASELINE_5['win_rate']:>6.1f}%  +{BASELINE_5['avg_pnl']:>7.3f}%"
     )
+    # 39銘柄ベースライン
     print(
-        f"  {'40銘柄 Universe':<32}  {total_trades:>6} 件  "
-        f"{overall_win_rate:>6.1f}%  {pnl_sign}{avg_pnl:>7.2f}%"
+        f"  {BASELINE_39['label']:<38}  {BASELINE_39['n_trades']:>6} 件  "
+        f"{BASELINE_39['win_rate']:>6.1f}%  +{BASELINE_39['avg_pnl_pct']:>7.3f}%"
     )
-    trade_delta = total_trades - BASELINE_5["n_trades"]
-    wr_delta    = overall_win_rate - BASELINE_5["win_rate"]
-    pnl_delta   = avg_pnl - BASELINE_5["avg_pnl"]
+    # 今回の結果
+    cur_label = f"{n_tickers}銘柄 Universe（今回）"
     print(
-        f"  {'差分':<32}  {'+' if trade_delta >= 0 else ''}{trade_delta:>5} 件  "
+        f"  {cur_label:<38}  {total_trades:>6} 件  "
+        f"{overall_win_rate:>6.1f}%  {pnl_sign}{avg_pnl:>7.3f}%"
+    )
+    print("─" * _W)
+    trade_delta = total_trades - BASELINE_39["n_trades"]
+    wr_delta    = overall_win_rate - BASELINE_39["win_rate"]
+    pnl_delta   = avg_pnl - BASELINE_39["avg_pnl_pct"]
+    scale_ratio = total_trades / BASELINE_39["n_trades"] if BASELINE_39["n_trades"] else 0.0
+    ticker_ratio = n_tickers / 39
+    print(
+        f"  {'vs 39銘柄差分':<38}  "
+        f"{'+' if trade_delta >= 0 else ''}{trade_delta:>5} 件  "
         f"{'+' if wr_delta >= 0 else ''}{wr_delta:>6.1f} pt  "
-        f"{'+' if pnl_delta >= 0 else ''}{pnl_delta:>7.2f} pt"
+        f"{'+' if pnl_delta >= 0 else ''}{pnl_delta:>7.3f} pt"
+    )
+    print(
+        f"  スケール効率: 銘柄数 {ticker_ratio:.2f}x → 取引数 {scale_ratio:.2f}x  "
+        f"({'線形スケール達成' if scale_ratio >= ticker_ratio * 0.8 else '線形スケール未達'})"
     )
 
     # ── ボトルネック分析
