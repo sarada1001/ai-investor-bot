@@ -20,6 +20,7 @@ import pandas as pd
 
 import yfinance as yf
 from dotenv import load_dotenv
+from skills.api_guard import yf_download_safe
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 warnings.filterwarnings("ignore")
@@ -199,7 +200,7 @@ def analyze_ticker(ticker: str, period: str = "6mo") -> dict:
         }
     """
     try:
-        df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+        df = yf_download_safe(ticker, period=period, progress=False, auto_adjust=True)
         if df.empty or len(df) < 30:
             return {
                 "ticker": ticker, "period": period, "error":
@@ -248,7 +249,7 @@ def _analyze_batch(tickers: dict[str, str], period: str) -> dict:
     results: dict = {}
     for name, symbol in tickers.items():
         try:
-            df = yf.download(symbol, period=period, progress=False, auto_adjust=True)
+            df = yf_download_safe(symbol, period=period, progress=False, auto_adjust=True)
             if df.empty or len(df) < 30:
                 results[name] = {
                     "ticker": symbol,

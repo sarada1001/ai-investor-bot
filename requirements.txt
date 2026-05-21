@@ -45,6 +45,9 @@ lxml>=5.0.0                     # Fast HTML/XML parser (beautifulsoup4 backend)
 streamlit>=1.35.0
 plotly>=5.22.0
 
+# --- リトライ / Rate Limit 対策 ---
+tenacity>=8.2.0                 # 指数バックオフ付き自動リトライ（api_guard.py）
+
 # --- 設定・ユーティリティ ---
 python-dotenv==1.2.2
 PyYAML==6.0.3

@@ -14,6 +14,7 @@ import warnings
 import pandas as pd
 import yfinance as yf
 from dotenv import load_dotenv
+from skills.api_guard import yf_download_safe
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 warnings.filterwarnings("ignore")
@@ -34,7 +35,7 @@ def _get_llm() -> ChatGoogleGenerativeAI:
 # ------------------------------------------------------------------ #
 
 def _analyze_spy(period: str) -> dict:
-    df = yf.download("SPY", period=period, progress=False, auto_adjust=True)
+    df = yf_download_safe("SPY", period=period, progress=False, auto_adjust=True)
     if df.empty or len(df) < 5:
         return {"error": f"SPY データ不足 ({len(df)} 行)"}
 
@@ -60,7 +61,7 @@ def _analyze_spy(period: str) -> dict:
 
 
 def _analyze_vix(period: str) -> dict:
-    df = yf.download("^VIX", period=period, progress=False, auto_adjust=True)
+    df = yf_download_safe("^VIX", period=period, progress=False, auto_adjust=True)
     if df.empty or len(df) < 3:
         return {"error": f"VIX データ不足 ({len(df)} 行)"}
 

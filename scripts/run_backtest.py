@@ -39,7 +39,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(PROJECT_ROOT / ".env")
 
 from skills.technical_calc import _calc_rsi, _calc_macd, _calc_sma25  # noqa: E402
-from tools.critic_agent import CriticAgent                              # noqa: E402
+from skills.ohlcv_cache import get_ohlcv                               # noqa: E402
+from tools.critic_agent import CriticAgent                             # noqa: E402
 
 RESULTS_DIR = PROJECT_ROOT / "data" / "backtest_results"
 logging.basicConfig(
@@ -68,21 +69,8 @@ _W = 72  # 表示幅
 # ─────────────────────────────────────────────────────────────
 
 def fetch_ohlcv(ticker: str, start: datetime, end: datetime) -> pd.DataFrame:
-    """バッファ付きで OHLCV を取得する。"""
-    fetch_start = start - timedelta(days=INDICATOR_BUFFER_DAYS)
-    df = yf.download(
-        ticker,
-        start=fetch_start.strftime("%Y-%m-%d"),
-        end=(end + timedelta(days=1)).strftime("%Y-%m-%d"),
-        progress=False,
-        auto_adjust=True,
-    )
-    if df.empty:
-        raise ValueError(f"yfinance から {ticker} のデータを取得できませんでした。")
-    # MultiIndex を単一カラムに
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.index = pd.to_datetime(df.index)
+    """バッファ付きで OHLCV を取得する（キャッシュ優先）。"""
+    df = get_ohlcv(ticker, start=start, end=end, buffer_days=INDICATOR_BUFFER_DAYS)
     logger.info("取得完了: %s  %d 営業日  (%s 〜 %s)",
                 ticker, len(df), df.index[0].date(), df.index[-1].date())
     return df
