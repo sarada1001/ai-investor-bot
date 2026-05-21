@@ -63,8 +63,8 @@ BUY_SCORE_THRESHOLD   = 0.40 # テクニカルスコアの BUY 閾値（-1〜+1�
 
 # ── ニュートラルゾーン（不感帯）定数 ──────────────────────────────────
 # 0.0 にするとニュートラルゾーンなし（従来の厳格モード）
-MACD_NEUTRAL_RATIO = 0.20  # histogram/|macd_line| が -0.20 以上なら neutral(0)
-SMA_NEUTRAL_PCT    = 2.0   # diff_pct が -2.0% 以上（SMA を 2% 未満で下回る）なら neutral(0)
+MACD_NEUTRAL_RATIO = 0.30  # histogram/|macd_line| が -0.30 以上なら neutral(0)
+SMA_NEUTRAL_PCT    = 4.0   # diff_pct が -4.0% 以上（SMA を 4% 未満で下回る）なら neutral(0)
 
 _W = 72  # 表示幅
 
@@ -235,7 +235,10 @@ def run_simulation(
             continue
 
         price_today = float(df.loc[date, "Close"])
-        score, details = calc_tech_score(hist, macd_neutral_ratio, sma_neutral_pct)
+        # エントリー用スコア（ニュートラルゾーン適用）
+        score_entry, details = calc_tech_score(hist, macd_neutral_ratio, sma_neutral_pct)
+        # 出口用スコア（ニュートラルゾーンなし・厳格モード固定）
+        score_exit, _ = calc_tech_score(hist, 0.0, 0.0)
 
         # ── 保有中ポジションの出口チェック
         if position is not None:
@@ -250,7 +253,7 @@ def run_simulation(
                 exit_reason = "TAKE_PROFIT"
             elif hold_days_done >= MAX_HOLD_DAYS:
                 exit_reason = "MAX_HOLD"
-            elif score < -0.5:
+            elif score_exit < -0.5:
                 exit_reason = "SIGNAL_REVERSAL"
 
             if exit_reason:
@@ -275,14 +278,14 @@ def run_simulation(
             else:
                 position["hold_days"] += 1
 
-        # ── エントリー判定（ポジションなし && スコアが閾値超え）
-        if position is None and score >= buy_threshold:
+        # ── エントリー判定（ポジションなし && エントリースコアが閾値超え）
+        if position is None and score_entry >= buy_threshold:
             critic_decision = "APPROVE"
             critic_reason   = "CriticAgent 無効（--no-critic）"
 
             if use_critic:
-                logger.info("  BUY候補 %s  score=%+.3f → CriticAgent 評価...",
-                            date.date(), score)
+                logger.info("  BUY候補 %s  entry=%+.3f exit=%+.3f → CriticAgent 評価...",
+                            date.date(), score_entry, score_exit)
                 result          = call_critic(critic, ticker,
                                               date.date().isoformat(), details)
                 critic_decision = result.get("critic_decision", "APPROVE")
@@ -307,11 +310,11 @@ def run_simulation(
                     "hold_days":       0,
                     "critic_decision": critic_decision,
                     "critic_reason":   critic_reason,
-                    "tech_score":      score,
+                    "tech_score":      score_entry,
                     "details":         details,
                 }
                 logger.info("  BUY   %s @ $%.2f  qty=%.3f  score=%+.3f",
-                            next_date.date(), open_price, qty, score)
+                            next_date.date(), open_price, qty, score_entry)
             else:
                 logger.info("  OVERRIDE: %s", critic_reason[:80])
                 # OVERRIDE されたトレードも記録（介入効果の測定用）
