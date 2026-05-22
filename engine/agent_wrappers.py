@@ -5,7 +5,7 @@ from __future__ import annotations
 import yaml
 from pathlib import Path
 
-from skills.llm_factory import get_llm_instance
+from skills.llm_factory import get_llm_instance, is_ollama_active
 
 import skills.news_monitor           as _news_mod
 import skills.technical_calc         as _tech_mod
@@ -597,7 +597,8 @@ class ManagerAgent:
                 f" Social={social_sig:+.2f}).{hype_note}"
             )
         else:
-            _log("根拠テキスト生成中 (gemini-2.0-flash)...")
+            _llm_backend = "ollama" if is_ollama_active() else "gemini"
+            _log(f"根拠テキスト生成中 ({_llm_backend})...")
             rationale = self._build_rationale(ticker, decision, score, sigs, reasons,
                                               wiki_context=wiki_ctx)
 

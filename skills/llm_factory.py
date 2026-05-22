@@ -27,11 +27,11 @@ from dotenv import load_dotenv
 warnings.filterwarnings("ignore")
 load_dotenv()
 
-_OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-_OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
-_FORCE_GEMINI     = os.getenv("FORCE_GEMINI", "false").lower() == "true"
-_DISABLE_GEMINI   = os.getenv("DISABLE_GEMINI", "false").lower() == "true"
-_DEFAULT_GEMINI   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+_OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.1")
+_DEFAULT_GEMINI  = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# FORCE_GEMINI / DISABLE_GEMINI は get_llm() 内で毎回 os.getenv() を呼んで読む。
+# モジュールレベルで固定すると cron 起動時に .env が未ロードのまま False になる。
 
 _ollama_available: bool | None = None  # None = 未チェック
 
@@ -63,10 +63,15 @@ def get_llm(
     Raises:
         RuntimeError: DISABLE_GEMINI=true かつ Ollama 接続不可の場合
     """
+    # .env を確実に読む（cron 起動等でインポート前に未ロードの場合も対応）
+    load_dotenv(override=False)
+    disable_gemini = os.getenv("DISABLE_GEMINI", "false").lower() == "true"
+    force_gemini   = os.getenv("FORCE_GEMINI",   "false").lower() == "true"
+
     model_ollama = ollama_model or _OLLAMA_MODEL
     model_gemini = gemini_model or _DEFAULT_GEMINI
 
-    use_ollama = (not _FORCE_GEMINI) and _check_ollama()
+    use_ollama = (not force_gemini) and _check_ollama()
 
     if use_ollama:
         from langchain_community.chat_models import ChatOllama
@@ -78,7 +83,7 @@ def get_llm(
         )
         return llm, "ollama"
 
-    if _DISABLE_GEMINI:
+    if disable_gemini:
         raise RuntimeError(
             "DISABLE_GEMINI=true が設定されており、Ollama にも接続できません。"
             f"Ollama サーバー ({_OLLAMA_BASE_URL}) を確認してください。"
@@ -104,4 +109,6 @@ def get_llm_instance(
 
 def is_ollama_active() -> bool:
     """現在 Ollama が使用中かどうかを返す（ログ表示用）。"""
-    return (not _FORCE_GEMINI) and _check_ollama()
+    load_dotenv(override=False)
+    force_gemini = os.getenv("FORCE_GEMINI", "false").lower() == "true"
+    return (not force_gemini) and _check_ollama()

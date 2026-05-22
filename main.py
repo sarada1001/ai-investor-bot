@@ -14,6 +14,7 @@ main.py — ECC スイングトレード自律エンジン エントリポイン
 
 from __future__ import annotations
 
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -113,6 +114,15 @@ if __name__ == "__main__":
         from tools.live_trading_gate import LiveTradingGate
         LiveTradingGate.disable()
         raise SystemExit(0)
+
+    # ── LLM バックエンド起動ログ ─────────────────────────────────────
+    from skills.llm_factory import is_ollama_active
+    _llm_backend = "ollama" if is_ollama_active() else "gemini"
+    print(
+        f"[LLM Factory] backend={_llm_backend}"
+        f" | DISABLE_GEMINI={os.getenv('DISABLE_GEMINI', 'false')}"
+        f" | FORCE_GEMINI={os.getenv('FORCE_GEMINI', 'false')}"
+    )
 
     # ── 組み合わせバリデーション ──────────────────────────────────
     if args.screen_only and args.daemon:
