@@ -113,7 +113,12 @@ class FundamentalAgent:
     def _get_llm(self):
         if self._llm is None:
             from skills.llm_factory import get_llm_instance
-            self._llm = get_llm_instance()
+            # json_mode=True: FA プロンプトは JSON 出力を明示要求するため
+            # Ollama の format="json" を有効化して構造化出力を強制する。
+            # （旧コードでは get_llm_instance() が常に format="json" を設定していたが、
+            #   llm_factory のバグ修正 PR で json_mode 引数が追加された際に FA への
+            #   伝播が漏れ、意図せず json_mode=False になっていた。）
+            self._llm = get_llm_instance(json_mode=True)
         return self._llm
 
     def _call_llm(self, prompt: str) -> str:

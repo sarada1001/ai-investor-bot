@@ -56,10 +56,17 @@ def _build_sentiment_prompt(articles: list[dict], subject: str) -> str:
         "on the target stock's price for each article.\n\n"
         f"{articles_block}\n\n"
         'For each article, classify sentiment as exactly "positive", "negative", or "neutral".\n'
+        # ── バイアス抑制ルール ───────────────────────────────────────────
+        # Llama 3.1 はfew-shot例の値を強くコピーする。
+        # 旧プロンプトが "positive" をハードコードしたことで全記事が positive に
+        # 偏るアンカー効果が発生したため、3択を明示 + 保守的評価指示を追加する。
+        "Default to neutral unless the article contains clear and specific directional "
+        "evidence for the target stock. Negative news (risks, downgrades, missed earnings) "
+        "MUST be classified as negative, not neutral.\n"
         "Respond ONLY with a JSON object in this exact format (no extra text):\n"
         "{\n"
         '  "results": [\n'
-        '    {"index": 1, "sentiment": "positive", "reason": "1-2 sentence reason in Japanese"},\n'
+        '    {"index": 1, "sentiment": "positive|negative|neutral", "reason": "1-2 sentence reason in Japanese"},\n'
         "    ...\n"
         "  ]\n"
         "}"

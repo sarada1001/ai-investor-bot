@@ -296,7 +296,9 @@ class SocialAgent:
             result = _social_mod.fetch_social_sentiment(ticker, hype_mode=True)
         except Exception as e:
             result = {
-                "ticker": ticker, "sentiment": "NEUTRAL", "hype_score": 0.5,
+                "ticker": ticker, "sentiment": "NEUTRAL", "hype_score": 0.0,
+                # hype_score=0.0: エラー時は「不明」として最も安全な中立扱い。
+                # 0.5 にするとUIのhypeバーが半分表示になり誤解を招くため 0.0 に修正。
                 "reason": f"取得エラー: {e}", "error": str(e),
             }
             _log(f"エラー: {e}")
