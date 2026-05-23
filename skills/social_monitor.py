@@ -3,8 +3,18 @@ Skill: social_monitor
 Permission: SocialAgent only
 
 Fetches social media posts about a ticker (Reddit r/wallstreetbets / StockTwits style).
-Since Reddit/StockTwits public APIs now require authentication, realistic mock posts
-are generated and fed to an LLM that evaluates:
+Since Reddit/StockTwits public APIs now require authentication, this module supports
+two modes controlled by the SOCIAL_USE_MOCK environment variable:
+
+  SOCIAL_USE_MOCK=false (default / 本番):
+      データなし扱いでニュートラル 0.0 を返す。
+      モックバイアスが加重スコアに混入するのを防ぐ安全側設定。
+
+  SOCIAL_USE_MOCK=true (開発/テスト):
+      hype_mode=True → _HYPE_POSTS モック投稿をLLMで評価する。
+      hype_mode=False → _ANALYTICAL_POSTS モック投稿をLLMで評価する。
+
+LLM 評価項目:
   - sentiment    : POSITIVE / NEUTRAL / NEGATIVE
   - hype_score   : 0.0–1.0
       high (0.7+) = emoji-heavy, no fundamental backing (pump & dump pattern)
@@ -14,6 +24,7 @@ are generated and fed to an LLM that evaluates:
 from __future__ import annotations
 
 import json
+import os
 import re
 import warnings
 from dotenv import load_dotenv
@@ -28,8 +39,15 @@ _llm = None
 def _get_llm():
     global _llm
     if _llm is None:
-        _llm = get_llm_instance()
+        # json_mode=True: Ollama に format="json" を設定して構造化出力を強制
+        _llm = get_llm_instance(json_mode=True)
     return _llm
+
+
+def _is_mock_enabled() -> bool:
+    """SOCIAL_USE_MOCK 環境変数を確認する（デフォルト: false = 本番中立モード）。"""
+    load_dotenv(override=False)
+    return os.getenv("SOCIAL_USE_MOCK", "false").lower() == "true"
 
 
 # ─── Mock post templates ──────────────────────────────────────────────────── #
@@ -92,7 +110,14 @@ def _llm_analyze(ticker: str, posts: list[str]) -> dict:
 
 def fetch_social_sentiment(ticker: str, hype_mode: bool = True) -> dict:
     """
-    Generate mock social posts and classify with LLM.
+    SNS センチメントを取得・分類する。
+
+    SOCIAL_USE_MOCK=false（デフォルト / 本番）:
+        実際の SNS API が利用できないため、中立 (NEUTRAL, hype_score=0.0) を返す。
+        モックバイアスが加重スコアに混入しないよう安全側に倒す。
+
+    SOCIAL_USE_MOCK=true（開発/テスト時）:
+        モック投稿を生成して LLM でセンチメント分類を行う（従来動作）。
 
     Returns:
         {
@@ -105,6 +130,19 @@ def fetch_social_sentiment(ticker: str, hype_mode: bool = True) -> dict:
             "posts_preview": list[str],
         }
     """
+    if not _is_mock_enabled():
+        # 本番モード: SNS API 未接続のため中立を返す（スコアへの不当な影響を排除）
+        return {
+            "ticker":        ticker,
+            "sentiment":     "NEUTRAL",
+            "hype_score":    0.0,
+            "reason":        "SNS API 未接続（SOCIAL_USE_MOCK=false）。中立スコアを使用。",
+            "post_count":    0,
+            "source":        "unavailable",
+            "posts_preview": [],
+        }
+
+    # 開発/テストモード: モック投稿を LLM で評価（従来動作）
     posts    = _make_posts(ticker, hype_mode=hype_mode)
     analysis = _llm_analyze(ticker, posts)
     return {

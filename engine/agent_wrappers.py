@@ -281,8 +281,15 @@ class SocialAgent:
         self.bbs = bbs
 
     def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-4/4") -> dict:
+        import os as _os
+        _mock_enabled = _os.getenv("SOCIAL_USE_MOCK", "false").lower() == "true"
+        _source_note = (
+            "mock_reddit_wsb (SOCIAL_USE_MOCK=true)"
+            if _mock_enabled
+            else "中立モード (SOCIAL_USE_MOCK=false / SNS API 未接続)"
+        )
         _phase_header(phase_tag, self.NAME)
-        _log(f"{ticker} のSNSセンチメントを分析中 (Reddit r/wallstreetbets 風モック)...")
+        _log(f"{ticker} のSNSセンチメントを分析中 ({_source_note})...")
         _sep()
 
         try:

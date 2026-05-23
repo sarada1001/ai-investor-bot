@@ -28,8 +28,90 @@ _llm = None
 def _get_llm():
     global _llm
     if _llm is None:
-        _llm = get_llm_instance()
+        # json_mode=True: Ollama に format="json" を設定して構造化出力を強制
+        _llm = get_llm_instance(json_mode=True)
     return _llm
+
+
+def _build_sentiment_prompt(articles: list[dict], subject: str) -> str:
+    """センチメント解析用プロンプトを構築する。
+
+    Ollama の format="json" モードは JSON オブジェクト ({}) を優先出力するため、
+    配列 ([]) ではなく {"results": [...]} 形式で返すよう指示する。
+    """
+    blocks = []
+    for i, a in enumerate(articles, 1):
+        target = a.get("subject") or subject
+        text = a["title"]
+        if a.get("summary"):
+            text += f"\nSummary: {a['summary'][:200]}"
+        blocks.append(f"[Article {i}] Target stock/company: {target}\n{text}")
+
+    articles_block = "\n\n".join(blocks)
+    n = len(articles)
+
+    return (
+        "You are a professional stock market analyst.\n"
+        f"Read the following {n} news article(s) and assess the short-term impact "
+        "on the target stock's price for each article.\n\n"
+        f"{articles_block}\n\n"
+        'For each article, classify sentiment as exactly "positive", "negative", or "neutral".\n'
+        "Respond ONLY with a JSON object in this exact format (no extra text):\n"
+        "{\n"
+        '  "results": [\n'
+        '    {"index": 1, "sentiment": "positive", "reason": "1-2 sentence reason in Japanese"},\n'
+        "    ...\n"
+        "  ]\n"
+        "}"
+    )
+
+
+def _extract_results_from_json(raw: str) -> list[dict] | None:
+    """LLM 出力から results リストを多段階戦略で抽出する。
+
+    Strategy 1: json.loads() で直接パース → list か {"results": [...]} を確認
+    Strategy 2: regex で [...] を抽出してパース
+    Returns None if all strategies fail.
+    """
+    # Strategy 1: 直接 JSON パース
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            # "results" キーを優先探索、次に任意の list 値を探す
+            for key in ("results", "analysis", "items", "data", "articles", "output"):
+                val = data.get(key)
+                if isinstance(val, list):
+                    return val
+            # フォールバック: dict の値から最初に見つかったリストを使用
+            for val in data.values():
+                if isinstance(val, list) and len(val) > 0:
+                    return val
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Strategy 2a: 非貪欲 regex で最初の [...] を抽出
+    m = re.search(r'\[.*?\]', raw, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group())
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Strategy 2b: 貪欲 regex（入れ子 JSON オブジェクトを含む配列に対応）
+    m2 = re.search(r'\[.*\]', raw, re.DOTALL)
+    if m2:
+        try:
+            parsed = json.loads(m2.group())
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return None
 
 
 def _analyze_sentiment_batch(
@@ -51,54 +133,52 @@ def _analyze_sentiment_batch(
     if not articles:
         return []
 
-    blocks = []
-    for i, a in enumerate(articles, 1):
-        target = a.get("subject") or subject
-        text = a["title"]
-        if a.get("summary"):
-            text += f"\n概要: {a['summary'][:200]}"
-        blocks.append(f"【記事{i}】対象銘柄/企業: {target}\n{text}")
-
-    articles_block = "\n\n".join(blocks)
     n = len(articles)
-
-    prompt = (
-        "あなたはプロの株式投資アナリストです。\n"
-        f"以下の{n}件のニュースをそれぞれ読み、各記事の「対象銘柄/企業」の"
-        "株価への短期的な影響を判定してください。\n\n"
-        f"{articles_block}\n\n"
-        "必ず以下のJSON配列形式のみで出力してください（余分なテキスト不要）:\n"
-        "[\n"
-        '  {"index": 1, "sentiment": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の理由"},\n'
-        "  ...\n"
-        "]"
-    )
-
     default = [{"sentiment": "neutral", "reason": "解析失敗"} for _ in articles]
+    prompt = _build_sentiment_prompt(articles, subject)
 
-    try:
-        raw = _get_llm().invoke(prompt).content.strip()
-        m = re.search(r'\[.*\]', raw, re.DOTALL)
-        if not m:
-            return default
-        parsed = json.loads(m.group())
-        if not isinstance(parsed, list):
-            return default
+    # 最大 2 回リトライ（LLM の確率的出力に対して堅牢化）
+    for attempt in range(2):
+        try:
+            raw = _get_llm().invoke(prompt).content.strip()
+            parsed_list = _extract_results_from_json(raw)
 
-        result = list(default)
-        for item in parsed:
-            try:
-                idx = int(item.get("index", 0)) - 1
-            except (TypeError, ValueError):
+            if parsed_list is None:
+                # 1回目の失敗ならリトライ
+                if attempt == 0:
+                    continue
+                return default
+
+            result = list(default)
+            matched = 0
+            for item in parsed_list:
+                try:
+                    idx = int(item.get("index", 0)) - 1
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= idx < n:
+                    sentiment = str(item.get("sentiment", "neutral")).lower()
+                    # 有効値のみ受け入れる（ハルシネーション対策）
+                    if sentiment not in ("positive", "negative", "neutral"):
+                        sentiment = "neutral"
+                    result[idx] = {
+                        "sentiment": sentiment,
+                        "reason":    str(item.get("reason", "")),
+                    }
+                    matched += 1
+
+            # 1件もマッチしなかった場合は再試行
+            if matched == 0 and attempt == 0:
                 continue
-            if 0 <= idx < n:
-                result[idx] = {
-                    "sentiment": str(item.get("sentiment", "neutral")),
-                    "reason":    str(item.get("reason", "")),
-                }
-        return result
-    except Exception as e:
-        return [{"sentiment": "neutral", "reason": f"LLM解析エラー: {e}"} for _ in articles]
+
+            return result
+
+        except Exception as e:
+            if attempt == 0:
+                continue
+            return [{"sentiment": "neutral", "reason": f"LLM解析エラー: {e}"} for _ in articles]
+
+    return default
 
 
 # ------------------------------------------------------------------ #

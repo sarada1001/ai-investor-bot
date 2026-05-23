@@ -53,9 +53,15 @@ def get_llm(
     ollama_model: str | None = None,
     gemini_model: str | None = None,
     temperature: float = 0,
+    json_mode: bool = False,
 ) -> tuple[Any, str]:
     """
     LLM インスタンスとソース名を返す。
+
+    Args:
+        json_mode: True の場合、Ollama に format="json" を指定して構造化 JSON 出力を強制する。
+                   ニュース/SNS センチメント解析など JSON を返すプロンプト専用。
+                   テキスト要約（ManagerAgent の rationale など）では False にすること。
 
     Returns:
         (llm, source)  source: "ollama" | "gemini"
@@ -75,12 +81,17 @@ def get_llm(
 
     if use_ollama:
         from langchain_community.chat_models import ChatOllama
-        llm = ChatOllama(
-            base_url    = _OLLAMA_BASE_URL,
-            model       = model_ollama,
-            temperature = temperature,
-            format      = "json",
-        )
+        # json_mode=True の場合のみ format="json" を設定する。
+        # テキスト生成プロンプト（rationale 要約等）で format="json" を使うと
+        # Llama 3.1 が JSON 構造を出力しようとして文章が崩壊するため分離する。
+        ollama_kwargs: dict[str, Any] = {
+            "base_url":    _OLLAMA_BASE_URL,
+            "model":       model_ollama,
+            "temperature": temperature,
+        }
+        if json_mode:
+            ollama_kwargs["format"] = "json"
+        llm = ChatOllama(**ollama_kwargs)
         return llm, "ollama"
 
     if disable_gemini:
@@ -101,9 +112,20 @@ def get_llm_instance(
     ollama_model: str | None = None,
     gemini_model: str | None = None,
     temperature: float = 0,
+    json_mode: bool = False,
 ) -> Any:
-    """LLM インスタンスのみを返す（ソース名不要な呼び出し元向け）。"""
-    llm, _ = get_llm(ollama_model=ollama_model, gemini_model=gemini_model, temperature=temperature)
+    """LLM インスタンスのみを返す（ソース名不要な呼び出し元向け）。
+
+    Args:
+        json_mode: True にすると Ollama で format="json" を有効化。
+                   JSON 構造を返すプロンプト（センチメント解析等）にのみ使用すること。
+    """
+    llm, _ = get_llm(
+        ollama_model=ollama_model,
+        gemini_model=gemini_model,
+        temperature=temperature,
+        json_mode=json_mode,
+    )
     return llm
 
 
