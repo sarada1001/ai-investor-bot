@@ -30,7 +30,7 @@ from engine.display  import (
 )
 from engine.notify        import send_line_message
 from engine.agent_wrappers import (
-    TechnicalAgent, NewsAgent, MacroAgent, SocialAgent,
+    TechnicalAgent, NewsAgent, MacroAgent, SocialAgent, LiquidityAgent,
     FundamentalAgent, ManagerAgent, RiskAgent, ExitAgent,
     _gate_check, _gate_display,
 )
@@ -209,7 +209,7 @@ def run_trade_cycle(
             _log(f"[CircuitBreaker] チェックエラー（スキップ）: {_cb_err}")
 
     # ── Stage 1: 安価シグナルスキャン ────────────────────────────
-    _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social]")
+    _stage_header(1, "安価シグナルスキャン  [Technical + News + Macro + Social + Liquidity]")
 
     def _run_shadow_agent(
         agent_name: str,
@@ -241,56 +241,74 @@ def run_trade_cycle(
         elif "technical" in _suspended_keys:
             _run_shadow_agent(
                 "TechnicalAgent", "technical_analysis",
-                lambda: TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4-SHADOW"),
+                lambda: TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/5-SHADOW"),
             )
         else:
-            TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/4")
+            TechnicalAgent(bbs).run(ticker, phase_tag="S1-1/5")
 
         if "news" in excluded_keys:
             _write_excluded("NewsAgent", "news_analysis")
         elif "news" in _suspended_keys:
             _run_shadow_agent(
                 "NewsAgent", "news_analysis",
-                lambda: NewsAgent(bbs).run(ticker, phase_tag="S1-2/4-SHADOW"),
+                lambda: NewsAgent(bbs).run(ticker, phase_tag="S1-2/5-SHADOW"),
             )
         else:
-            NewsAgent(bbs).run(ticker, phase_tag="S1-2/4")
+            NewsAgent(bbs).run(ticker, phase_tag="S1-2/5")
 
         if "macro" in excluded_keys:
             _write_excluded("MacroAgent", "macro_analysis")
         elif "macro" in _suspended_keys:
             _run_shadow_agent(
                 "MacroAgent", "macro_analysis",
-                lambda: MacroAgent(bbs).run(phase_tag="S1-3/4-SHADOW"),
+                lambda: MacroAgent(bbs).run(phase_tag="S1-3/5-SHADOW"),
             )
         else:
-            MacroAgent(bbs).run(phase_tag="S1-3/4")
+            MacroAgent(bbs).run(phase_tag="S1-3/5")
 
         if "social" in excluded_keys:
             _write_excluded("SocialAgent", "social_analysis")
         elif "social" in _suspended_keys:
             _run_shadow_agent(
                 "SocialAgent", "social_analysis",
-                lambda: SocialAgent(bbs).run(ticker, phase_tag="S1-4/4-SHADOW"),
+                lambda: SocialAgent(bbs).run(ticker, phase_tag="S1-4/5-SHADOW"),
             )
         else:
-            SocialAgent(bbs).run(ticker, phase_tag="S1-4/4")
+            SocialAgent(bbs).run(ticker, phase_tag="S1-4/5")
+
+        if "liquidity" in excluded_keys:
+            bbs.write("LiquidityAgent", "liquidity_analysis",
+                      {"verbal_annotation": "LiquidityAgent 除外済", "score": 0.0,
+                       "ask_ratio": 0.5, "bid_ratio": 0.5, "net_large_inflow": 0.0,
+                       "net_small_inflow": 0.0, "pressure": "neutral",
+                       "excluded": True, "trend": "neutral",
+                       "trend_reason": "LiquidityAgent 除外済"})
+        elif "liquidity" in _suspended_keys:
+            _run_shadow_agent(
+                "LiquidityAgent", "liquidity_analysis",
+                lambda: LiquidityAgent(bbs).run(ticker, phase_tag="S1-5/5-SHADOW"),
+            )
+        else:
+            LiquidityAgent(bbs).run(ticker, phase_tag="S1-5/5")
 
     # ── Gate: マクロブレーキ / 双方 NEUTRAL → HOLD 即終了 ────────
     gate = _gate_check(bbs, ticker)
     _gate_display(gate)
 
     if gate["skip_fundamental"]:
-        _social_gate     = bbs.read("social_analysis") or {}
+        _social_gate     = bbs.read("social_analysis")    or {}
+        _liq_gate        = bbs.read("liquidity_analysis") or {}
         _sg_sentiment    = _social_gate.get("sentiment", "NEUTRAL").upper()
         _sg_hype         = float(_social_gate.get("hype_score", 0.0))
         _sg_sig_gate_raw = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}.get(_sg_sentiment, 0.0)
         _sg_sig_gate     = _sg_sig_gate_raw
+        _liq_sig_gate    = float(_liq_gate.get("score", 0.0))
         score = round(
             gate["news_signal"]    * eff_weights["news"]
             + gate["tech_signal"]  * eff_weights["technical"]
             + gate["macro_signal"] * eff_weights["macro"]
-            + _sg_sig_gate         * eff_weights["social"],
+            + _sg_sig_gate         * eff_weights["social"]
+            + _liq_sig_gate        * eff_weights.get("liquidity", 0.0),
             4,
         )
         brake_label = "マクロブレーキ" if gate["macro_brake"] else "シグナル不足"
@@ -305,6 +323,7 @@ def run_trade_cycle(
                 "macro":       gate["macro_signal"],
                 "fundamental": 0.0,
                 "social":      _sg_sig_gate,
+                "liquidity":   _liq_sig_gate,
             },
             "gate_skipped":  True,
             "gate_reason":   gate["reason"],

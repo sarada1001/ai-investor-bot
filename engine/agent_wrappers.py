@@ -12,6 +12,7 @@ import skills.technical_calc         as _tech_mod
 import skills.macro_monitor          as _macro_mod
 import skills.social_monitor         as _social_mod
 import skills.risk_calculator        as _risk_mod
+import skills.liquidity_monitor      as _liq_mod
 from agents.fundamental_agent import FundamentalAgent as _FundamentalAgentImpl
 from agents.exit_agent        import ExitAgent        as _ExitAgentImpl
 
@@ -99,15 +100,18 @@ def _extract_news_signal(news_data: dict, ticker: str) -> tuple[float, str]:
 
 
 def _gate_check(bbs: BBS, ticker: str) -> dict:
-    tech_data  = bbs.read("technical_analysis") or {}
-    news_data  = bbs.read("news_analysis")       or {}
-    macro_data = bbs.read("macro_analysis")      or {}
+    tech_data      = bbs.read("technical_analysis") or {}
+    news_data      = bbs.read("news_analysis")       or {}
+    macro_data     = bbs.read("macro_analysis")      or {}
+    liquidity_data = bbs.read("liquidity_analysis")  or {}
 
     tech_sig             = _trend_to_signal(tech_data.get("trend", "neutral"))
     news_sig, _          = _extract_news_signal(news_data, ticker)
     # MacroAgent が SUSPENDED (shadow mode) の場合はブレーキを発動させない
     macro_is_shadow = bool(macro_data.get("suspended"))
     macro_sig       = 0.0 if macro_is_shadow else _trend_to_signal(macro_data.get("trend", "neutral"))
+    # LiquidityAgent の連続スコア（Gate 判定には影響せず、表示・参照のみ）
+    liquidity_sig   = _safe_float_score(liquidity_data.get("score", 0.0))
 
     macro_brake  = macro_sig < 0.0
     signals_flat = tech_sig <= 0.0 and news_sig <= 0.0
@@ -124,6 +128,7 @@ def _gate_check(bbs: BBS, ticker: str) -> dict:
         "tech_signal":        tech_sig,
         "news_signal":        news_sig,
         "macro_signal":       macro_sig,
+        "liquidity_signal":   liquidity_sig,
         "macro_brake":        macro_brake,
         "macro_is_suspended": macro_is_shadow,
         "skip_fundamental":   skip,
@@ -132,11 +137,12 @@ def _gate_check(bbs: BBS, ticker: str) -> dict:
 
 
 def _gate_display(gate: dict) -> None:
-    skip        = gate["skip_fundamental"]
-    tech_sig    = gate["tech_signal"]
-    news_sig    = gate["news_signal"]
-    macro_sig   = gate["macro_signal"]
-    macro_brake = gate["macro_brake"]
+    skip          = gate["skip_fundamental"]
+    tech_sig      = gate["tech_signal"]
+    news_sig      = gate["news_signal"]
+    macro_sig     = gate["macro_signal"]
+    liquidity_sig = gate.get("liquidity_signal", 0.0)
+    macro_brake   = gate["macro_brake"]
 
     def _icon(v: float) -> str:
         return "📈" if v > 0 else "📉" if v < 0 else "➡️"
@@ -158,9 +164,10 @@ def _gate_display(gate: dict) -> None:
     print(f"\n┌{'─' * _W}┐")
     print(f"│  {'◇ Gate チェック':^{_W - 4}}")
     print(f"│  {'┄' * (_W - 4)}")
-    print(f"│  {_icon(tech_sig)} TechnicalAgent : {tech_sig:+.2f}  ({_label(tech_sig)})")
-    print(f"│  {_icon(news_sig)} NewsAgent      : {news_sig:+.2f}  ({_label(news_sig)})")
-    print(f"│  {_icon(macro_sig)} MacroAgent     : {macro_sig:+.2f}  ({_label(macro_sig)}){macro_note}")
+    print(f"│  {_icon(tech_sig)} TechnicalAgent  : {tech_sig:+.2f}  ({_label(tech_sig)})")
+    print(f"│  {_icon(news_sig)} NewsAgent       : {news_sig:+.2f}  ({_label(news_sig)})")
+    print(f"│  {_icon(macro_sig)} MacroAgent      : {macro_sig:+.2f}  ({_label(macro_sig)}){macro_note}")
+    print(f"│  {_icon(liquidity_sig)} LiquidityAgent : {liquidity_sig:+.2f}  ({_label(liquidity_sig)})  ← 参照のみ")
     print(f"│  {'┄' * (_W - 4)}")
     print(f"│  判定: {verdict}")
     print(f"└{'─' * _W}┘")
@@ -371,6 +378,62 @@ class SocialAgent:
         return result
 
 
+# ── Stage 1-E: LiquidityAgent ───────────────────────────────
+
+class LiquidityAgent:
+    NAME = "LiquidityAgent"
+
+    def __init__(self, bbs: BBS):
+        self.bbs = bbs
+
+    def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-5/5") -> dict:
+        _phase_header(phase_tag, self.NAME)
+        _log(f"{ticker} の板情報・資金フローを取得中 (VTA: Verbal Technical Analysis)...")
+        _sep()
+
+        try:
+            result = _liq_mod.analyze_liquidity(ticker)
+        except Exception as e:
+            result = {
+                "ticker":            ticker,
+                "verbal_annotation": f"取得エラー: {e}",
+                "ask_ratio":         0.5,
+                "bid_ratio":         0.5,
+                "net_large_inflow":  0.0,
+                "net_small_inflow":  0.0,
+                "pressure":          "neutral",
+                "score":             0.0,
+                "data_source":       "error",
+                "error":             str(e),
+            }
+            _log(f"エラー: {e}")
+
+        score       = result.get("score", 0.0)
+        pressure    = result.get("pressure", "neutral")
+        ask_ratio   = result.get("ask_ratio", 0.5)
+        bid_ratio   = result.get("bid_ratio", 0.5)
+        net_large   = result.get("net_large_inflow", 0.0)
+        data_source = result.get("data_source", "mock")
+        annotation  = result.get("verbal_annotation", "")
+
+        s_icon      = "📈" if score > 0 else "📉" if score < 0 else "➡️"
+        filled      = int((score + 1.0) / 2.0 * 10)  # -1〜+1 を 0〜10 にマップ
+        score_bar   = "█" * filled + "░" * (10 - filled)
+
+        _log(f"データソース    : {data_source}")
+        _log(f"Ask/Bid 比率    : Ask {ask_ratio:.0%}  /  Bid {bid_ratio:.0%}")
+        _log(f"大口純流入額    : ${net_large:+,.0f}")
+        _sep()
+        _log(f"Verbal Annotation:")
+        _log(f"  {annotation[:90]}")
+        _sep()
+        _log(f"流動性シグナル  : {s_icon} [{score_bar}] {score:+.4f}  (pressure: {pressure})")
+
+        self.bbs.write(self.NAME, "liquidity_analysis", result)
+        _phase_footer()
+        return result
+
+
 # ── Stage 0: ExitAgent ───────────────────────────────────────
 
 class ExitAgent:
@@ -508,7 +571,9 @@ class ManagerAgent:
             f"ファンダメンタル ({WEIGHTS['fundamental']:.0%}): "
             f"{sigs['fundamental']:+.2f} — {reasons['fundamental']}\n"
             f"テクニカル       ({WEIGHTS['technical']:.0%}): {sigs['technical']:+.2f} — {reasons['technical']}\n"
-            f"SNSセンチメント  ({WEIGHTS['social']:.0%}): {sigs['social']:+.2f} — {reasons['social']}"
+            f"SNSセンチメント  ({WEIGHTS['social']:.0%}): {sigs['social']:+.2f} — {reasons['social']}\n"
+            f"流動性分析(VTA)  ({WEIGHTS.get('liquidity', 0.0):.0%}): "
+            f"{sigs['liquidity']:+.2f} — {reasons['liquidity'][:80]}"
         )
         try:
             return self._llm.invoke(prompt).content.strip()[:200]
@@ -534,11 +599,12 @@ class ManagerAgent:
             _log(f"  [アブレーション] 除外: {excluded_keys}  有効ウェイト: { {k: f'{v:.3f}' for k, v in w.items()} }")
         _sep()
 
-        news_data   = self.bbs.read("news_analysis")        or {}
-        tech_data   = self.bbs.read("technical_analysis")   or {}
-        fa_data     = self.bbs.read("fundamental_analysis") or {}
-        macro_data  = self.bbs.read("macro_analysis")       or {}
-        social_data = self.bbs.read("social_analysis")      or {}
+        news_data      = self.bbs.read("news_analysis")        or {}
+        tech_data      = self.bbs.read("technical_analysis")   or {}
+        fa_data        = self.bbs.read("fundamental_analysis") or {}
+        macro_data     = self.bbs.read("macro_analysis")       or {}
+        social_data    = self.bbs.read("social_analysis")      or {}
+        liquidity_data = self.bbs.read("liquidity_analysis")   or {}
 
         news_sig, news_reason = _extract_news_signal(news_data, ticker)
         # 連続スコア優先: "score" フィールドがあればそれを使用、なければ SIGNAL_MAP[trend] にフォールバック
@@ -575,12 +641,17 @@ class ManagerAgent:
             if social_hype_penalty else social_reason_base
         )
 
+        # ── Liquidity シグナル ──────────────────────────────────
+        liquidity_sig    = _safe_float_score(liquidity_data.get("score", 0.0))
+        liquidity_reason = liquidity_data.get("verbal_annotation", "データなし")
+
         score = round(
-            news_sig     * w["news"]
-            + fa_sig     * w["fundamental"]
-            + tech_sig   * w["technical"]
-            + macro_sig  * w["macro"]
-            + social_sig * w["social"],
+            news_sig      * w["news"]
+            + fa_sig      * w["fundamental"]
+            + tech_sig    * w["technical"]
+            + macro_sig   * w["macro"]
+            + social_sig  * w["social"]
+            + liquidity_sig * w.get("liquidity", 0.0),
             4,
         )
 
@@ -597,11 +668,13 @@ class ManagerAgent:
 
         sigs    = {
             "news": news_sig, "fundamental": fa_sig,
-            "technical": tech_sig, "macro": macro_sig, "social": social_sig,
+            "technical": tech_sig, "macro": macro_sig,
+            "social": social_sig, "liquidity": liquidity_sig,
         }
         reasons = {
             "news": news_reason, "fundamental": fa_reason,
-            "technical": tech_reason, "macro": macro_reason, "social": social_reason,
+            "technical": tech_reason, "macro": macro_reason,
+            "social": social_reason, "liquidity": liquidity_reason,
         }
         icons = {k: ("📈" if v > 0 else "📉" if v < 0 else "➡️") for k, v in sigs.items()}
 
@@ -623,6 +696,11 @@ class ManagerAgent:
              f"({w['social']:.0%}) : {social_sig:+.2f}"
              f"  [生={raw_social_sig:+.1f} hype={social_hype_score:.2f}]"
              f"  → {social_reason_base[:30]}")
+        liq_w = w.get("liquidity", 0.0)
+        _log(f"  {icons['liquidity']} 💧 流動性分析      "
+             f"({liq_w:.0%}) : {liquidity_sig:+.2f}"
+             f"  → {liquidity_reason[:40]}"
+             + ("  [除外]" if "liquidity" in excluded_keys else ""))
         if social_hype_penalty:
             _log(f"     ⚠️  Hype≥{SOCIAL_HYPE_THRESHOLD} かつ FA/Tech 未確認"
                  f" → 買い煽りペナルティ適用 ({raw_social_sig:+.1f} → {social_sig:+.2f})")
@@ -650,10 +728,10 @@ class ManagerAgent:
                 else f" Social Hype={social_hype_score:.2f}→FA+Tech確認済・ペナルティなし"
             )
             rationale = (
-                f"[MOCK] 5シグナル総合: score={score:+.4f}"
+                f"[MOCK] 6シグナル総合: score={score:+.4f}"
                 f" (FA={fa_sig:+.1f}, Tech={tech_sig:+.1f},"
                 f" Macro={macro_sig:+.1f}, News={news_sig:+.1f},"
-                f" Social={social_sig:+.2f}).{hype_note}"
+                f" Social={social_sig:+.2f}, Liq={liquidity_sig:+.2f}).{hype_note}"
             )
         else:
             _llm_backend = "ollama" if is_ollama_active() else "gemini"

@@ -23,6 +23,8 @@ def _agent_to_weight_key(agent_name: str) -> str | None:
         "social":           "social",
         "fundamentalagent": "fundamental",
         "fundamental":      "fundamental",
+        "liquidityagent":   "liquidity",
+        "liquidity":        "liquidity",
     }
     return mapping.get(agent_name.lower())
 

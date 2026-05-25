@@ -169,6 +169,48 @@ class FundamentalAnalysis:
         )
 
 
+@dataclass
+class LiquidityAnalysis:
+    """LiquidityAgent → BBS['liquidity_analysis']
+
+    VTA (Verbal Technical Analysis) の出力スキーマ。
+    生の板情報・資金フロー数値を自然言語に変換したサマリーを保持する。
+    """
+    verbal_annotation: str   = ""        # ManagerAgentへ渡す自然言語サマリー (VTA)
+    ask_ratio:         float = 0.5       # Ask側板数量比率 (0.0–1.0)
+    bid_ratio:         float = 0.5       # Bid側板数量比率 (0.0–1.0)
+    net_large_inflow:  float = 0.0       # 大口（超大口+大口）純流入額 USD
+    net_small_inflow:  float = 0.0       # 小口純流入額 USD
+    pressure:          str   = "neutral" # "buy_dominant" | "sell_dominant" | "neutral"
+    score:             float = 0.0       # 複合シグナルスコア (-1.0〜+1.0)
+    data_source:       str   = "mock"    # "mock" | "live" | "error"
+
+    def to_dict(self) -> dict:
+        return {
+            "verbal_annotation": self.verbal_annotation,
+            "ask_ratio":         self.ask_ratio,
+            "bid_ratio":         self.bid_ratio,
+            "net_large_inflow":  self.net_large_inflow,
+            "net_small_inflow":  self.net_small_inflow,
+            "pressure":          self.pressure,
+            "score":             self.score,
+            "data_source":       self.data_source,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "LiquidityAnalysis":
+        return cls(
+            verbal_annotation = str(data.get("verbal_annotation", "")),
+            ask_ratio         = float(data.get("ask_ratio",        0.5)),
+            bid_ratio         = float(data.get("bid_ratio",        0.5)),
+            net_large_inflow  = float(data.get("net_large_inflow", 0.0)),
+            net_small_inflow  = float(data.get("net_small_inflow", 0.0)),
+            pressure          = str(data.get("pressure",          "neutral")),
+            score             = float(data.get("score",            0.0)),
+            data_source       = str(data.get("data_source",       "mock")),
+        )
+
+
 # ──────────────────────────────────────────────
 # Stage 2-4: 判断・リスク・監査スキーマ
 # ──────────────────────────────────────────────

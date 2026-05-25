@@ -11,13 +11,15 @@ _W                   = 62      # ターミナル表示幅
 _STRONG_BUY_LABEL    = "STRONG BUY"
 _HOLD_LABEL          = "HOLD"
 
-# 5 要素の合計ウェイト = 1.00
+# 6 要素の合計ウェイト = 1.00
+# ※ LiquidityAgent 追加に伴い fundamental を -0.05, macro を -0.05 調整
 WEIGHTS: dict[str, float] = {
-    "fundamental": 0.40,
+    "fundamental": 0.35,
     "technical":   0.20,
-    "macro":       0.20,
+    "macro":       0.15,
     "news":        0.10,
     "social":      0.10,
+    "liquidity":   0.10,
 }
 
 SIGNAL_MAP: dict[str, float] = {
@@ -89,6 +91,22 @@ MOCK_BBS_DATA: dict[str, dict] = {
         ),
         "post_count": 5,
         "source": "mock_reddit_wsb",
+    },
+    "liquidity_analysis": {
+        "ticker":            TARGET_TICKER,
+        "verbal_annotation": (
+            "📥 大口資金は+$5.5百万の買い越し（純流入）。"
+            "板はBid側に65%集中しており、下値サポートが厚く買い圧力が優勢。"
+            "小口（個人）は-$70千の売り傾向。"
+            "総合的に強い買い圧力優勢。機関資金の積極的な流入が見られる。"
+        ),
+        "ask_ratio":        0.35,
+        "bid_ratio":        0.65,
+        "net_large_inflow": 5_500_000.0,
+        "net_small_inflow":  -70_000.0,
+        "pressure":         "buy_dominant",
+        "score":             0.65,
+        "data_source":      "mock",
     },
     "risk_analysis": {
         "ticker":                  TARGET_TICKER,

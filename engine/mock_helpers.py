@@ -29,7 +29,7 @@ def _run_mock_stage1(
             "trend_reason": f"{agent_name} SUSPENDED (shadow mode) — ウェイト=0",
         })
 
-    _phase_header("S1-1/4", "TechnicalAgent")
+    _phase_header("S1-1/5", "TechnicalAgent")
     _log(note)
     _sep()
     if "technical" in excluded_keys:
@@ -47,7 +47,7 @@ def _run_mock_stage1(
         bbs.write("TechnicalAgent", "technical_analysis", data)
     _phase_footer()
 
-    _phase_header("S1-2/4", "NewsAgent")
+    _phase_header("S1-2/5", "NewsAgent")
     _log(note)
     _sep()
     if "news" in excluded_keys:
@@ -81,7 +81,7 @@ def _run_mock_stage1(
         bbs.write("NewsAgent", "news_analysis", data)
     _phase_footer()
 
-    _phase_header("S1-3/4", "MacroAgent")
+    _phase_header("S1-3/5", "MacroAgent")
     _log(note)
     _sep()
     if "macro" in excluded_keys:
@@ -99,7 +99,7 @@ def _run_mock_stage1(
         bbs.write("MacroAgent", "macro_analysis", data)
     _phase_footer()
 
-    _phase_header("S1-4/4", "SocialAgent")
+    _phase_header("S1-4/5", "SocialAgent")
     _log(note)
     _sep()
     if "social" in excluded_keys:
@@ -122,6 +122,37 @@ def _run_mock_stage1(
         _sep()
         _log(f"判定根拠: {social_mock['reason'][:80]}")
         bbs.write("SocialAgent", "social_analysis", social_mock)
+    _phase_footer()
+
+    _phase_header("S1-5/5", "LiquidityAgent")
+    _log("⚠️  [MOCK] Python 演算スキップ — ダミーデータを BBS に書き込み")
+    _sep()
+    if "liquidity" in excluded_keys:
+        _log("  ⚠️  [アブレーション] LiquidityAgent を除外 → NEUTRAL エントリを書き込み")
+        bbs.write("LiquidityAgent", "liquidity_analysis",
+                  {"verbal_annotation": "LiquidityAgent 除外済", "score": 0.0,
+                   "ask_ratio": 0.5, "bid_ratio": 0.5, "net_large_inflow": 0.0,
+                   "net_small_inflow": 0.0, "pressure": "neutral",
+                   "excluded": True, "data_source": "excluded"})
+    elif "liquidity" in suspended_keys:
+        _log("  🔴 [SUSPENDED] LiquidityAgent — Shadow Mode (本番スコア影響なし)")
+        shadow_liq = {**MOCK_BBS_DATA["liquidity_analysis"], "ticker": ticker}
+        _write_shadow_mock("liquidity_analysis", "LiquidityAgent", shadow_liq)
+    else:
+        liq_mock = {**MOCK_BBS_DATA["liquidity_analysis"], "ticker": ticker}
+        score   = liq_mock["score"]
+        filled  = int((score + 1.0) / 2.0 * 10)
+        s_bar   = "█" * filled + "░" * (10 - filled)
+        s_icon  = "📈" if score > 0 else "📉" if score < 0 else "➡️"
+        _log(f"データソース    : {liq_mock['data_source']}")
+        _log(f"Ask/Bid 比率    : Ask {liq_mock['ask_ratio']:.0%}  /  Bid {liq_mock['bid_ratio']:.0%}")
+        _log(f"大口純流入額    : ${liq_mock['net_large_inflow']:+,.0f}")
+        _sep()
+        _log(f"Verbal Annotation:")
+        _log(f"  {liq_mock['verbal_annotation'][:90]}")
+        _sep()
+        _log(f"流動性シグナル  : {s_icon} [{s_bar}] {score:+.4f}  (pressure: {liq_mock['pressure']})")
+        bbs.write("LiquidityAgent", "liquidity_analysis", liq_mock)
     _phase_footer()
 
 
