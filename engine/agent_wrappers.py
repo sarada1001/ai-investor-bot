@@ -38,7 +38,43 @@ def _trend_to_signal(trend_str: str) -> float:
     return SIGNAL_MAP.get((trend_str or "neutral").lower(), 0.0)
 
 
+def _safe_float_score(val: object, default: float = 0.0) -> float:
+    """
+    任意の値を -1.0〜+1.0 の float に変換する。
+    変換失敗・NaN は default (0.0) を返す。範囲外はクランプ（reject ではなく clamp）。
+    """
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if f != f:          # NaN チェック
+            return default
+        return round(max(-1.0, min(1.0, f)), 4)
+    except (TypeError, ValueError):
+        return default
+
+
+def _prefer_score(data: dict, trend_key: str = "trend") -> float:
+    """
+    エージェント結果 dict から連続スコアを優先取得する。
+
+    優先順位:
+      1. "score" フィールドが存在 → _safe_float_score() で正規化して使用
+      2. フォールバック: SIGNAL_MAP[trend_key] (従来の離散値 +1.0 / 0.0 / -1.0)
+    """
+    score_raw = data.get("score")
+    if score_raw is not None:
+        return _safe_float_score(score_raw)
+    return SIGNAL_MAP.get((data.get(trend_key) or "neutral").lower(), 0.0)
+
+
 def _extract_news_signal(news_data: dict, ticker: str) -> tuple[float, str]:
+    """
+    NewsAgent の結果から連続シグナルを抽出する。
+
+    各記事に "score" (float) フィールドがあればそれを優先使用する。
+    なければ SIGNAL_MAP[sentiment] にフォールバック（後方互換）。
+    """
     articles = news_data.get("articles", [])
     target_arts = [
         a for a in articles
@@ -49,9 +85,16 @@ def _extract_news_signal(news_data: dict, ticker: str) -> tuple[float, str]:
         target_arts = articles
     if not target_arts:
         return 0.0, "ニュースなし"
-    scores = [SIGNAL_MAP.get(a.get("sentiment", "neutral"), 0.0) for a in target_arts]
-    avg    = round(sum(scores) / len(scores), 4)
-    parts  = [a.get("sentiment", "?") for a in target_arts[:3]]
+
+    scores: list[float] = []
+    for a in target_arts:
+        if "score" in a and a["score"] is not None:
+            scores.append(_safe_float_score(a["score"]))
+        else:
+            scores.append(SIGNAL_MAP.get(a.get("sentiment", "neutral"), 0.0))
+
+    avg   = round(sum(scores) / len(scores), 4)
+    parts = [a.get("sentiment", "?") for a in target_arts[:3]]
     return avg, " / ".join(parts)
 
 
@@ -498,27 +541,34 @@ class ManagerAgent:
         social_data = self.bbs.read("social_analysis")      or {}
 
         news_sig, news_reason = _extract_news_signal(news_data, ticker)
-        tech_sig              = _trend_to_signal(tech_data.get("trend", "neutral"))
-        tech_reason           = tech_data.get("trend_reason", "データなし")
-        fa_sig                = _trend_to_signal(fa_data.get("trend", "neutral"))
-        fa_reason             = fa_data.get("trend_reason", "データなし")
-        macro_sig             = _trend_to_signal(macro_data.get("trend", "neutral"))
-        macro_reason          = macro_data.get("trend_reason", "データなし")
+        # 連続スコア優先: "score" フィールドがあればそれを使用、なければ SIGNAL_MAP[trend] にフォールバック
+        tech_sig    = _prefer_score(tech_data,  "trend")
+        tech_reason = tech_data.get("trend_reason", "データなし")
+        fa_sig      = _prefer_score(fa_data,    "trend")
+        fa_reason   = fa_data.get("trend_reason", "データなし")
+        macro_sig   = _prefer_score(macro_data, "trend")
+        macro_reason = macro_data.get("trend_reason", "データなし")
 
         _SOCIAL_MAP          = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}
         social_raw_sentiment = social_data.get("sentiment", "NEUTRAL").upper()
         social_hype_score    = float(social_data.get("hype_score", 0.0))
         social_reason_base   = social_data.get("reason", "データなし")
 
-        raw_social_sig      = _SOCIAL_MAP.get(social_raw_sentiment, 0.0)
-        social_hype_penalty = False
-        social_sig          = raw_social_sig
-
-        if (social_raw_sentiment == "POSITIVE"
-                and social_hype_score >= SOCIAL_HYPE_THRESHOLD
-                and not (fa_sig > 0.0 and tech_sig >= 0.0)):
-            social_sig          = -0.5
-            social_hype_penalty = True
+        if "score" in social_data and social_data["score"] is not None:
+            # 連続スコアモード: social_monitor が signal_score として hype 考慮済みの値を返す
+            raw_social_sig      = _safe_float_score(social_data["score"])
+            social_sig          = raw_social_sig
+            social_hype_penalty = False
+        else:
+            # 後方互換モード: 離散スコア + 買い煽りペナルティ
+            raw_social_sig      = _SOCIAL_MAP.get(social_raw_sentiment, 0.0)
+            social_hype_penalty = False
+            social_sig          = raw_social_sig
+            if (social_raw_sentiment == "POSITIVE"
+                    and social_hype_score >= SOCIAL_HYPE_THRESHOLD
+                    and not (fa_sig > 0.0 and tech_sig >= 0.0)):
+                social_sig          = -0.5
+                social_hype_penalty = True
 
         social_reason = (
             f"[買い煽りペナルティ hype={social_hype_score:.2f}] {social_reason_base}"

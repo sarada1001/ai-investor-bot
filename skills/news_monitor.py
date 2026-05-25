@@ -55,18 +55,23 @@ def _build_sentiment_prompt(articles: list[dict], subject: str) -> str:
         f"Read the following {n} news article(s) and assess the short-term impact "
         "on the target stock's price for each article.\n\n"
         f"{articles_block}\n\n"
-        'For each article, classify sentiment as exactly "positive", "negative", or "neutral".\n'
+        "For each article, provide:\n"
+        '- "score": a float from -1.0 (very bearish) to +1.0 (very bullish). '
+        "Use the FULL range: strong directional news → ±0.7 to ±1.0, "
+        "mild impact → ±0.3 to ±0.6, negligible/ambiguous → ±0.0 to ±0.2.\n"
+        '- "sentiment": exactly "positive", "negative", or "neutral" — must match the sign of score '
+        "(score > 0.1 → positive, score < -0.1 → negative, else → neutral).\n"
+        '- "reason": 1-2 sentence explanation in Japanese.\n\n'
         # ── バイアス抑制ルール ───────────────────────────────────────────
-        # Llama 3.1 はfew-shot例の値を強くコピーする。
-        # 旧プロンプトが "positive" をハードコードしたことで全記事が positive に
-        # 偏るアンカー効果が発生したため、3択を明示 + 保守的評価指示を追加する。
-        "Default to neutral unless the article contains clear and specific directional "
-        "evidence for the target stock. Negative news (risks, downgrades, missed earnings) "
-        "MUST be classified as negative, not neutral.\n"
+        # "score" フィールドを数値で制約することで few-shot アンカーバイアスを抑制。
+        # 保守的評価: 判断根拠が不明確な場合は score を 0.0 付近に設定すること。
+        # Negative news MUST have a negative score — do not soften to 0.
+        "Default score to 0.0 unless there is clear directional evidence. "
+        "Negative news (risks, downgrades, missed earnings) MUST have a negative score.\n"
         "Respond ONLY with a JSON object in this exact format (no extra text):\n"
         "{\n"
         '  "results": [\n'
-        '    {"index": 1, "sentiment": "positive|negative|neutral", "reason": "1-2 sentence reason in Japanese"},\n'
+        '    {"index": 1, "score": 0.75, "sentiment": "positive|negative|neutral", "reason": "1-2 sentence reason in Japanese"},\n'
         "    ...\n"
         "  ]\n"
         "}"
@@ -168,8 +173,24 @@ def _analyze_sentiment_batch(
                     # 有効値のみ受け入れる（ハルシネーション対策）
                     if sentiment not in ("positive", "negative", "neutral"):
                         sentiment = "neutral"
+
+                    # 連続スコアを優先取得。失敗時は sentiment ラベルから離散値にフォールバック
+                    _LABEL_SCORE = {"positive": 1.0, "negative": -1.0, "neutral": 0.0}
+                    score_raw = item.get("score")
+                    try:
+                        article_score = float(score_raw)
+                        article_score = round(max(-1.0, min(1.0, article_score)), 4)
+                        # score と sentiment の整合チェック（乖離が大きい場合は score を優先）
+                        if article_score > 0.1 and sentiment == "negative":
+                            sentiment = "positive"
+                        elif article_score < -0.1 and sentiment == "positive":
+                            sentiment = "negative"
+                    except (TypeError, ValueError):
+                        article_score = _LABEL_SCORE.get(sentiment, 0.0)
+
                     result[idx] = {
                         "sentiment": sentiment,
+                        "score":     article_score,
                         "reason":    str(item.get("reason", "")),
                     }
                     matched += 1

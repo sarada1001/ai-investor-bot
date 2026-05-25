@@ -335,7 +335,10 @@ class FundamentalAgent:
             "### Step 5: 【最終結論】\n"
             "Step 1〜4 の論理的帰結として、スイングトレード観点での最終的な投資判断を下してください。\n"
             "判断は以下の5段階から厳密に1つ選択し、その根拠を Step 1〜4 の分析に紐づけて説明してください：\n"
-            "STRONG BUY / BUY / HOLD / SELL / STRONG SELL\n\n"
+            "STRONG BUY / BUY / HOLD / SELL / STRONG SELL\n"
+            "また、investment_signal と整合した連続スコア（-1.0〜+1.0 の実数）を score フィールドに出力してください。\n"
+            "参考: STRONG BUY≈+1.0, BUY≈+0.6, HOLD≈0.0, SELL≈-0.6, STRONG SELL≈-1.0\n"
+            "（単純な固定値ではなく、指標の強度を反映した細かい値を使うこと）\n\n"
 
             "## 出力フォーマット\n"
             "思考プロセス全体を含む、以下の JSON 形式のみで出力してください"
@@ -356,6 +359,7 @@ class FundamentalAgent:
             '  "risks":             "（引用元：参考資料N）主要リスク要因の要約",\n'
             '  "outlook":           "（引用元：参考資料N）業績見通し・ガイダンスの要約（数値引用）",\n'
             '  "investment_signal": "STRONG BUY|BUY|HOLD|SELL|STRONG SELL",\n'
+            '  "score":             0.65,\n'
             '  "trend":             "positive|negative|neutral",\n'
             '  "trend_reason":      "1〜2文の日本語の根拠（参考資料番号を含める）",\n'
             '  "data_source":       "RAG（一次情報：financial_filings）"\n'
@@ -373,6 +377,19 @@ class FundamentalAgent:
                 "SELL": "negative",   "STRONG SELL": "negative",
             }
             result["trend"] = _sig_map.get(result.get("investment_signal", ""), "neutral")
+
+        # score 抽出: LLM が出力した連続値を優先, なければ investment_signal テーブルからフォールバック
+        _SIGNAL_SCORE_MAP = {
+            "STRONG BUY": 1.0, "BUY": 0.6, "HOLD": 0.0,
+            "SELL": -0.6, "STRONG SELL": -1.0,
+        }
+        score_raw = result.get("score")
+        try:
+            fa_score = float(score_raw)
+            fa_score = round(max(-1.0, min(1.0, fa_score)), 4)
+        except (TypeError, ValueError):
+            fa_score = _SIGNAL_SCORE_MAP.get(result.get("investment_signal", ""), 0.0)
+        result["score"] = fa_score
 
         result.setdefault("data_source", "RAG（一次情報：financial_filings）")
         result["chunks_used"]    = len(chunks)
@@ -521,7 +538,10 @@ class FundamentalAgent:
             "Step 1〜4 の論理的帰結として、スイングトレード観点での最終的な投資判断を下してください。\n"
             "⚠️ 二次情報に基づく判断のため、確信度は一次資料分析より低いことを明示すること。\n"
             "判断は以下の5段階から厳密に1つ選択してください：\n"
-            "STRONG BUY / BUY / HOLD / SELL / STRONG SELL\n\n"
+            "STRONG BUY / BUY / HOLD / SELL / STRONG SELL\n"
+            "また、investment_signal と整合した連続スコア（-1.0〜+1.0 の実数）を score フィールドに出力してください。\n"
+            "参考: STRONG BUY≈+1.0, BUY≈+0.6, HOLD≈0.0, SELL≈-0.6, STRONG SELL≈-1.0\n"
+            "（単純な固定値ではなく、指標の強度を反映した細かい値を使うこと）\n\n"
 
             "## 出力フォーマット\n"
             "思考プロセス全体を含む、以下の JSON 形式のみで出力してください"
@@ -542,6 +562,7 @@ class FundamentalAgent:
             '  "risks":             "主要リスク要因（確度：低 — 二次情報）",\n'
             '  "outlook":           "将来展望（推測不可領域あり — yfinanceにガイダンスなし）",\n'
             '  "investment_signal": "STRONG BUY|BUY|HOLD|SELL|STRONG SELL",\n'
+            '  "score":             0.65,\n'
             '  "trend":             "positive|negative|neutral",\n'
             '  "trend_reason":      "1〜2文の日本語の根拠（二次情報である旨を含める）",\n'
             '  "data_source":       "yfinance（フォールバック）"\n'
@@ -563,6 +584,19 @@ class FundamentalAgent:
                 "SELL": "negative",   "STRONG SELL": "negative",
             }
             result["trend"] = _sig_map.get(result.get("investment_signal", ""), "neutral")
+
+        # score 抽出: LLM が出力した連続値を優先, なければ investment_signal テーブルからフォールバック
+        _SIGNAL_SCORE_MAP = {
+            "STRONG BUY": 1.0, "BUY": 0.6, "HOLD": 0.0,
+            "SELL": -0.6, "STRONG SELL": -1.0,
+        }
+        score_raw = result.get("score")
+        try:
+            fa_score = float(score_raw)
+            fa_score = round(max(-1.0, min(1.0, fa_score)), 4)
+        except (TypeError, ValueError):
+            fa_score = _SIGNAL_SCORE_MAP.get(result.get("investment_signal", ""), 0.0)
+        result["score"] = fa_score
 
         result.setdefault("data_source", "yfinance（フォールバック）")
         result.setdefault("raw_llm_output", raw)
@@ -662,6 +696,7 @@ class FundamentalAgent:
         result["edgar_auto_fetch"] = edgar_triggered
         result.setdefault("error",          fetch_error)
         result.setdefault("trend",          "neutral")
+        result.setdefault("score",          0.0)
         result.setdefault("trend_reason",   "")
         result.setdefault("revenue_growth", "N/A")
         result.setdefault("profitability",  "N/A")

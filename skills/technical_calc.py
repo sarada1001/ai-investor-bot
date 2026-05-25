@@ -131,10 +131,30 @@ def _signal_summary(rsi: float, macd: dict, sma: dict) -> str:
 # LLM trend classification                                            #
 # ------------------------------------------------------------------ #
 
-def _llm_classify_trend(ticker: str, rsi: float, macd: dict, sma: dict) -> tuple[str, str]:
+def _derive_tech_score(rsi: float, macd: dict, sma: dict) -> float:
     """
-    Ask LLM to judge short-term trend as positive / negative / neutral.
-    Returns (trend, reason).
+    LLM 不使用の数学的スコア算出（LLM フォールバック / 保険用）。
+    RSI / MACD / SMA25 の 3 指標を重み付き合成して -1.0〜+1.0 を返す。
+
+    RSI  (40%): 50 が中立, <30 が売られすぎ(強気+), >70 が買われすぎ(弱気-)
+    MACD (40%): ゴールデンクロス=+0.5, デッドクロス=-0.5 (固定)
+    SMA  (20%): 乖離率 ±8% を ±1.0 に正規化
+    """
+    rsi_score  = max(-1.0, min(1.0, (50.0 - rsi) / 30.0))
+    macd_score = 0.5 if macd["trend"] == "golden_cross" else -0.5
+    sma_score  = max(-1.0, min(1.0, sma["diff_pct"] / 8.0))
+    return round(0.4 * rsi_score + 0.4 * macd_score + 0.2 * sma_score, 4)
+
+
+def _llm_classify_trend(
+    ticker: str, rsi: float, macd: dict, sma: dict
+) -> tuple[str, float, str]:
+    """
+    Ask LLM to judge short-term trend with a continuous score.
+    Returns (trend, score, reason).
+      trend : "positive" | "negative" | "neutral"
+      score : float in [-1.0, +1.0]  (LLM 失敗時は数学的フォールバック)
+      reason: str
     """
     rsi_label = (
         f"{rsi}（売られすぎ）" if rsi < 30 else
@@ -147,6 +167,8 @@ def _llm_classify_trend(ticker: str, rsi: float, macd: dict, sma: dict) -> tuple
         else f"SMA25より{sma['diff_pct']:+.2f}%（下方乖離）"
     )
 
+    math_fallback = _derive_tech_score(rsi, macd, sma)
+
     prompt = (
         f"あなたはプロのテクニカルアナリストです。\n"
         f"銘柄【{ticker}】の直近テクニカル指標を読み、スイングトレードの観点から"
@@ -157,7 +179,11 @@ def _llm_classify_trend(ticker: str, rsi: float, macd: dict, sma: dict) -> tuple
         f"            macd={macd['macd']:.4f}, signal={macd['signal']:.4f}, histogram={macd['histogram']:+.4f}\n"
         f"  SMA25    : {sma_label}（SMA={sma['sma25']:.2f}, 現在値={sma['latest_price']:.2f}）\n\n"
         f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
-        f'{{"trend": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の根拠"}}\n'
+        f'{{"score": 0.65, "trend": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の根拠"}}\n'
+        f"score: -1.0（極めて弱気）〜 +1.0（極めて強気）の実数。"
+        f"単純な +1/0/-1 ではなく、指標の複合的な強度を反映した細かい値を使うこと。\n"
+        f"trend: score の符号と一致させること"
+        f"（score > 0.1 → positive, score < -0.1 → negative, else → neutral）。\n"
         f"positive=強気（上昇見込み）, negative=弱気（下落リスク）, neutral=中立"
     )
     try:
@@ -165,10 +191,16 @@ def _llm_classify_trend(ticker: str, rsi: float, macd: dict, sma: dict) -> tuple
         m = re.search(r'\{.*\}', raw, re.DOTALL)
         if m:
             parsed = json.loads(m.group())
-            return str(parsed.get("trend", "neutral")), str(parsed.get("reason", ""))
+            trend = str(parsed.get("trend", "neutral"))
+            try:
+                score = float(parsed.get("score", math_fallback))
+                score = round(max(-1.0, min(1.0, score)), 4)
+            except (TypeError, ValueError):
+                score = math_fallback
+            return trend, score, str(parsed.get("reason", ""))
     except Exception as e:
-        return "neutral", f"LLM分類エラー: {e}"
-    return "neutral", "パース失敗"
+        return "neutral", math_fallback, f"LLM分類エラー: {e}"
+    return "neutral", math_fallback, "パース失敗"
 
 
 # ------------------------------------------------------------------ #
@@ -219,7 +251,7 @@ def analyze_ticker(ticker: str, period: str = "6mo") -> dict:
         macd = _calc_macd(close)
         sma = _calc_sma25(close)
         summary = _signal_summary(rsi, macd, sma)
-        trend, reason = _llm_classify_trend(ticker, rsi, macd, sma)
+        trend, score, reason = _llm_classify_trend(ticker, rsi, macd, sma)
 
         return {
             "ticker": ticker,
@@ -232,7 +264,8 @@ def analyze_ticker(ticker: str, period: str = "6mo") -> dict:
                 "sma25": sma,
             },
             "signal_summary": summary,
-            "trend": trend,
+            "trend":        trend,
+            "score":        score,   # 連続スコア (-1.0〜+1.0)
             "trend_reason": reason,
             "error": None,
         }

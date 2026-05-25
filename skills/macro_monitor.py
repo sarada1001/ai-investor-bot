@@ -94,7 +94,29 @@ def _analyze_vix(period: str) -> dict:
 # LLM classification                                                   #
 # ------------------------------------------------------------------ #
 
-def _llm_classify(spy: dict, vix: dict) -> tuple[str, str]:
+def _derive_macro_score(spy: dict, vix: dict) -> float:
+    """
+    LLM 不使用の数学的スコア算出（LLM フォールバック / 保険用）。
+    SPY 乖離・5日リターン・VIX の 3 軸を重み付き合成して -1.0〜+1.0 を返す。
+
+    SPY 乖離  (30%): ±5% を ±1.0 に正規化
+    5日リターン(30%): ±3% を ±1.0 に正規化
+    VIX      (40%): VIX=20 が中立, <10 → +1.0, >30 → -1.0（逆スケール）
+    """
+    spy_score = max(-1.0, min(1.0, spy["diff_pct"] / 5.0))
+    ret_score = max(-1.0, min(1.0, spy["return_5d_pct"] / 3.0))
+    vix_score = max(-1.0, min(1.0, (20.0 - vix["latest"]) / 10.0))
+    return round(0.3 * spy_score + 0.3 * ret_score + 0.4 * vix_score, 4)
+
+
+def _llm_classify(spy: dict, vix: dict) -> tuple[str, float, str]:
+    """
+    Ask LLM to judge macro environment with a continuous score.
+    Returns (trend, score, reason).
+      trend : "positive" | "negative" | "neutral"
+      score : float in [-1.0, +1.0]  (LLM 失敗時は数学的フォールバック)
+      reason: str
+    """
     spy_label = (
         f"SPY={spy['latest_price']:.2f}, SMA乖離{spy['diff_pct']:+.2f}%"
         f"（{'上方' if spy['position'] == 'above' else '下方'}乖離）, "
@@ -105,13 +127,19 @@ def _llm_classify(spy: dict, vix: dict) -> tuple[str, str]:
         f"5日平均={vix['avg_5d']:.2f}"
     )
 
+    math_fallback = _derive_macro_score(spy, vix)
+
     prompt = (
         "あなたはプロのマクロアナリストです。\n"
         "以下の市場全体の指標を読み、スイングトレードに対する現在の相場環境を判定してください。\n\n"
         f"【S&P 500 (SPY)】\n{spy_label}\n\n"
         f"【恐怖指数 (VIX)】\n{vix_label}\n\n"
         "必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
-        '{"trend": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の根拠"}\n'
+        '{"score": 0.45, "trend": "positive"|"negative"|"neutral", "reason": "1~2文の日本語の根拠"}\n'
+        "score: -1.0（極めてリスクオフ）〜 +1.0（極めてリスクオン）の実数。"
+        "単純な +1/0/-1 ではなく、指標の複合的な強度を反映した細かい値を使うこと。\n"
+        "trend: score の符号と一致させること"
+        "（score > 0.1 → positive, score < -0.1 → negative, else → neutral）。\n"
         "positive=リスクオン（相場堅調・VIX低位安定）, "
         "negative=リスクオフ（相場下落・VIX高騰または急上昇）, "
         "neutral=方向感なしまたは混合シグナル"
@@ -121,10 +149,16 @@ def _llm_classify(spy: dict, vix: dict) -> tuple[str, str]:
         m = re.search(r'\{.*\}', raw, re.DOTALL)
         if m:
             parsed = json.loads(m.group())
-            return str(parsed.get("trend", "neutral")), str(parsed.get("reason", ""))
+            trend = str(parsed.get("trend", "neutral"))
+            try:
+                score = float(parsed.get("score", math_fallback))
+                score = round(max(-1.0, min(1.0, score)), 4)
+            except (TypeError, ValueError):
+                score = math_fallback
+            return trend, score, str(parsed.get("reason", ""))
     except Exception as e:
-        return "neutral", f"LLM分類エラー: {e}"
-    return "neutral", "パース失敗"
+        return "neutral", math_fallback, f"LLM分類エラー: {e}"
+    return "neutral", math_fallback, "パース失敗"
 
 
 # ------------------------------------------------------------------ #
@@ -158,7 +192,7 @@ def run(period: str = "1mo") -> dict:
             "error": err,
         }
 
-    trend, reason = _llm_classify(spy, vix)
+    trend, score, reason = _llm_classify(spy, vix)
 
     summary = (
         f"SPY {spy['diff_pct']:+.2f}%乖離({spy['position']}) "
@@ -170,6 +204,7 @@ def run(period: str = "1mo") -> dict:
         "vix": vix,
         "signal_summary": summary,
         "trend": trend,
+        "score": score,        # 連続スコア (-1.0〜+1.0)
         "trend_reason": reason,
         "error": None,
     }

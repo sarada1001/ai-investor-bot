@@ -81,29 +81,47 @@ def _llm_analyze(ticker: str, posts: list[str]) -> dict:
     prompt = (
         f"以下は株式ティッカー {ticker} に関するSNS投稿（Reddit r/wallstreetbets・StockTwits風）です。\n\n"
         f"【投稿リスト】\n{posts_block}\n\n"
-        f"以下の3点を評価してください。\n"
+        f"以下の4点を評価してください。\n"
         f"① overall_sentiment: 全体的なセンチメント (\"POSITIVE\", \"NEUTRAL\", \"NEGATIVE\" のいずれか)\n"
         f"② hype_score: 0.0〜1.0 の買い煽り(Hype)スコア\n"
         f"   - 🚀💎YOLO等の絵文字・感情語が多く、PER・売上・チャート根拠なし → 高い(0.7〜1.0)\n"
         f"   - 財務指標・DCF・テクニカル指標への具体的言及あり          → 低い(0.0〜0.3)\n"
-        f"③ reason: 判定理由（英語1〜2文）\n\n"
+        f"③ signal_score: -1.0〜+1.0 の投資シグナルスコア。hype_score が高いほど割り引くこと。\n"
+        f"   - POSITIVE + 低Hype(0.0〜0.3): +0.4〜+1.0\n"
+        f"   - POSITIVE + 高Hype(0.7〜1.0): +0.0〜+0.2（根拠なき買い煽りは信頼度低）\n"
+        f"   - NEGATIVE: -0.3〜-0.8\n"
+        f"   - NEUTRAL: -0.1〜+0.1\n"
+        f"④ reason: 判定理由（英語1〜2文）\n\n"
         f"必ず以下のJSON形式のみで出力してください（余分なテキスト不要）:\n"
         '{{"overall_sentiment": "POSITIVE"|"NEUTRAL"|"NEGATIVE", '
-        '"hype_score": 0.0-1.0, "reason": "English 1-2 sentences"}}'
+        '"hype_score": 0.0-1.0, "signal_score": 0.0, "reason": "English 1-2 sentences"}}'
     )
+    _SENT_SCORE: dict[str, float] = {"POSITIVE": 0.4, "NEUTRAL": 0.0, "NEGATIVE": -0.4}
     try:
         raw = _get_llm().invoke(prompt).content.strip()
         start = raw.find("{")
         if start != -1:
             parsed, _ = json.JSONDecoder().raw_decode(raw, start)
+            sentiment = str(parsed.get("overall_sentiment", "NEUTRAL")).upper()
+            # 連続スコア: LLM 出力を優先, 取得失敗時は sentiment ラベルから離散フォールバック
+            raw_sig = parsed.get("signal_score")
+            try:
+                sig_score = float(raw_sig)
+                sig_score = round(max(-1.0, min(1.0, sig_score)), 4)
+            except (TypeError, ValueError):
+                sig_score = _SENT_SCORE.get(sentiment, 0.0)
             return {
-                "sentiment":  str(parsed.get("overall_sentiment", "NEUTRAL")).upper(),
-                "hype_score": float(parsed.get("hype_score", 0.5)),
-                "reason":     str(parsed.get("reason", "")),
+                "sentiment":    sentiment,
+                "hype_score":   float(parsed.get("hype_score", 0.5)),
+                "signal_score": sig_score,
+                "reason":       str(parsed.get("reason", "")),
             }
     except Exception as e:
-        return {"sentiment": "NEUTRAL", "hype_score": 0.5, "reason": f"LLM error: {e}"}
-    return {"sentiment": "NEUTRAL", "hype_score": 0.5, "reason": "Parse failed"}
+        return {
+            "sentiment": "NEUTRAL", "hype_score": 0.5,
+            "signal_score": 0.0, "reason": f"LLM error: {e}",
+        }
+    return {"sentiment": "NEUTRAL", "hype_score": 0.5, "signal_score": 0.0, "reason": "Parse failed"}
 
 
 # ─── Public API ───────────────────────────────────────────────────────────── #
@@ -136,6 +154,7 @@ def fetch_social_sentiment(ticker: str, hype_mode: bool = True) -> dict:
             "ticker":        ticker,
             "sentiment":     "NEUTRAL",
             "hype_score":    0.0,
+            "score":         0.0,   # 連続スコア（本番は常に中立）
             "reason":        "SNS API 未接続（SOCIAL_USE_MOCK=false）。中立スコアを使用。",
             "post_count":    0,
             "source":        "unavailable",
@@ -149,6 +168,7 @@ def fetch_social_sentiment(ticker: str, hype_mode: bool = True) -> dict:
         "ticker":        ticker,
         "sentiment":     analysis["sentiment"],
         "hype_score":    analysis["hype_score"],
+        "score":         analysis.get("signal_score", 0.0),   # 連続スコア (hype 割引済み)
         "reason":        analysis["reason"],
         "post_count":    len(posts),
         "source":        "mock_reddit_wsb",
