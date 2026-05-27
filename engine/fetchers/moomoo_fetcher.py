@@ -1,27 +1,46 @@
 """engine/fetchers/moomoo_fetcher.py — Moomoo (Futu OpenAPI) データフェッチャー
 
-本番APIは後日実装予定。現時点ではインターフェースとモック（ダミーデータ）を提供する。
+FutuOpenD ローカルゲートウェイ (デフォルト: 127.0.0.1:11111) 経由で
+米国株のリアルタイム板情報・資金フローを取得する。
+
+接続エラー・レートリミット・休場日などの場合はモックデータにフォールバックし、
+システム全体をクラッシュさせない設計（try-except + フォールバック徹底）。
 
 取得データ:
   - OrderBook : Ask/Bid の気配値・数量（最良5本値）
-  - CapitalFlow: 超大口・大口・中口・小口の資金流入出（当日累計 USD）
+  - CapitalFlow: 超大口・大口・中口・小口の純資金流入出（当日累計 USD）
+
+Futu API 戻り値仕様:
+  get_order_book(code, num) → (RET_OK, {'Ask': [(price, vol, n, {}), ...], 'Bid': [...]})
+  get_capital_flow(code)    → (RET_OK, DataFrame[
+                                 last_valid_time, in_flow,
+                                 super_in_flow, big_in_flow, mid_in_flow, sml_in_flow,
+                                 main_in_flow, capital_flow_item_time
+                               ])
+  ※ *_in_flow は純流入額(USD, 正=買い越し/負=売り越し)
+
+環境変数:
+    MOOMOO_USE_MOCK   : "true" でモック強制 (デフォルト: "false" = ライブ優先)
+    MOOMOO_HOST       : OpenD ゲートウェイホスト (デフォルト: "127.0.0.1")
+    MOOMOO_PORT       : OpenD ゲートウェイポート (デフォルト: 11111)
 
 使用例:
-    fetcher = MoomooFetcher(ticker="AAPL", use_mock=True)
+    fetcher = MoomooFetcher(ticker="AAPL")                 # ライブ優先 (OpenD 接続)
+    fetcher = MoomooFetcher(ticker="AAPL", use_mock=True)  # モック強制
     book = fetcher.get_order_book()    # OrderBook dataclass
     flow = fetcher.get_capital_flow()  # CapitalFlow dataclass
-
-本番接続時（将来実装）:
-    import futu
-    fetcher = MoomooFetcher(ticker="AAPL", use_mock=False)
-    # OpenD ゲートウェイ経由で実データを取得する実装に差し替える
+    print(fetcher.data_source)         # "live" | "mock" | "mock_fallback"
 """
 
 from __future__ import annotations
 
+import logging
 import os
+import socket
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────
@@ -63,6 +82,18 @@ class CapitalFlowTier:
     def net(self) -> float:
         return self.inflow - self.outflow
 
+    @classmethod
+    def from_net(cls, net_flow: float) -> "CapitalFlowTier":
+        """
+        Futu APIの純流入額（net）から CapitalFlowTier を生成する。
+        net > 0 → inflow=net, outflow=0 （買い越し）
+        net < 0 → inflow=0, outflow=-net （売り越し）
+        tier.net は元の net_flow と等価。
+        """
+        if net_flow >= 0:
+            return cls(inflow=round(net_flow, 2), outflow=0.0)
+        return cls(inflow=0.0, outflow=round(-net_flow, 2))
+
 
 @dataclass
 class CapitalFlow:
@@ -71,9 +102,9 @@ class CapitalFlow:
 
     各ティアの一般的な定義:
       super_large : 注文1件 $500k 超（機関投資家・ヘッジファンド）
-      large       : 注文1件 $100k〜$500k
-      medium      : 注文1件 $10k〜$100k
-      small       : 注文1件 $10k 未満（個人投資家）
+      large       : 注文1件 $100k〜$500k（Futu: big_in_flow）
+      medium      : 注文1件 $10k〜$100k （Futu: mid_in_flow）
+      small       : 注文1件 $10k 未満（個人投資家、Futu: sml_in_flow）
     """
     super_large: CapitalFlowTier = field(default_factory=lambda: CapitalFlowTier(0.0, 0.0))
     large:       CapitalFlowTier = field(default_factory=lambda: CapitalFlowTier(0.0, 0.0))
@@ -93,14 +124,14 @@ class CapitalFlow:
 
 @runtime_checkable
 class LiquidityFetcher(Protocol):
-    """板情報・資金フローを取得するフェッチャーのインターフェース（将来の差し替え用）。"""
+    """板情報・資金フローを取得するフェッチャーのインターフェース（差し替え用）。"""
 
     def get_order_book(self, levels: int = 5) -> OrderBook: ...
     def get_capital_flow(self) -> CapitalFlow: ...
 
 
 # ──────────────────────────────────────────────
-# モックデータセット（再現性のため定数）
+# モックデータセット（フォールバック・テスト用）
 # ──────────────────────────────────────────────
 
 # 強気シナリオ: 大口買い越し + Bid側優勢
@@ -183,9 +214,10 @@ _MOCK_NEUTRAL: dict[str, dict] = {
 
 # ティッカー別モックシナリオ割り当て（テスト再現性のため固定）
 _TICKER_SCENARIO: dict[str, dict] = {
-    "AAPL": _MOCK_BULLISH, "MSFT": _MOCK_BULLISH, "NVDA": _MOCK_BULLISH,
+    "AAPL": _MOCK_BULLISH,  "MSFT": _MOCK_BULLISH, "NVDA": _MOCK_BULLISH,
     "GOOGL": _MOCK_BULLISH, "META": _MOCK_BULLISH, "AMZN": _MOCK_BULLISH,
-    "TSLA": _MOCK_BEARISH, "INTC": _MOCK_BEARISH, "BA": _MOCK_BEARISH, "DIS": _MOCK_BEARISH,
+    "TSLA": _MOCK_BEARISH,  "INTC": _MOCK_BEARISH, "BA":   _MOCK_BEARISH,
+    "DIS":  _MOCK_BEARISH,
 }
 
 
@@ -202,18 +234,51 @@ class MoomooFetcher:
     """
     Moomoo (Futu OpenAPI) データフェッチャー。
 
+    FutuOpenD ローカルゲートウェイ経由でリアルタイムデータを取得する。
+    接続エラー・APIエラー・休場時は自動的にモックデータにフォールバックし、
+    システムをクラッシュさせない。
+
     Parameters
     ----------
-    ticker   : 取得対象銘柄シンボル
-    use_mock : True = モックデータを返す（デフォルト）
-               False = 将来の本番API実装用（現在は未実装、NotImplementedError を発生）
+    ticker   : 取得対象銘柄シンボル（例: "AAPL"）。Futu用 "US.AAPL" に自動変換。
+    use_mock : True = モック強制 / False = ライブ優先 / None = 環境変数に従う
+    host     : OpenD ゲートウェイホスト（None = 環境変数 MOOMOO_HOST）
+    port     : OpenD ゲートウェイポート（None = 環境変数 MOOMOO_PORT）
     """
 
-    def __init__(self, ticker: str, use_mock: bool | None = None) -> None:
+    def __init__(
+        self,
+        ticker: str,
+        use_mock: bool | None = None,
+        host: str | None = None,
+        port: int | None = None,
+    ) -> None:
         self.ticker   = ticker.upper()
-        # 環境変数 MOOMOO_USE_MOCK=false で将来の本番モードに切り替え可能
-        _env_mock     = os.getenv("MOOMOO_USE_MOCK", "true").lower()
-        self.use_mock = use_mock if use_mock is not None else (_env_mock != "false")
+        _env_mock     = os.getenv("MOOMOO_USE_MOCK", "false").lower()
+        self.use_mock = use_mock if use_mock is not None else (_env_mock == "true")
+        self._host    = host or os.getenv("MOOMOO_HOST", "127.0.0.1")
+        self._port    = port or int(os.getenv("MOOMOO_PORT", "11111"))
+        # ライブフェッチでいずれかが失敗した場合にフラグを立てる
+        self._had_live_failure: bool = False
+
+    @property
+    def data_source(self) -> str:
+        """
+        最後のフェッチで使ったデータソースを返す。
+
+        "live"         : ライブAPI取得成功
+        "mock"         : use_mock=True によるモック使用
+        "mock_fallback": ライブ試行後にエラーでモックにフォールバック
+        """
+        if self.use_mock:
+            return "mock"
+        return "mock_fallback" if self._had_live_failure else "live"
+
+    # ── Ticker conversion ─────────────────────────────────
+
+    def _to_futu_code(self) -> str:
+        """Futu API用の銘柄コードに変換する (例: AAPL → US.AAPL)。"""
+        return f"US.{self.ticker}"
 
     # ── Public API ────────────────────────────────────────
 
@@ -244,6 +309,158 @@ class MoomooFetcher:
             return self._mock_capital_flow()
         return self._live_capital_flow()
 
+    # ── Live implementations ──────────────────────────────
+
+    def _check_opend_reachable(self, timeout_sec: float = 2.0) -> None:
+        """
+        OpenD ゲートウェイへの TCP 疎通を事前チェックする（タイムアウト: timeout_sec 秒）。
+
+        OpenQuoteContext は接続失敗時に無限リトライ（6秒×∞）するため、
+        ソケットレベルで先に確認してから接続する。
+        接続できない場合は ConnectionRefusedError を raise する。
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout_sec)
+            result = sock.connect_ex((self._host, self._port))
+        if result != 0:
+            raise ConnectionRefusedError(
+                f"FutuOpenD が {self._host}:{self._port} で応答しません "
+                f"(errno={result}, timeout={timeout_sec}s)"
+            )
+
+    def _live_order_book(self, levels: int) -> OrderBook:
+        """
+        FutuOpenD から板情報をリアルタイム取得する。
+
+        Futu API の戻り値形式:
+            {'code': 'US.AAPL',
+             'Ask': [(price, vol, order_count, {}), ...],
+             'Bid': [(price, vol, order_count, {}), ...]}
+        """
+        ctx = None
+        try:
+            self._check_opend_reachable()  # 事前疎通チェック（2秒以内）
+            import futu as ft  # noqa: PLC0415  (lazy: 未インストール環境でも起動可)
+            logger.debug(
+                "[MoomooFetcher] Connecting to OpenD %s:%s — %s order book",
+                self._host, self._port, self.ticker,
+            )
+            ctx = ft.OpenQuoteContext(host=self._host, port=self._port)
+            ret, data = ctx.get_order_book(self._to_futu_code(), num=levels)
+
+            if ret != ft.RET_OK:
+                raise RuntimeError(f"Futu get_order_book error: {data}")
+
+            asks = [
+                OrderLevel(price=float(row[0]), size=int(row[1]))
+                for row in data.get("Ask", [])[:levels]
+            ]
+            bids = [
+                OrderLevel(price=float(row[0]), size=int(row[1]))
+                for row in data.get("Bid", [])[:levels]
+            ]
+
+            logger.info(
+                "[MoomooFetcher] ✅ %s order book (LIVE): %d asks / %d bids "
+                "| best_ask=%.2f best_bid=%.2f",
+                self.ticker,
+                len(asks),
+                len(bids),
+                asks[0].price if asks else 0.0,
+                bids[0].price if bids else 0.0,
+            )
+            return OrderBook(asks=asks, bids=bids)
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[MoomooFetcher] ⚠️  Order book live fetch failed for %s: %s"
+                " — falling back to mock",
+                self.ticker, exc,
+            )
+            self._had_live_failure = True
+            return self._mock_order_book(levels)
+        finally:
+            if ctx is not None:
+                try:
+                    ctx.close()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def _live_capital_flow(self) -> CapitalFlow:
+        """
+        FutuOpenD から当日の資金フローを取得する。
+
+        Futu API の capital_flow DataFrame 列 (INTRADAY):
+            super_in_flow : 超大口純流入額（正=買い越し / 負=売り越し）
+            big_in_flow   : 大口純流入額
+            mid_in_flow   : 中口純流入額
+            sml_in_flow   : 小口純流入額
+        最終行が当日の最新累計値。CapitalFlowTier.from_net() で inflow/outflow に変換。
+        """
+        ctx = None
+        try:
+            self._check_opend_reachable()  # 事前疎通チェック（2秒以内）
+            import futu as ft  # noqa: PLC0415  (lazy import)
+            logger.debug(
+                "[MoomooFetcher] Connecting to OpenD %s:%s — %s capital flow",
+                self._host, self._port, self.ticker,
+            )
+            ctx = ft.OpenQuoteContext(host=self._host, port=self._port)
+            ret, data = ctx.get_capital_flow(self._to_futu_code())
+
+            if ret != ft.RET_OK:
+                raise RuntimeError(f"Futu get_capital_flow error: {data}")
+
+            if data is None or (hasattr(data, "empty") and data.empty):
+                raise RuntimeError(
+                    "Empty capital flow data (market may be closed or LV2 data unavailable)"
+                )
+
+            # 最終行 = 当日最新の累計値
+            row = data.iloc[-1]
+
+            def _safe_net(col: str) -> float:
+                """列が存在しない・NaN の場合は 0.0 を返す。"""
+                try:
+                    val = row[col]
+                    return float(val) if val is not None else 0.0
+                except (KeyError, TypeError, ValueError):
+                    return 0.0
+
+            flow = CapitalFlow(
+                super_large = CapitalFlowTier.from_net(_safe_net("super_in_flow")),
+                large       = CapitalFlowTier.from_net(_safe_net("big_in_flow")),
+                medium      = CapitalFlowTier.from_net(_safe_net("mid_in_flow")),
+                small       = CapitalFlowTier.from_net(_safe_net("sml_in_flow")),
+            )
+            net_large = flow.super_large.net + flow.large.net
+            logger.info(
+                "[MoomooFetcher] ✅ %s capital flow (LIVE): "
+                "net_large=$%.0f  super=$%.0f  big=$%.0f  mid=$%.0f  sml=$%.0f",
+                self.ticker,
+                net_large,
+                flow.super_large.net,
+                flow.large.net,
+                flow.medium.net,
+                flow.small.net,
+            )
+            return flow
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[MoomooFetcher] ⚠️  Capital flow live fetch failed for %s: %s"
+                " — falling back to mock",
+                self.ticker, exc,
+            )
+            self._had_live_failure = True
+            return self._mock_capital_flow()
+        finally:
+            if ctx is not None:
+                try:
+                    ctx.close()
+                except Exception:  # noqa: BLE001
+                    pass
+
     # ── Mock implementations ─────────────────────────────
 
     def _mock_order_book(self, levels: int) -> OrderBook:
@@ -257,24 +474,10 @@ class MoomooFetcher:
 
     def _mock_capital_flow(self) -> CapitalFlow:
         scenario = _get_mock_scenario(self.ticker)
-        cf       = scenario["capital_flow"]
+        cf = scenario["capital_flow"]
         return CapitalFlow(
             super_large = CapitalFlowTier(**cf["super_large"]),
             large       = CapitalFlowTier(**cf["large"]),
             medium      = CapitalFlowTier(**cf["medium"]),
             small       = CapitalFlowTier(**cf["small"]),
-        )
-
-    # ── Live implementations (将来の本番実装) ────────────
-
-    def _live_order_book(self, levels: int) -> OrderBook:  # noqa: ARG002
-        raise NotImplementedError(
-            "Moomoo本番API未実装。use_mock=True を使用するか、"
-            "futu-api をインストールして OpenD ゲートウェイ経由で実装してください。"
-        )
-
-    def _live_capital_flow(self) -> CapitalFlow:
-        raise NotImplementedError(
-            "Moomoo本番API未実装。use_mock=True を使用するか、"
-            "futu-api をインストールして OpenD ゲートウェイ経由で実装してください。"
         )

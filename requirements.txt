@@ -54,5 +54,8 @@ PyYAML==6.0.3
 tqdm>=4.66.0                    # プログレスバー（build_corpus.py）
 websockets>=13.0,<17.0          # yfinance 1.3.0 + google-genai 1.75.0 共通制約
 
+# --- Moomoo / Futu OpenAPI ---
+futu-api>=9.0.0                 # Futu OpenD ゲートウェイ経由でリアルタイム板情報・資金フロー取得
+
 # --- テスト ---
 pytest>=8.0.0

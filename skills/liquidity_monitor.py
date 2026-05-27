@@ -252,7 +252,7 @@ def analyze_liquidity(ticker: str, use_mock: bool | None = None) -> dict:
         "net_small_inflow":  net_small_inflow,
         "pressure":          pressure,
         "score":             score,
-        "data_source":       "mock" if fetcher.use_mock else "live",
+        "data_source":       fetcher.data_source,
     }
 
 
