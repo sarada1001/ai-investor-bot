@@ -36,7 +36,9 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
 import socket
+import threading
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
@@ -311,13 +313,16 @@ class MoomooFetcher:
 
     # ── Live implementations ──────────────────────────────
 
+    # OpenD 接続タイムアウト（秒）。Graphic verification 等で無限リトライするのを防ぐ
+    _CONNECT_TIMEOUT_SEC: float = 4.0
+
     def _check_opend_reachable(self, timeout_sec: float = 2.0) -> None:
         """
         OpenD ゲートウェイへの TCP 疎通を事前チェックする（タイムアウト: timeout_sec 秒）。
 
-        OpenQuoteContext は接続失敗時に無限リトライ（6秒×∞）するため、
-        ソケットレベルで先に確認してから接続する。
         接続できない場合は ConnectionRefusedError を raise する。
+        ※ ポートが OPEN でも画像認証などで接続拒否される場合があるため、
+          この check のあとにさらにスレッドタイムアウトを使う。
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(timeout_sec)
@@ -326,6 +331,59 @@ class MoomooFetcher:
             raise ConnectionRefusedError(
                 f"FutuOpenD が {self._host}:{self._port} で応答しません "
                 f"(errno={result}, timeout={timeout_sec}s)"
+            )
+
+    def _open_quote_ctx_with_timeout(self) -> "futu.OpenQuoteContext":  # type: ignore[name-defined]
+        """
+        OpenQuoteContext をスレッド内で生成し、_CONNECT_TIMEOUT_SEC 秒以内に
+        接続が完了しなければ TimeoutError を raise する。
+
+        OpenQuoteContext は画像認証要求・接続拒否時に while True で無限リトライするため、
+        daemon スレッド + queue.Queue を使って強制タイムアウトする。
+        timeout 超過時、スレッドは daemon なので main プロセス終了時に自動回収される。
+        """
+        import futu  # noqa: PLC0415
+
+        # Futu SDK の内部接続リトライログを抑制する。
+        # futu SDK は 'FTConsoleLog' / 'FTFileLog' という独自ロガーを使うため
+        # 標準の 'futu' ロガーへの setLevel は効かない。両方を CRITICAL に設定する。
+        # （タイムアウト後も daemon スレッドがリトライし続けるためノイズを消す）
+        _ft_console = logging.getLogger("FTConsoleLog")
+        _ft_file    = logging.getLogger("FTFileLog")
+        _orig_console_lvl = _ft_console.level
+        _orig_file_lvl    = _ft_file.level
+        _ft_console.setLevel(logging.CRITICAL)
+        _ft_file.setLevel(logging.CRITICAL)
+
+        result_q: queue.Queue = queue.Queue(maxsize=1)
+
+        def _connect() -> None:
+            try:
+                ctx = futu.OpenQuoteContext(host=self._host, port=self._port)
+                result_q.put_nowait(("ok", ctx))
+            except Exception as exc:  # noqa: BLE001
+                result_q.put_nowait(("err", exc))
+
+        t = threading.Thread(target=_connect, daemon=True, name="futu-connect")
+        t.start()
+
+        try:
+            status, value = result_q.get(timeout=self._CONNECT_TIMEOUT_SEC)
+            # 成功 or 即時エラー → futu ロガーをレベル復元
+            _ft_console.setLevel(_orig_console_lvl)
+            _ft_file.setLevel(_orig_file_lvl)
+            if status == "err":
+                raise value  # type: ignore[misc]
+            return value  # type: ignore[return-value]
+        except queue.Empty:
+            # タイムアウト: daemon スレッドはそのまま daemon なので main 終了時に自動回収
+            # ロガー抑制はそのまま維持（バックグラウンドのリトライログを消し続ける）
+            raise TimeoutError(
+                f"FutuOpenD ({self._host}:{self._port}) への接続が "
+                f"{self._CONNECT_TIMEOUT_SEC}s 以内に完了しませんでした。\n"
+                "【原因として考えられる】画像認証コード (Graphic Verification Code) が\n"
+                "FutuOpenD アプリで要求されています。プロジェクトルートの PicVerifyCode.png\n"
+                "に表示されたコードを FutuOpenD の認証ダイアログに入力してください。"
             )
 
     def _live_order_book(self, levels: int) -> OrderBook:
@@ -339,13 +397,13 @@ class MoomooFetcher:
         """
         ctx = None
         try:
-            self._check_opend_reachable()  # 事前疎通チェック（2秒以内）
             import futu as ft  # noqa: PLC0415  (lazy: 未インストール環境でも起動可)
+            self._check_opend_reachable()  # TCP 疎通チェック（2秒以内、ECONNREFUSED を早期検出）
             logger.debug(
                 "[MoomooFetcher] Connecting to OpenD %s:%s — %s order book",
                 self._host, self._port, self.ticker,
             )
-            ctx = ft.OpenQuoteContext(host=self._host, port=self._port)
+            ctx = self._open_quote_ctx_with_timeout()  # タイムアウト付き接続（画像認証対策）
             ret, data = ctx.get_order_book(self._to_futu_code(), num=levels)
 
             if ret != ft.RET_OK:
@@ -399,13 +457,13 @@ class MoomooFetcher:
         """
         ctx = None
         try:
-            self._check_opend_reachable()  # 事前疎通チェック（2秒以内）
             import futu as ft  # noqa: PLC0415  (lazy import)
+            self._check_opend_reachable()  # TCP 疎通チェック（2秒以内）
             logger.debug(
                 "[MoomooFetcher] Connecting to OpenD %s:%s — %s capital flow",
                 self._host, self._port, self.ticker,
             )
-            ctx = ft.OpenQuoteContext(host=self._host, port=self._port)
+            ctx = self._open_quote_ctx_with_timeout()  # タイムアウト付き接続（画像認証対策）
             ret, data = ctx.get_capital_flow(self._to_futu_code())
 
             if ret != ft.RET_OK:
