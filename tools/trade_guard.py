@@ -5,7 +5,7 @@ BUY 発注前に以下の 3 条件をすべて確認し、1 つでも失敗し�
 
   1. 日次 BUY 上限      : 1日あたりの最大発注回数 (デフォルト: 3 回)
   2. 同時保有銘柄数上限 : ポートフォリオの最大銘柄数 (デフォルト: 5 銘柄)
-  3. ポジション比率上限 : 1 銘柄あたり口座資産の最大割合 (デフォルト: 20%)
+  3. ポジション比率上限 : 1 銘柄あたり口座資産の最大割合 (デフォルト: 100%)
 
 設定ファイル : data/trade_guards.json  (存在しない場合はデフォルト値を使用)
 状態ファイル : data/trade_guard_state.json  (日次 BUY カウントを永続化)
@@ -40,9 +40,9 @@ _CONFIG_PATH  = _PROJECT_ROOT / "data" / "trade_guards.json"
 _STATE_PATH   = _PROJECT_ROOT / "data" / "trade_guard_state.json"
 
 _DEFAULT_CONFIG: dict = {
-    "max_daily_buys":   3,     # 1 日あたり最大 BUY 発注回数
-    "max_positions":    5,     # 同時保有最大銘柄数
-    "max_position_pct": 0.20,  # 1 銘柄あたり口座資産の最大割合
+    "max_daily_buys":   3,    # 1 日あたり最大 BUY 発注回数
+    "max_positions":    5,    # 同時保有最大銘柄数
+    "max_position_pct": 1.0,  # 1 銘柄あたり口座資産の最大割合 (1.0=上限なし相当)
 }
 
 

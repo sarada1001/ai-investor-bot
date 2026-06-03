@@ -16,8 +16,10 @@ def _posted_text(mock_post) -> str:
     return body["messages"][0]["text"]
 
 
-def _result(ticker: str, decision: str, score: float = 1.0, rationale: str = "テスト理由") -> dict:
-    return {"ticker": ticker, "decision": decision, "score": score, "rationale": rationale}
+def _result(ticker: str, decision: str, score: float = 1.0, rationale: str = "テスト理由",
+            order: dict | None = None) -> dict:
+    return {"ticker": ticker, "decision": decision, "score": score,
+            "rationale": rationale, "order": order}
 
 
 @pytest.fixture(autouse=True)
@@ -117,11 +119,50 @@ class TestSendLineNotification:
             text = _posted_text(mock_post)
             assert "ECC スクリーニング結果" in text
 
-    def test_rationale_truncated_to_60_chars(self):
-        """rationaleが60文字で切り詰められること。"""
-        long_reason = "あ" * 100
-        results = [_result("AAPL", "BUY", rationale=long_reason)]
+    def test_rationale_not_included_in_line_output(self):
+        """rationaleはLINEメッセージに含まれないこと（ニュース情報除外要件）。"""
+        results = [_result("AAPL", "BUY", rationale="ニュースポジティブ・テクニカル強い")]
         with patch("engine.notify.requests.post") as mock_post:
             notify_mod.send_line_notification(results)
             text = _posted_text(mock_post)
-            assert "あ" * 61 not in text
+            assert "ニュースポジティブ" not in text
+            assert "理由:" not in text
+
+    def test_strong_buy_with_successful_order_shows_order_id(self):
+        """STRONG BUY かつ発注成功時にorder_idが表示されること。"""
+        order = {"success": True, "order_id": "abc12345-xxxx", "qty": 5}
+        results = [_result("NVDA", "STRONG BUY", order=order)]
+        with patch("engine.notify.requests.post") as mock_post:
+            notify_mod.send_line_notification(results)
+            text = _posted_text(mock_post)
+            assert "✅" in text
+            assert "abc12345" in text
+            assert "×5株" in text
+
+    def test_strong_buy_with_dry_run_shows_dry_run_label(self):
+        """STRONG BUY かつ dry_run 時にDry-Runラベルが表示されること。"""
+        order = {"dry_run": True, "qty": 3}
+        results = [_result("AAPL", "STRONG BUY", order=order)]
+        with patch("engine.notify.requests.post") as mock_post:
+            notify_mod.send_line_notification(results)
+            text = _posted_text(mock_post)
+            assert "Dry-Run" in text
+
+    def test_strong_buy_with_skipped_order_shows_skip_reason(self):
+        """STRONG BUY かつ発注スキップ時にスキップ理由が表示されること。"""
+        order = {"skipped": True, "skip_reason": "既に保有中（二重注文防止）"}
+        results = [_result("TSLA", "STRONG BUY", order=order)]
+        with patch("engine.notify.requests.post") as mock_post:
+            notify_mod.send_line_notification(results)
+            text = _posted_text(mock_post)
+            assert "スキップ" in text
+
+    def test_strong_buy_no_order_shows_nothing_extra(self):
+        """STRONG BUY かつ order=None のとき余分な行が追加されないこと。"""
+        results = [_result("META", "STRONG BUY", order=None)]
+        with patch("engine.notify.requests.post") as mock_post:
+            notify_mod.send_line_notification(results)
+            text = _posted_text(mock_post)
+            assert "META" in text
+            assert "✅" not in text
+            assert "Dry-Run" not in text

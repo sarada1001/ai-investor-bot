@@ -132,10 +132,12 @@ class TestMoomooFetcher:
         net_large = flow.super_large.net + flow.large.net
         assert abs(net_large) < 500_000, "中立シナリオは大口フローがほぼ均衡であること"
 
-    def test_live_mode_raises_not_implemented(self):
+    def test_live_mode_returns_valid_order_book(self):
+        # use_mock=False ではライブ取得 ("live") またはフォールバック ("mock_fallback") になる
         fetcher = MoomooFetcher(ticker="AAPL", use_mock=False)
-        with pytest.raises(NotImplementedError):
-            fetcher.get_order_book()
+        book = fetcher.get_order_book()
+        assert isinstance(book, OrderBook)
+        assert fetcher.data_source in ("live", "mock_fallback")
 
     def test_to_dict_structure(self):
         fetcher = MoomooFetcher(ticker="AAPL", use_mock=True)

@@ -10,13 +10,14 @@ Functions:
 
 from __future__ import annotations
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_API_KEY = os.getenv("APCA_API_KEY_ID", "")
-_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY", "")
-_PAPER = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
+_API_KEY    = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY", "")
+_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY", "")
+_PAPER      = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
 
 
 def _client():

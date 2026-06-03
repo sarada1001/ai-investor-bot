@@ -1,5 +1,10 @@
 {
-  "daily_buy_count": 0,
-  "last_reset_date": null,
-  "buy_log": []
+  "daily_buy_count": 1,
+  "last_reset_date": "2026-06-03",
+  "buy_log": [
+    {
+      "ticker": "AAPL",
+      "time": "2026-06-03T11:36:01.542194"
+    }
+  ]
 }

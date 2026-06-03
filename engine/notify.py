@@ -54,14 +54,25 @@ def send_line_notification(results: list[dict]) -> None:
     if buy_results:
         lines.append(f"{total}銘柄を分析 | 通過: {len(buy_results)}銘柄\n")
         for r in buy_results:
-            decision  = r.get("decision", "BUY")
-            ticker    = r.get("ticker", "?")
-            score     = r.get("score", 0.0)
-            rationale = r.get("rationale", "")[:60]
-            icon      = "🚀" if decision == "STRONG BUY" else "📈"
+            decision = r.get("decision", "BUY")
+            ticker   = r.get("ticker", "?")
+            score    = r.get("score", 0.0)
+            icon     = "🚀" if decision == "STRONG BUY" else "📈"
             lines.append(f"{icon} {ticker}  {decision}  スコア {score:+.4f}")
-            if rationale:
-                lines.append(f"   理由: {rationale}")
+            if decision == "STRONG BUY":
+                order = r.get("order") or {}
+                if order.get("success"):
+                    oid = str(order.get("order_id", ""))[:8]
+                    qty = int(order.get("qty", 0))
+                    lines.append(f"   ✅ Alpaca発注済: ×{qty}株  ID={oid}")
+                elif order.get("dry_run"):
+                    lines.append("   🔵 Dry-Run（発注スキップ）")
+                elif order.get("skipped"):
+                    reason = (order.get("skip_reason") or "")[:40]
+                    lines.append(f"   ⏭ スキップ: {reason}")
+                elif order.get("error"):
+                    err = (order.get("error") or "")[:40]
+                    lines.append(f"   ❌ 発注エラー: {err}")
         if hold_results:
             hold_tickers = ", ".join(r.get("ticker", "?") for r in hold_results)
             lines.append(f"\n⏸ HOLD ({len(hold_results)}銘柄): {hold_tickers}")

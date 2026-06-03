@@ -2,9 +2,9 @@
   "_doc": {
     "max_daily_buys":   "1日あたりの最大 BUY 発注回数（デフォルト: 3）",
     "max_positions":    "同時保有できる最大銘柄数（デフォルト: 5）",
-    "max_position_pct": "1銘柄あたり口座資産の最大割合 0.0〜1.0（デフォルト: 0.20 = 20%）"
+    "max_position_pct": "1銘柄あたり口座資産の最大割合 0.0〜1.0（1.0=上限なし相当）"
   },
   "max_daily_buys":   3,
   "max_positions":    5,
-  "max_position_pct": 0.20
+  "max_position_pct": 1.0
 }

@@ -404,7 +404,16 @@ class MoomooFetcher:
                 self._host, self._port, self.ticker,
             )
             ctx = self._open_quote_ctx_with_timeout()  # タイムアウト付き接続（画像認証対策）
-            ret, data = ctx.get_order_book(self._to_futu_code(), num=levels)
+            code = self._to_futu_code()
+
+            # Futu API は get_order_book の前に ORDER_BOOK の subscribe が必須。
+            # subscribe_push=False でプッシュコールバックなしのポーリングモードで購読する。
+            ret_sub, msg_sub = ctx.subscribe([code], [ft.SubType.ORDER_BOOK], subscribe_push=False)
+            if ret_sub != ft.RET_OK:
+                raise RuntimeError(f"Futu subscribe ORDER_BOOK error: {msg_sub}")
+            logger.debug("[MoomooFetcher] ORDER_BOOK subscribed for %s", self.ticker)
+
+            ret, data = ctx.get_order_book(code, num=levels)
 
             if ret != ft.RET_OK:
                 raise RuntimeError(f"Futu get_order_book error: {data}")
@@ -464,7 +473,19 @@ class MoomooFetcher:
                 self._host, self._port, self.ticker,
             )
             ctx = self._open_quote_ctx_with_timeout()  # タイムアウト付き接続（画像認証対策）
-            ret, data = ctx.get_capital_flow(self._to_futu_code())
+            code = self._to_futu_code()
+
+            # SubType.CAPITAL_FLOW は Futu SDK に存在しない。
+            # QUOTE サブタイプを購読することで銘柄の実データをOpenDにロードさせる。
+            # capital_flow 自体はサブスクリプション不要の同期APIだが、
+            # QUOTE 購読がないとデータ未ロードで空データを返すケースがある。
+            ret_sub, msg_sub = ctx.subscribe([code], [ft.SubType.QUOTE], subscribe_push=False)
+            if ret_sub != ft.RET_OK:
+                logger.debug("[MoomooFetcher] QUOTE subscribe warning for %s: %s", self.ticker, msg_sub)
+            else:
+                logger.debug("[MoomooFetcher] QUOTE subscribed for %s", self.ticker)
+
+            ret, data = ctx.get_capital_flow(code)
 
             if ret != ft.RET_OK:
                 raise RuntimeError(f"Futu get_capital_flow error: {data}")

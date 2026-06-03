@@ -185,12 +185,6 @@ def run_trade_cycle(
                     f"{'─' * (_W - 2)}",
                     f"  BBS ログ     : {bbs.path}",
                 ])
-                if notify_line:
-                    send_line_message(
-                        f"【ECC {ticker} 判断】⏸ HOLD\n"
-                        f"⚠️ CB: {_cb_result.status}\n"
-                        f"日次損益: {_cb_result.daily_pnl_pct:+.2f}%  DD: {_cb_result.total_drawdown_pct:+.2f}%"
-                    )
                 record_id = _training_mod.save_training_record(
                     session_id=session_id, ticker=ticker,
                     bbs_entries=bbs.read_all(), judgment=_cb_judgment,
@@ -346,10 +340,6 @@ def run_trade_cycle(
             f"  BBS ログ     : {bbs.path}",
         ])
 
-        if notify_line:
-            send_line_message(
-                f"【ECC {ticker} 判断】⏸ HOLD\nスコア: {score:+.4f}"
-            )
         if mock_mode:
             _mock_banner("テスト実行完了（Gate: HOLD）。実際のAPIは一切呼び出されていません。")
         elif hybrid_mode:
@@ -616,13 +606,6 @@ def run_trade_cycle(
         f"  BBS ログ     : {bbs.path}",
     ]
     _decision_box(box_lines)
-
-    if notify_line:
-        send_line_message(
-            f"【ECC {ticker} 判断】{icon} {decision}\n"
-            f"スコア: {score:+.4f}"
-        )
-        print("\n[LINE] 通知送信完了。")
 
     if mock_mode:
         _mock_banner("テスト実行完了。実際のAPIは一切呼び出されていません。")

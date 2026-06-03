@@ -39,12 +39,16 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# .env をプロジェクトルート（tools/ の親）から絶対パスで読み込む。
+# cron やデーモンなど作業ディレクトリが変わる環境でも確実に動作する。
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-_API_KEY    = os.getenv("APCA_API_KEY_ID", "")
-_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY", "")
+# APCA_API_KEY_ID が正式名称（Alpaca SDK 標準）。
+# ALPACA_API_KEY はエイリアスとして後方互換のために対応。
+_API_KEY    = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY", "")
+_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY", "")
 _PAPER      = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
 
 LIMIT_SPREAD_PCT = 0.005  # 指値価格のスプレッド: 現在価格 ±0.5%
@@ -79,6 +83,14 @@ class AlpacaClient:
     """Alpaca Paper Trading API のラッパークライアント。"""
 
     def __init__(self) -> None:
+        if not _API_KEY or not _SECRET_KEY:
+            raise EnvironmentError(
+                "⚠️  Alpaca の API キーが設定されていません。\n"
+                "  プロジェクトルートの .env に以下を追加してください:\n"
+                "    APCA_API_KEY_ID=<your_key>\n"
+                "    APCA_API_SECRET_KEY=<your_secret>\n"
+                "  .env.example を参照してください。"
+            )
         from alpaca.trading.client import TradingClient
         self._tc = TradingClient(_API_KEY, _SECRET_KEY, paper=_PAPER)
 

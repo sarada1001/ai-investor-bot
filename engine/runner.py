@@ -48,8 +48,6 @@ def _run_dip_scan_subloop(
                 )
                 _log(line)
                 msg_lines.append(line.strip())
-            if notify_line:
-                send_line_message("\n".join(msg_lines))
         else:
             _log(f"[DipScan] 急落候補なし（閾値: {dip_threshold_pct:+.1f}%）")
 
@@ -101,7 +99,7 @@ def run_watchlist_cycle(
             result = run_trade_cycle(
                 ticker          = ticker,
                 dry_run         = dry_run,
-                notify_line     = False,
+                notify_line     = notify_line,
                 mock_mode       = mock_mode,
                 hybrid_mode     = hybrid_mode,
                 excluded_agents = excluded_agents,

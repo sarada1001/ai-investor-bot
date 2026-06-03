@@ -19,6 +19,12 @@ import sys
 import warnings
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# .env をプロジェクトルートからの絶対パスで確実に読み込む。
+# cron / デーモン / 異なるカレントディレクトリからの起動でも動作する。
+load_dotenv(Path(__file__).parent / ".env")
+
 warnings.filterwarnings("ignore")
 
 sys.path.insert(0, str(Path(__file__).parent))

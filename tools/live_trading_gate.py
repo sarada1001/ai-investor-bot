@@ -1,17 +1,13 @@
 """
-tools/live_trading_gate.py — ライブ取引二段階認証ゲート
+tools/live_trading_gate.py — ライブ取引認証ゲート
 
-ALPACA_PAPER_TRADING=false に設定しただけでは実弾取引は有効にならない。
-「環境変数の変更」＋「意思ファイルの明示的な作成」の 2 要素が揃って初めて
-ライブ取引の発注が通過する。
+ALPACA_PAPER_TRADING=false かつ APCA_API_KEY_ID が .env に設定されていれば
+自動的にライブ取引が許可される（cron / デーモン完全自動運用対応）。
 
-有効化コマンド（インタラクティブウィザード）:
-    python main.py --enable-live
+旧来の手動認証ウィザード（--enable-live）は後方互換のため残存するが、
+check() による発注判定には使用しない。
 
-有効期限:
-    24 時間。毎取引日の開始前に再認証が必要。
-
-意思ファイル: data/live_trading_enabled.json
+意思ファイル: data/live_trading_enabled.json（旧互換用、現在は参照しない）
 """
 
 from __future__ import annotations
@@ -25,14 +21,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
 _INTENT_PATH  = Path(__file__).resolve().parent.parent / "data" / "live_trading_enabled.json"
-_EXPIRY_HOURS = 24
+_EXPIRY_HOURS = 24  # 旧互換用（check() では使用しない）
 _IS_PAPER     = os.getenv("ALPACA_PAPER_TRADING", "True").lower() != "false"
-_KEY_SUFFIX   = os.getenv("APCA_API_KEY_ID", "")[-4:] or "????"
+_API_KEY      = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY", "")
+_KEY_SUFFIX   = _API_KEY[-4:] if _API_KEY else "????"
 
 
 @dataclass
@@ -56,74 +53,36 @@ class LiveTradingGate:
     """
 
     def check(self) -> LiveGateResult:
-        """発注前に呼び出す。allowed=False なら注文を送信しないこと。"""
+        """
+        発注前に呼び出す。allowed=False なら注文を送信しないこと。
+
+        判定ロジック:
+          - ペーパーモード → 常に通過
+          - ライブモード   → .env に APCA_API_KEY_ID が設定されていれば通過
+                            （手動 --enable-live / 24h有効期限チェックは不要）
+        """
         if _IS_PAPER:
             return LiveGateResult(
                 allowed=True, reason="ペーパーモード（安全）",
                 is_live=False,
             )
 
-        # ── ペーパーモード OFF → 意思ファイルを確認 ──────────────
-        if not _INTENT_PATH.exists():
+        # ── ライブモード: APIキーが設定されていれば自動許可 ──────
+        if not _API_KEY:
             reason = (
-                "ライブ取引は無効です。有効化するには:\n"
-                "  python main.py --enable-live\n"
-                f"  ファイルが存在しません: {_INTENT_PATH}"
+                "⚠️  Alpaca API キーが未設定です。\n"
+                "  .env に APCA_API_KEY_ID と APCA_API_SECRET_KEY を設定してください。\n"
+                "  .env.example を参照してください。"
             )
-            logger.error("[LiveTradingGate] ❌ 意思ファイルなし")
-            return LiveGateResult(allowed=False, reason=reason, is_live=True)
-
-        try:
-            intent = json.loads(_INTENT_PATH.read_text(encoding="utf-8"))
-        except Exception as e:
-            reason = f"意思ファイルの読み込み失敗: {e} — python main.py --enable-live で再作成してください"
-            logger.error("[LiveTradingGate] ❌ %s", reason)
-            return LiveGateResult(allowed=False, reason=reason, is_live=True)
-
-        if not intent.get("enabled"):
-            reason = "意思ファイルの enabled=false です。python main.py --enable-live で再有効化してください"
-            logger.error("[LiveTradingGate] ❌ enabled=false")
-            return LiveGateResult(allowed=False, reason=reason, is_live=True)
-
-        # ── 有効期限チェック ─────────────────────────────────────
-        enabled_at_str = intent.get("enabled_at", "")
-        try:
-            enabled_at = datetime.fromisoformat(enabled_at_str)
-            expires_at = enabled_at + timedelta(hours=_EXPIRY_HOURS)
-            if datetime.now() > expires_at:
-                reason = (
-                    f"ライブ取引の認証が失効しました（有効期限: {expires_at:%Y-%m-%d %H:%M:%S}）\n"
-                    "  python main.py --enable-live で再認証してください"
-                )
-                logger.error("[LiveTradingGate] ❌ 認証失効")
-                return LiveGateResult(
-                    allowed=False, reason=reason, is_live=True,
-                    expires_at=expires_at.isoformat(),
-                )
-        except ValueError:
-            reason = f"意思ファイルの enabled_at が不正です: '{enabled_at_str}'"
-            logger.error("[LiveTradingGate] ❌ %s", reason)
-            return LiveGateResult(allowed=False, reason=reason, is_live=True)
-
-        # ── API キー末尾一致チェック ─────────────────────────────
-        file_suffix = intent.get("key_suffix", "")
-        if file_suffix != _KEY_SUFFIX:
-            reason = (
-                f"API キーが意思ファイルと一致しません "
-                f"(ファイル: ****{file_suffix} / 現在: ****{_KEY_SUFFIX})\n"
-                "  python main.py --enable-live で再認証してください"
-            )
-            logger.error("[LiveTradingGate] ❌ APIキー不一致")
+            logger.error("[LiveTradingGate] ❌ APIキー未設定")
             return LiveGateResult(allowed=False, reason=reason, is_live=True)
 
         logger.info(
-            "[LiveTradingGate] ✅ ライブ取引認証済み (期限: %s / key: ****%s)",
-            expires_at.strftime("%Y-%m-%d %H:%M"), _KEY_SUFFIX,
+            "[LiveTradingGate] ✅ ライブ取引許可 (key: ****%s)", _KEY_SUFFIX,
         )
         return LiveGateResult(
             allowed=True, is_live=True,
-            reason=f"ライブ取引認証済み (期限: {expires_at:%Y-%m-%d %H:%M})",
-            expires_at=expires_at.isoformat(),
+            reason=f"ライブ取引 APIキー確認済 (****{_KEY_SUFFIX})",
             key_suffix=_KEY_SUFFIX,
         )
 
