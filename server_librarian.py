@@ -30,11 +30,11 @@ NOW          = datetime.now().strftime("%Y-%m-%d %H:%M")
 # ─────────────────────────────────────────────
 
 def call_gemini(prompt: str) -> str:
-    """Gemini 2.0 Flash 経由でLLM呼び出し（Google API Key が必要）。"""
+    """Gemini 2.5 Flash 経由でLLM呼び出し（Google API Key が必要）。"""
     api_key = os.getenv("GOOGLE_API_KEY", "")
     if not api_key:
         return ""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
         resp = requests.post(url, json=payload, timeout=60)

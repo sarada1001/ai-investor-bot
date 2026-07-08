@@ -6,7 +6,7 @@ APPROVE / OVERRIDE を判定して返す。
 
 LLMバックエンド（優先順）:
   1. Ollama (llama3.1) — ローカル LLM
-  2. Gemini API (gemini-2.0-flash) — Ollamaが接続エラー/タイムアウト時に自動切替
+  2. Gemini API (gemini-2.5-flash) — Ollamaが接続エラー/タイムアウト時に自動切替
   3. _FALLBACK_RESPONSE — 両方が失敗した場合の安全フォールバック
 """
 
@@ -24,7 +24,7 @@ OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api
 OLLAMA_MODEL    = "llama3.1"
 OLLAMA_TIMEOUT  = 60  # seconds
 
-GEMINI_MODEL    = "gemini-2.0-flash"
+GEMINI_MODEL    = "gemini-2.5-flash"
 GEMINI_TIMEOUT  = 30  # seconds
 
 # フォールバック値（Ollama・Gemini 両方が失敗した場合にシステムを止めない）
