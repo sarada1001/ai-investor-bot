@@ -1,13 +1,13 @@
 ---
-date: 2026-06-03
+date: 2026-06-07
 ticker: AAPL
 action: BUY
 outcome: CLOSED
 profit_loss: +66.13%
-tags: ["entry", "aapl", "20260603_113600"]
+tags: ["entry", "aapl", "20260607_223719"]
 ---
 
-# [CLOSED] AAPL — BUY (未確定) | 2026-06-03
+# [CLOSED] AAPL — BUY (未確定) | 2026-06-07
 
 ## 1. 当時の市場コンテキスト
 
@@ -33,4 +33,4 @@ tags: ["entry", "aapl", "20260603_113600"]
 - **損益**: +66.13%
 - **売却種別**: TAKE_PROFIT
 - **売却理由**: ATRベース目標株価 $210.00 に到達
-- **売却ログ**: [[Log_20260607_AAPL_SELL.md]]
+- **売却ログ**: [[Log_20260607_AAPL_SELL_2.md]]
