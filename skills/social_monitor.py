@@ -2,13 +2,14 @@
 Skill: social_monitor
 Permission: SocialAgent only
 
-Fetches social media posts about a ticker (Reddit r/wallstreetbets / StockTwits style).
-Since Reddit/StockTwits public APIs now require authentication, this module supports
-two modes controlled by the SOCIAL_USE_MOCK environment variable:
+Fetches social media posts about a ticker via StockTwits public API (no key required).
+Falls back to neutral 0.0 if the API is unreachable.
+
+Two modes controlled by the SOCIAL_USE_MOCK environment variable:
 
   SOCIAL_USE_MOCK=false (default / 本番):
-      データなし扱いでニュートラル 0.0 を返す。
-      モックバイアスが加重スコアに混入するのを防ぐ安全側設定。
+      StockTwits API から最新 10〜15 件を取得し LLM でセンチメント分析する。
+      API 取得失敗時はニュートラル 0.0 にフォールバック。
 
   SOCIAL_USE_MOCK=true (開発/テスト):
       hype_mode=True → _HYPE_POSTS モック投稿をLLMで評価する。
@@ -19,6 +20,7 @@ LLM 評価項目:
   - hype_score   : 0.0–1.0
       high (0.7+) = emoji-heavy, no fundamental backing (pump & dump pattern)
       low  (<0.3) = concrete FA/TA references, reasoned thesis
+  - signal_score : -1.0〜+1.0 の連続センチメントスコア（hype 割引済み）
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.request
 import warnings
 from dotenv import load_dotenv
 from skills.llm_factory import get_llm_instance
@@ -45,9 +48,13 @@ def _get_llm():
 
 
 def _is_mock_enabled() -> bool:
-    """SOCIAL_USE_MOCK 環境変数を確認する（デフォルト: false = 本番中立モード）。"""
+    """SOCIAL_USE_MOCK 環境変数を確認する。
+    文字列 'true'（大小文字不問）のときのみ True。
+    'false' / 空文字 / 未設定 はすべて False（本番 StockTwits 路線）。
+    """
     load_dotenv(override=False)
-    return os.getenv("SOCIAL_USE_MOCK", "false").lower() == "true"
+    raw = os.getenv("SOCIAL_USE_MOCK", "")
+    return raw.strip().lower() == "true"
 
 
 # ─── Mock post templates ──────────────────────────────────────────────────── #
@@ -67,6 +74,38 @@ _ANALYTICAL_POSTS: list[str] = [
     "{t} institutional ownership up 3% last quarter per 13F. Smart money quietly accumulating.",
     "DCF for {t} gives ~$210 fair value (WACC 8%, 5yr terminal growth 3%). Current $185 = 13% upside.",
 ]
+
+
+_STOCKTWITS_URL = "https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
+_STOCKTWITS_MAX_POSTS = 15
+
+
+def _fetch_stocktwits(ticker: str) -> list[str]:
+    """StockTwits 公開 API からティッカーの最新投稿テキストを取得する（認証不要）。
+
+    Returns:
+        投稿テキストのリスト（最大 _STOCKTWITS_MAX_POSTS 件）。
+        取得失敗時は RuntimeError を送出する。
+    """
+    url = _STOCKTWITS_URL.format(ticker=ticker.upper())
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://stocktwits.com/",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    messages = data.get("messages", [])
+    posts = [m["body"] for m in messages if m.get("body")]
+    return posts[:_STOCKTWITS_MAX_POSTS]
 
 
 def _make_posts(ticker: str, hype_mode: bool) -> list[str]:
@@ -130,48 +169,77 @@ def fetch_social_sentiment(ticker: str, hype_mode: bool = True) -> dict:
     """
     SNS センチメントを取得・分類する。
 
-    SOCIAL_USE_MOCK=false（デフォルト / 本番）:
-        実際の SNS API が利用できないため、中立 (NEUTRAL, hype_score=0.0) を返す。
-        モックバイアスが加重スコアに混入しないよう安全側に倒す。
+    SOCIAL_USE_MOCK=true（開発/テスト時のみ）:
+        モック投稿を生成して LLM でセンチメント分類を行う。
 
-    SOCIAL_USE_MOCK=true（開発/テスト時）:
-        モック投稿を生成して LLM でセンチメント分類を行う（従来動作）。
+    それ以外（デフォルト / 本番）:
+        StockTwits 公開 API から最新投稿を取得し、LLM でセンチメント分析する。
+        API 取得失敗・投稿0件の場合は中立 (NEUTRAL, score=0.0) にフォールバック。
 
     Returns:
         {
             "ticker":        str,
             "sentiment":     "POSITIVE" | "NEUTRAL" | "NEGATIVE",
-            "hype_score":    float,   # 0.0-1.0
+            "hype_score":    float,        # 0.0-1.0
+            "score":         float,        # -1.0〜+1.0 連続シグナル (hype 割引済み)
             "reason":        str,
             "post_count":    int,
-            "source":        str,
+            "source":        "stocktwits" | "mock_reddit_wsb" | "unavailable",
             "posts_preview": list[str],
         }
     """
-    if not _is_mock_enabled():
-        # 本番モード: SNS API 未接続のため中立を返す（スコアへの不当な影響を排除）
+    # ── モードチェック: SOCIAL_USE_MOCK=true の場合のみモックを使う ──
+    if _is_mock_enabled():
+        # 開発/テストモード: モック投稿を LLM で評価
+        posts    = _make_posts(ticker, hype_mode=hype_mode)
+        analysis = _llm_analyze(ticker, posts)
+        return {
+            "ticker":        ticker,
+            "sentiment":     analysis["sentiment"],
+            "hype_score":    analysis["hype_score"],
+            "score":         analysis.get("signal_score", 0.0),
+            "reason":        analysis["reason"],
+            "post_count":    len(posts),
+            "source":        "mock_reddit_wsb",
+            "posts_preview": posts[:2],
+        }
+
+    # ── 本番モード: StockTwits API → LLM 分析 ──────────────────────
+    try:
+        posts = _fetch_stocktwits(ticker)
+    except Exception as e:
         return {
             "ticker":        ticker,
             "sentiment":     "NEUTRAL",
             "hype_score":    0.0,
-            "score":         0.0,   # 連続スコア（本番は常に中立）
-            "reason":        "SNS API 未接続（SOCIAL_USE_MOCK=false）。中立スコアを使用。",
+            "score":         0.0,
+            "reason":        f"StockTwits 取得失敗: {e}。中立スコアを使用。",
             "post_count":    0,
             "source":        "unavailable",
             "posts_preview": [],
         }
 
-    # 開発/テストモード: モック投稿を LLM で評価（従来動作）
-    posts    = _make_posts(ticker, hype_mode=hype_mode)
+    if not posts:
+        return {
+            "ticker":        ticker,
+            "sentiment":     "NEUTRAL",
+            "hype_score":    0.0,
+            "score":         0.0,
+            "reason":        "StockTwits 投稿なし。中立スコアを使用。",
+            "post_count":    0,
+            "source":        "stocktwits",
+            "posts_preview": [],
+        }
+
     analysis = _llm_analyze(ticker, posts)
     return {
         "ticker":        ticker,
         "sentiment":     analysis["sentiment"],
         "hype_score":    analysis["hype_score"],
-        "score":         analysis.get("signal_score", 0.0),   # 連続スコア (hype 割引済み)
+        "score":         analysis.get("signal_score", 0.0),
         "reason":        analysis["reason"],
         "post_count":    len(posts),
-        "source":        "mock_reddit_wsb",
+        "source":        "stocktwits",
         "posts_preview": posts[:2],
     }
 

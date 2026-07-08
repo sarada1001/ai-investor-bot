@@ -332,13 +332,13 @@ class SocialAgent:
 
     def run(self, ticker: str = TARGET_TICKER, phase_tag: str = "S1-4/4") -> dict:
         import os as _os
-        _mock_enabled = _os.getenv("SOCIAL_USE_MOCK", "false").lower() == "true"
-        _source_note = (
-            "mock_reddit_wsb (SOCIAL_USE_MOCK=true)"
-            if _mock_enabled
-            else "中立モード (SOCIAL_USE_MOCK=false / SNS API 未接続)"
-        )
+        _social_use_mock_raw = _os.getenv("SOCIAL_USE_MOCK", "")
+        # 文字列 "true" のみモック。"false"/空/未設定はすべて本番(StockTwits)路線。
+        _mock_enabled = _social_use_mock_raw.lower() == "true"
+        _source_note = "mock (SOCIAL_USE_MOCK=true)" if _mock_enabled else "StockTwits 公開 API"
+
         _phase_header(phase_tag, self.NAME)
+        _log(f"[モード] SOCIAL_USE_MOCK={_social_use_mock_raw!r} → {'モック' if _mock_enabled else 'StockTwits 本番'}")
         _log(f"{ticker} のSNSセンチメントを分析中 ({_source_note})...")
         _sep()
 
@@ -347,9 +347,8 @@ class SocialAgent:
         except Exception as e:
             result = {
                 "ticker": ticker, "sentiment": "NEUTRAL", "hype_score": 0.0,
-                # hype_score=0.0: エラー時は「不明」として最も安全な中立扱い。
-                # 0.5 にするとUIのhypeバーが半分表示になり誤解を招くため 0.0 に修正。
-                "reason": f"取得エラー: {e}", "error": str(e),
+                "score": 0.0, "reason": f"SocialAgent例外: {e}", "error": str(e),
+                "post_count": 0, "source": "error", "posts_preview": [],
             }
             _log(f"エラー: {e}")
 
@@ -358,6 +357,7 @@ class SocialAgent:
         reason     = result.get("reason", "")
         source     = result.get("source", "")
         posts      = result.get("posts_preview", [])
+        sig_score  = result.get("score", 0.0)
 
         s_icon   = {"POSITIVE": "📈", "NEGATIVE": "📉", "NEUTRAL": "➡️"}.get(sentiment, "❓")
         filled   = int(hype_score * 10)
@@ -367,7 +367,7 @@ class SocialAgent:
         if posts:
             _log(f"投稿サンプル   : {posts[0][:65]}...")
         _sep()
-        _log(f"センチメント判定: {s_icon} {sentiment}")
+        _log(f"センチメント判定: {s_icon} {sentiment}  (signal={sig_score:+.4f})")
         _log(f"買い煽りスコア  : [{hype_bar}] {hype_score:.2f}  "
              f"{'⚠️  高Hype警戒 (FA/Tech裏付け必要)' if hype_score >= SOCIAL_HYPE_THRESHOLD else '✅ 正常範囲'}")
         _sep()
