@@ -169,28 +169,31 @@ STRONG BUY確定後のみ実行:
 
 ### ① LiveTradingGate
 
+> ⚠️ **2026-06-03（`d6f7bd1`）で完全自動化済み。** 下表は現在の実際の挙動。
+> 旧来の「24時間手動同意＋ウィザード確認」方式は無人cron運用と相容れないため廃止され、
+> `.env` のAPIキー設定そのものを人間の意思表明とみなす方式に変更されている。
+> 設計変更の経緯・リスクの詳細は [`docs/SAFETY.md`](docs/SAFETY.md) を参照。
+
 | 条件 | 内容 |
 |---|---|
 | 環境変数 | `ALPACA_PAPER_TRADING=false` が必須 |
-| 意思ファイル | `data/live_trading_enabled.json` が存在する |
-| 有効期限 | 認証から24時間（毎取引日に再認証必須） |
-| APIキー照合 | 意思ファイルのkey_suffix ↔ 現在のAPIキー末尾4桁が一致 |
+| APIキー | `.env` に `APCA_API_KEY_ID` が設定されていれば**自動的に許可**（`check()`は同意ファイル・24h期限を参照しない） |
 
-有効化・無効化:
+`--enable-live` / `--disable-live` ウィザードはコード上は後方互換で残存するが、実際の発注判定には使われない:
 ```bash
-python main.py --enable-live   # インタラクティブウィザード起動
-python main.py --disable-live  # 即座に無効化（意思ファイル削除）
+python main.py --enable-live   # レガシーウィザード（発注判定には未使用）
+python main.py --disable-live  # 意思ファイル削除（同上）
 ```
 
 ### ② TradeGuard
 
 デフォルト設定（`data/trade_guards.json` で変更可）:
 
-| ガードレール | デフォルト値 |
-|---|---|
-| 日次BUY上限 | 3回/日 |
-| 同時保有銘柄数上限 | 5銘柄 |
-| 1銘柄の最大ポジション比率 | 口座の20% |
+| ガードレール | 現在値 | 備考 |
+|---|---|---|
+| 日次BUY上限 | 3回/日 | 変更なし |
+| 同時保有銘柄数上限 | 5銘柄 | 変更なし |
+| 1銘柄の最大ポジション比率 | **1.0（実質上限なし）** | 2026-06-03に0.20（20%）から緩和。詳細は [`docs/SAFETY.md`](docs/SAFETY.md) |
 
 ### ③ CircuitBreaker
 

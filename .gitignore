@@ -46,6 +46,7 @@ data/circuit_breaker_state.json
 data/trade_guard_state.json
 data/training/open_positions_index.json
 data/training/training_data.jsonl
+data/training/training_data_prod.jsonl
 
 # ライブ取引認証状態（24h有効期限付き・コミット不要）
 data/live_trading_enabled.json
