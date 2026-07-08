@@ -45,9 +45,40 @@ SocialAgentは2026-05-24〜07-08の約1.5ヶ月間、常時NEUTRAL固定のス�
 ### 発見1: Ollamaトンネル切断時に全銘柄が強制HOLDになる障害
 
 本番はローカルLLM（Ollama）を別のGPUサーバーからSSHトンネル経由で利用する設計
-だったが、トンネルの自動再接続機構（`tools/ollama_tunnel.py` の
-`ensure_ollama_reachable()`）がどこからも呼ばれておらず、トンネル切断後は
-手動復旧するまでOllamaに到達できない状態だった。
+だった。**当初「トンネルの自動再接続機構（`tools/ollama_tunnel.py` の
+`ensure_ollama_reachable()`）がどこからも呼ばれていないため」と記録したが、
+これは誤りだった（2026-07-09訂正）。**
+
+実際には、毎晩の実行ラッパー `/home/naito/run_investor_bot.sh`（リポジトリ外、
+crontabから直接実行）が以下の処理で**トンネルを毎回自動的に張り直していた**：
+
+```bash
+pkill -f 11434
+sleep 2
+ssh -o BatchMode=yes -o StrictHostKeyChecking=no -f -N -L 11434:127.0.0.1:11434 uema2lab-gpu
+sleep 3
+# ボット実行 ...
+pkill -f 11434
+```
+
+問題は自動再接続の欠如ではなく、**`uema2lab-search` から `uema2lab-gpu`
+（`~/.ssh/config` 上のHostName、プライベートIP `192.168.0.167`）への
+ネットワーク経路そのものが到達不能**だったこと。実際に本番上で同じコマンドを
+実行して再現したところ `ssh: connect to host 192.168.0.167 port 22:
+No route to host` で失敗した。`run_investor_bot.sh` にはこの`ssh`コマンドの
+終了コードを確認する処理が一切なく、接続に失敗しても後続のボット実行が
+そのまま続行される。そのため**この障害は毎晩サイレントに発生し続けていた**
+と考えられる。
+
+`tools/ollama_tunnel.py` の孤立コード（未使用の`ensure_ollama_reachable()`）
+は実在するが、**今回の障害の直接の原因ではなかった**。トンネル確立自体は
+別の仕組み（`run_investor_bot.sh`）が毎回試みており、そこが失敗していた、
+というのが正しい理解。
+
+**この経路到達性の問題自体はネットワークインフラ側の話であり、
+アプリケーションのコード修正では解決しない。** 今後ローカルLLM（Ollama）に
+戻す判断をする場合は、`uema2lab-search`⇔GPUサーバー間のネットワーク経路
+（同一LAN/VPNに属しているか、ファイアウォール設定等）を別途確認する必要がある。
 
 さらに `.env` の `DISABLE_GEMINI=true`（Gemini課金ゼロ保証のための安全弁）が
 同時に有効だったため、Ollama不通時に **Geminiへのフォールバックすら行われず、
