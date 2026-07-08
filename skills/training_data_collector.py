@@ -17,18 +17,11 @@ import uuid
 import datetime
 from pathlib import Path
 
+from engine.constants import WEIGHTS as _WEIGHTS
+
 TRAINING_DIR = Path(__file__).parent.parent / "data" / "training"
 TRAINING_FILE = TRAINING_DIR / "training_data.jsonl"
 POSITIONS_INDEX = TRAINING_DIR / "open_positions_index.json"
-
-# ManagerAgent の加重（main.py と同期して変更すること）
-_WEIGHTS = {
-    "fundamental": 0.40,
-    "technical":   0.20,
-    "macro":       0.20,
-    "news":        0.10,
-    "social":      0.10,
-}
 
 _INPUT_KEYS = {
     "technical_analysis",
@@ -36,6 +29,7 @@ _INPUT_KEYS = {
     "macro_analysis",
     "social_analysis",
     "fundamental_analysis",
+    "liquidity_analysis",
 }
 
 
