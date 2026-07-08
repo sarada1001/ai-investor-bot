@@ -47,6 +47,14 @@ Stage 1 (fast/cheap)         Stage 2 (expensive)
 Stage 1のみで判断可能なケースではStage 2を実行しないことで、LLM/API呼び出し
 コストを大幅に削減する。Gate条件の詳細は
 `.claude/skills/architecture-pipeline/SKILL.md` を参照。
+
+> **前段の絞り込み（2026-07-09訂正）**: Stage 1自体もS&P500 100銘柄全てに対して
+> 毎日実行されるわけではない。`skills/screener.py`によるLLM不要のテクニカル
+> スクリーニング（RSI・出来高比率等でスコアリング）で100銘柄から上位`top_n`
+> 銘柄（`--top-n`オプション、デフォルト5）に絞り込んだ後、その選出銘柄のみが
+> Stage 1に入る。詳細は`.claude/skills/architecture-pipeline/SKILL.md`の
+> レイヤー構成図を参照。
+
 なお実装（`engine/agent_wrappers.py` の `_gate_check()`）は原文の `=0` ではなく
 `<= 0.0` で比較しており、**意図的か実装バグか未確定の疑義がある**
 （`docs/POTENTIAL_BUGS.md` #1）。修正・依存コード追加はユーザー承認必須。
