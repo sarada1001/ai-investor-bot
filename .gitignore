@@ -39,8 +39,13 @@ chroma_db/
 # BBS セッションログ（実行ごとに生成される一時ファイル）
 bbs/
 
-# ポートフォリオ実行状態（ローカル実行環境に依存）
-portfolio_state.json
+# 実行時状態ファイル（ローカル/本番の実行環境に依存、頻繁に更新されるため追跡しない）
+data/portfolio.json
+data/agent_status.json
+data/circuit_breaker_state.json
+data/trade_guard_state.json
+data/training/open_positions_index.json
+data/training/training_data.jsonl
 
 # ライブ取引認証状態（24h有効期限付き・コミット不要）
 data/live_trading_enabled.json
