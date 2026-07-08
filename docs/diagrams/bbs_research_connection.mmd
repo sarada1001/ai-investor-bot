@@ -1,0 +1,68 @@
+%% docs/diagrams/bbs_research_connection.mmd
+%% 「本番BBSログ → 卒業研究の評価データ」への一方向変換パイプライン。
+%% README・スライド両方で使い回すための単一ソース。詳細説明は docs/BBS_RESEARCH_CONNECTION.md を参照。
+%% 実装確認日: 2026-07-02。ノードは実在するファイル/スクリプトのみ（evaluate_financebench.pyのみ例外 = 未着手ロードマップ項目として点線表示）。
+
+flowchart LR
+    subgraph PROD["本番運用（データの発生源）"]
+        direction TB
+        BBS["bbs/*.json<br/>6エージェント分析<br/>technical/news/macro/<br/>social/fundamental/liquidity"]
+        MGR["ManagerAgent<br/>加重統合 (weighted_score)"]
+        CRITIC["CriticAgent<br/>LLM監査"]
+        TG["TradeGuard"]
+        LTG["LiveTradingGate<br/>(最終防壁)"]
+        ALPACA["Alpaca発注"]
+        OBSLOG["ObsidianLogger<br/>→ Log_*.md (raw層)"]
+
+        BBS --> MGR --> CRITIC --> TG --> LTG --> ALPACA
+        TG -.->|スキップ判断も記録| OBSLOG
+        ALPACA --> OBSLOG
+    end
+
+    subgraph XFORM["変換・蓄積レイヤー"]
+        direction TB
+        TDC["training_data_collector.py"]
+        TDJSONL["training_data.jsonl"]
+        RESHELP["research_helpers.py<br/>(research_modeフラグ制御)"]
+        HOLDCASES["hold_cases.jsonl"]
+        INTERVSCRIPT["run_intervention_experiment.py"]
+        INTERVJSONL["intervention_results.jsonl"]
+        FAITHSCRIPT["compute_faithfulness_score.py"]
+        FAITHCSV["faithfulness_report.csv"]
+        LIBRARIAN["server_librarian.py --ingest"]
+        WIKI["3層Wiki → INDEX.md"]
+
+        TDC --> TDJSONL
+        RESHELP --> HOLDCASES
+        HOLDCASES --> INTERVSCRIPT --> INTERVJSONL
+        HOLDCASES --> FAITHSCRIPT
+        INTERVJSONL --> FAITHSCRIPT
+        FAITHSCRIPT --> FAITHCSV
+        OBSLOG --> LIBRARIAN --> WIKI
+    end
+
+    subgraph RSRCH["研究・評価（データの利用先）"]
+        direction TB
+        ABLATION["run_ablation_test.py<br/>→ ablation_results.csv"]
+        FINANCEBENCH["evaluate_financebench.py<br/>（未着手・ロードマップ項目）"]
+        THESIS["卒業研究:<br/>AIのHOLD判断評価<br/>フレームワーク"]
+    end
+
+    MGR -->|サイクル入出力| TDC
+    BBS -.->|オフライン抽出<br/>research_mode| RESHELP
+    BBS -.->|main.py 独立再実行<br/>mock/hybrid, 蓄積データ不使用| ABLATION
+
+    FAITHCSV --> THESIS
+    INTERVJSONL --> THESIS
+    ABLATION --> THESIS
+    FINANCEBENCH -.-> THESIS
+
+    classDef prod fill:#d0e8f5,stroke:#357,color:#000
+    classDef xform fill:#fef3d0,stroke:#a80,color:#000
+    classDef rsrch fill:#e0d0f5,stroke:#639,color:#000
+    classDef future fill:#f0f0f0,stroke:#999,color:#666,stroke-dasharray: 5 5
+
+    class BBS,MGR,CRITIC,TG,LTG,ALPACA,OBSLOG prod
+    class TDC,TDJSONL,RESHELP,HOLDCASES,INTERVSCRIPT,INTERVJSONL,FAITHSCRIPT,FAITHCSV,LIBRARIAN,WIKI xform
+    class ABLATION,THESIS rsrch
+    class FINANCEBENCH future
