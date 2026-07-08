@@ -1,0 +1,64 @@
+%% docs/diagrams/architecture.mmd
+%% Single source diagram for README.md / README.en.md / slides.
+%% Renders on GitHub natively, or via https://mermaid.live for export to PNG/SVG.
+%% Mirrors the ASCII diagram in README.md "システム全体アーキテクチャ" — keep both in sync when the pipeline changes.
+
+flowchart TD
+    SCR["① Screener (no LLM)<br/>PRODUCTION_UNIVERSE — 100 tickers<br/>backtest-verified"] --> TOPN["Top-N tickers<br/>(SQLite cache)"]
+
+    TOPN --> P1
+
+    subgraph P1["② Phase 1 — Cheap Scan (parallel, all 4 agents)"]
+        direction LR
+        TA["TechnicalAgent<br/>RSI / MACD / SMA25"]
+        NA["NewsAgent<br/>news sentiment"]
+        MA["MacroAgent<br/>SPY / VIX"]
+        SA["SocialAgent<br/>social sentiment"]
+    end
+
+    TA --> BBS[("BBS<br/>shared memory bus")]
+    NA --> BBS
+    MA --> BBS
+    SA --> BBS
+
+    BBS --> GATE{"Stage Gate"}
+    GATE -->|"Macro = NEGATIVE"| HOLD1["HOLD<br/>(macro brake)"]
+    GATE -->|"Tech & News both NEUTRAL"| HOLD2["HOLD<br/>(cost-saving skip)"]
+    GATE -->|"pass"| P2
+
+    subgraph P2["③ Phase 2 — Fundamental analysis (gate-passed only)"]
+        FA["FundamentalAgent<br/>Multi-HyDE RAG + autonomous EDGAR fetch"]
+    end
+
+    P2 --> P3
+
+    subgraph P3["④ Phase 3 — Final decision"]
+        direction LR
+        MGR["ManagerAgent<br/>weighted score aggregation"]
+        CRIT["CriticAgent<br/>Ollama-first, Gemini fallback<br/>independent OVERRIDE"]
+        AUD["AuditAgent<br/>agent win-rate meta-eval<br/>SUSPENDED on win-rate < 40%"]
+        MGR --> CRIT
+        AUD -.->|"mutes underperforming<br/>agent weight"| MGR
+    end
+
+    CRIT -->|"STRONG BUY only"| P4
+
+    subgraph P4["⑤ Phase 4 — Risk sizing"]
+        RISK["RiskAgent<br/>min(Fixed Fractional, Kelly Criterion)"]
+    end
+
+    RISK --> SAFETY
+
+    subgraph SAFETY["⑥ Safety gates — ALL must pass, any failure blocks the order"]
+        direction LR
+        LTG["① LiveTradingGate<br/>24h consent file + API key match"] --> TG["② TradeGuard<br/>daily BUY cap / position limits"]
+        TG --> CB["③ CircuitBreaker<br/>SOFT_TRIP -5% / HARD_TRIP -10%"]
+        CB --> DRY["④ DryRun / Mock flag"]
+    end
+
+    SAFETY --> EXEC["Alpaca order execution /<br/>LINE notification /<br/>Obsidian knowledge-base log"]
+
+    classDef hold fill:#f5d0d0,stroke:#a33,color:#000
+    classDef safety fill:#d0e8f5,stroke:#357,color:#000
+    class HOLD1,HOLD2 hold
+    class LTG,TG,CB,DRY safety
