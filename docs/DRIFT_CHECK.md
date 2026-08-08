@@ -27,3 +27,27 @@ skill分割作業（2026-07-08）中に発見した「プロジェクト概要�
 | 16 | Wikiエンジンの LLM は「Gemini/Ollama」とのみ表記（バージョン不明瞭） | `server_librarian.py` の `call_gemini()` docstring は明示的に **Gemini 2.0 Flash** と記載（表の書きぶりでは2.5系を想起させる可能性あり） | §5 コアスタック表 | 2026-07-08 |
 | 17 | 開発環境は「Python 3.11 (venv) / Ubuntu 22.04 LTS」と断定的に記載 | skill作成時にコマンドを実行したサンドボックス環境は `Python 3.14.4` / `Ubuntu 26.04 LTS` だったが、これがユーザーの物理ThinkPad開発機と同一環境かは未確認。要ユーザー確認（断定不可） | §1 開発環境 | 2026-07-08 |
 | 18 | 旧 CLAUDE.md 冒頭サマリーが「5エージェント（Technical/News/Macro/Social/Fundamental）」と記載 | 実際は6エージェント構成（LiquidityAgent追加済み、ウェイト10%）。`engine/constants.py` の `WEIGHTS` に6キー存在、コメントに追加経緯あり | CLAUDE.md、README | 2026-07-08 |
+| 19 | ~~バックテスト成績（勝率46.0% 等）が本番戦略の成績として記載~~ | ~~バックテスト（`run_backtest.py` の `MAX_HOLD_DAYS=10` / exit_reason `MAX_HOLD`、`run_agent_exam.py` の同 10 営業日 / `TIMEOUT`）は最大保有日数を前提にシミュレーションしていたが、本番 `agents/exit_agent.py` の `_evaluate()` には時間軸 Exit が存在せず、ストップロス／利確／thesis破綻に触れない限り無期限保有だった。つまり本番とバックテストは別戦略~~ → **✅ 解消済み（2026-08-08）** | §7 評価スクリプト表、バックテスト成績の解釈全般、ブログ③ | 2026-08-08 |
+
+## 解消済み項目の詳細
+
+### #19 本番 ExitAgent の時間軸 Exit 欠落（2026-08-08 解消）
+
+**対応内容:**
+
+- `agents/exit_agent.py` の `_evaluate()` に `MAX_HOLD` 分岐（TIME_EXIT）を追加。
+  判定順序は `PRICE_UNAVAILABLE → TAKE_PROFIT → STOP_LOSS → MAX_HOLD → THESIS_BROKEN → HOLD`。
+  LLM を呼ぶ `THESIS_BROKEN` より前に置き、時間切れ確定ポジションで API を消費しない。
+- 最大保有日数は `engine/constants.py` の `MAX_HOLD_DAYS` に集約。
+  **初期値は 0（無効）** であり、有効化は人間の別判断・別コミットで行う。
+  つまり本項目は「実装の乖離」としては解消済みだが、
+  **本番挙動が実際にバックテストと一致するのは `MAX_HOLD_DAYS` を 10 にした時点から**。
+- バックテスト側（`run_backtest.py` / `run_agent_exam.py`）のハードコード `MAX_HOLD_DAYS = 10` は
+  `engine/constants.py` の `BACKTEST_MAX_HOLD_DAYS` を既定値とする CLI 引数 `--max-hold-days` に置換。
+- `run_agent_exam.py` の exit_reason `"TIMEOUT"` を `"MAX_HOLD"` に統一（3箇所で同じ命名になった）。
+- 有効化前の影響確認用に `scripts/check_time_exit_impact.py`（読み取り専用）を追加。
+
+**既知の制約:** 経過営業日は `numpy.busday_count` で算出するため土日のみ除外し、
+米国市場の祝日は営業日としてカウントされる。実際の営業日数よりわずかに多く数えられ、
+TIME_EXIT が本来より少し早く発火しうる（保有を引き延ばさない方向の誤差）。
+祝日カレンダー用の新規依存パッケージは追加していない。

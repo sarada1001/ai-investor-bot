@@ -120,6 +120,25 @@
 - **Kelly Criterion（簡略版）**: 勝率55%・損益比1.5 で Kelly 分率を算出
 - 両者の小さい方を `recommended_shares` として採用（保守的運用）
 
+#### ExitAgent（`agents/exit_agent.py`）
+- Selling Loop（Stage 0）で Buying Loop の前に毎日実行され、`data/portfolio.json` の全保有ポジションを評価する
+- 判定は以下の順で行い、最初に成立したものを採用する:
+
+| 順 | `exit_type` | 条件 |
+|----|-------------|------|
+| 1 | `PRICE_UNAVAILABLE` | 現在価格を取得できない → HOLD（安全側） |
+| 2 | `TAKE_PROFIT` | 現在価格 ≥ ATR由来 `target_price`（未設定時のみ含み益 ≥ +10% のフォールバック） |
+| 3 | `STOP_LOSS` | 現在価格 ≤ ATR由来 `stop_loss_price`（未設定時のみ含み損 ≤ -5% のフォールバック） |
+| 4 | `MAX_HOLD` | 保有期間が `MAX_HOLD_DAYS` 営業日に到達（**TIME_EXIT**） |
+| 5 | `THESIS_BROKEN` | 購入時の thesis が現在ニュースにより否定された（LLM 判定 → 失敗時はルールベースにフォールバック） |
+| 6 | `CONTINUE` | 上記いずれも不成立 → HOLD |
+
+- **`MAX_HOLD` を `THESIS_BROKEN` より前に置く理由**: `THESIS_BROKEN` は LLM 呼び出しを伴うため、時間切れが確定しているポジションで API を消費しないようにする
+- **`MAX_HOLD_DAYS`（`engine/constants.py`）の現在値は `0` = TIME_EXIT 無効**。バックテスト（`run_backtest.py` / `run_agent_exam.py`）は 10 営業日前提でシミュレーションしているため、有効化するまでは本番とバックテストで Exit 戦略が異なる（→ `docs/DRIFT_CHECK.md` #19）。有効化前に `scripts/check_time_exit_impact.py`（読み取り専用）で影響を確認すること
+- 経過営業日は `numpy.busday_count` で算出する。土日のみ除外し**米国市場の祝日は考慮しない**ため、TIME_EXIT が本来よりわずかに早く発火しうる（既知の制約）
+- `entry_date` が空・パース不能・未来日の場合は WARNING を出して TIME_EXIT 判定をスキップし HOLD 側に倒す
+- SELL 確定時は Alpaca 売り注文 → Obsidian ログ生成 → 購入ログの CLOSED 更新 → `training_data.jsonl` の WIN/LOSS 書き戻しを行う（注文失敗・スキップ時は SELL を HOLD に差し戻してポジションを保持する）
+
 ---
 
 ## 3. RAGパイプライン（Financial Filing Processing — FFP）
@@ -283,7 +302,7 @@ record_id = _training_mod.save_training_record(
 
 ### 5.3 アウトカムラベルの付与
 
-STRONG BUY が確定した場合、`open_positions_index.json` にポジション情報が登録される。将来実装予定の ExitAgent が SELL を実行した際に `update_outcome(ticker, pnl_pct, exit_price, exit_reason)` を呼び出すことで、FIFO 方式で対応するレコードに `"WIN"` / `"LOSS"` ラベルが付与される。
+STRONG BUY が確定した場合、`open_positions_index.json` にポジション情報が登録される。ExitAgent が SELL を実行した際に `update_outcome(ticker, pnl_pct, exit_price, exit_reason)` を呼び出すことで、FIFO 方式で対応するレコードに `"WIN"` / `"LOSS"` ラベルが付与される（`agents/exit_agent.py` の `_record_exit()`）。`exit_reason` には ExitAgent の `exit_type`（`TAKE_PROFIT` / `STOP_LOSS` / `MAX_HOLD` / `THESIS_BROKEN`）がそのまま渡る。
 
 ---
 
@@ -304,7 +323,8 @@ STRONG BUY が確定した場合、`open_positions_index.json` にポジショ�
 | ManagerAgent（加重スコア + Hypeペナルティ）| ✅ 完成 | |
 | RiskAgent（Fixed Fractional + Kelly）| ✅ 完成 | |
 | 学習データ収集（training_data.jsonl）| ✅ 完成 | |
-| アウトカムラベル付与（WIN/LOSS）| 🔄 部分完成 | ExitAgent は未実装 |
+| ExitAgent（Selling Loop）| ✅ 完成 | TAKE_PROFIT / STOP_LOSS / MAX_HOLD / THESIS_BROKEN。`MAX_HOLD_DAYS=0` のため TIME_EXIT は現在無効 |
+| アウトカムラベル付与（WIN/LOSS）| ✅ 完成 | ExitAgent の `_record_exit()` から `update_outcome()` を呼ぶ |
 | Reddit API 連携 | ❌ 未着手 | |
 | ローカル LLM への蒸留 | ❌ 未着手（構想段階）| §7 参照 |
 
@@ -332,7 +352,7 @@ STRONG BUY が確定した場合、`open_positions_index.json` にポジショ�
 ```
 ① データ量確保（ハイブリッドモードで継続実行 → 数百〜数千レコード）
        │
-       ② アウトカムラベルの付与（ExitAgent 実装 → WIN/LOSS で品質フィルタ）
+       ② アウトカムラベルの付与（ExitAgent の決済 → WIN/LOSS で品質フィルタ）
        │
        ③ 学習データのクリーニング（mock_mode=false のみ使用、hybrid優先）
        │
