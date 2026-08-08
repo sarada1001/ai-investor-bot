@@ -50,6 +50,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+from engine.constants import BACKTEST_MAX_HOLD_DAYS  # noqa: E402
+from engine.evaluation_history import append_agent_status_history  # noqa: E402
 from skills.technical_calc import _calc_rsi, _calc_macd  # noqa: E402
 
 AGENT_STATUS_PATH = PROJECT_ROOT / "data" / "agent_status.json"
@@ -81,7 +83,11 @@ ALL_EVAL_AGENTS: list[str] = [
 ]
 
 INDICATOR_BUFFER_DAYS = 60    # MACD/SMA 計算用ウォームアップ
-MAX_HOLD_DAYS         = 10    # 最大保有日数（営業日）
+
+# 最大保有日数（営業日）は engine.constants.BACKTEST_MAX_HOLD_DAYS を既定値とし、
+# CLI の --max-hold-days で上書きする。
+# ※ engine.constants.MAX_HOLD_DAYS は本番 ExitAgent 専用（初期値 0 = 無効）であり、
+#    Agent Exam からは参照しない。
 
 ATR_PERIOD      = 14
 ATR_MULTIPLIER  = 2.0         # SL = entry - ATR × 2.0
@@ -113,7 +119,7 @@ class VirtualTrade:
     atr:         float
     sl_price:    float
     tp_price:    float
-    exit_reason: str    # "TAKE_PROFIT" | "STOP_LOSS" | "TIMEOUT"
+    exit_reason: str    # "TAKE_PROFIT" | "STOP_LOSS" | "MAX_HOLD"
     pnl_pct:     float
     win:         bool
     macro_ok:    bool   # SPY > SMA200 かつ VIX < VIX_CALM_THRESHOLD (現在: 25)
@@ -303,17 +309,18 @@ def _walk_forward(
     entry_idx: int,
     sl_price: float,
     tp_price: float,
+    max_hold_days: int = BACKTEST_MAX_HOLD_DAYS,
 ) -> tuple[str, float, str]:
     """
-    エントリー翌日から MAX_HOLD_DAYS 間、High/Low で SL/TP を確認する。
+    エントリー翌日から max_hold_days 間、High/Low で SL/TP を確認する。
 
     SL と TP が同日に触れた場合は SL 優先（保守的）。
 
     Returns:
         (exit_reason, exit_price, exit_date_str)
-        exit_reason: "TAKE_PROFIT" | "STOP_LOSS" | "TIMEOUT"
+        exit_reason: "TAKE_PROFIT" | "STOP_LOSS" | "MAX_HOLD"
     """
-    for i in range(1, MAX_HOLD_DAYS + 1):
+    for i in range(1, max_hold_days + 1):
         idx = entry_idx + i
         if idx >= len(df):
             break
@@ -324,10 +331,10 @@ def _walk_forward(
         if float(row["High"]) >= tp_price:
             return "TAKE_PROFIT", tp_price, date_str
 
-    last_idx   = min(entry_idx + MAX_HOLD_DAYS, len(df) - 1)
+    last_idx   = min(entry_idx + max_hold_days, len(df) - 1)
     exit_price = float(df.iloc[last_idx]["Close"])
     date_str   = df.index[last_idx].date().isoformat()
-    return "TIMEOUT", exit_price, date_str
+    return "MAX_HOLD", exit_price, date_str
 
 
 def simulate_ticker(
@@ -336,6 +343,7 @@ def simulate_ticker(
     sim_start: datetime,
     spy_df: pd.DataFrame | None,
     vix_df: pd.DataFrame | None,
+    max_hold_days: int = BACKTEST_MAX_HOLD_DAYS,
 ) -> list[VirtualTrade]:
     """1 銘柄の walk-forward 仮想トレードリストを生成する。"""
     trades: list[VirtualTrade] = []
@@ -359,13 +367,13 @@ def simulate_ticker(
         tp_price    = entry_price + TP_MULTIPLIER  * atr
 
         exit_reason, exit_price, exit_date_str = _walk_forward(
-            df, idx, sl_price, tp_price
+            df, idx, sl_price, tp_price, max_hold_days=max_hold_days
         )
 
         pnl_pct = (exit_price - entry_price) / entry_price * 100.0
         win = (
             exit_reason == "TAKE_PROFIT"
-            or (exit_reason == "TIMEOUT" and exit_price > entry_price)
+            or (exit_reason == "MAX_HOLD" and exit_price > entry_price)
         )
         macro_ok = _is_macro_ok(date, spy_df, vix_df)
 
@@ -477,8 +485,9 @@ def apply_exam_results(
     dry_run: bool,
 ) -> None:
     """検定結果を agent_status.json に書き込む（coaching_prompt など既存フィールドを保持）。"""
-    existing = _load_status()
-    now      = datetime.now().isoformat()
+    existing    = _load_status()
+    before_state = {k: dict(v) for k, v in existing.items()}
+    now          = datetime.now().isoformat()
 
     for r in results:
         prev = existing.get(r.agent_name, {})
@@ -504,6 +513,7 @@ def apply_exam_results(
 
     _save_status(existing)
     logger.info("agent_status.json 更新完了 (%s)", AGENT_STATUS_PATH)
+    append_agent_status_history(before_state, existing, source="run_agent_exam")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -555,7 +565,11 @@ def _print_summary(
 # メインロジック
 # ─────────────────────────────────────────────────────────────
 
-def run_exam(exam_days: int = 90, dry_run: bool = False) -> list[AgentExamResult]:
+def run_exam(
+    exam_days: int = 90,
+    dry_run: bool = False,
+    max_hold_days: int = BACKTEST_MAX_HOLD_DAYS,
+) -> list[AgentExamResult]:
     """Walk-Forward テストを実行してエージェント合否を返す。"""
     today     = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     sim_end   = today
@@ -580,7 +594,9 @@ def run_exam(exam_days: int = 90, dry_run: bool = False) -> list[AgentExamResult
         if df is None:
             continue
 
-        ticker_trades = simulate_ticker(ticker, df, sim_start, spy_df, vix_df)
+        ticker_trades = simulate_ticker(
+            ticker, df, sim_start, spy_df, vix_df, max_hold_days=max_hold_days
+        )
         all_trades.extend(ticker_trades)
 
         wins_t = sum(1 for t in ticker_trades if t.win)
@@ -625,9 +641,15 @@ def main() -> None:
         action="store_true",
         help="agent_status.json を更新せずに検定のみ実行する",
     )
+    parser.add_argument(
+        "--max-hold-days",
+        type=int,
+        default=BACKTEST_MAX_HOLD_DAYS,
+        help=f"最大保有日数・営業日（デフォルト: {BACKTEST_MAX_HOLD_DAYS}）",
+    )
     args = parser.parse_args()
 
-    run_exam(args.days, args.dry_run)
+    run_exam(args.days, args.dry_run, max_hold_days=args.max_hold_days)
 
 
 if __name__ == "__main__":

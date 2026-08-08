@@ -38,6 +38,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+from engine.constants import BACKTEST_MAX_HOLD_DAYS                    # noqa: E402
 from skills.technical_calc import _calc_rsi, _calc_macd, _calc_sma25  # noqa: E402
 from skills.ohlcv_cache import get_ohlcv                               # noqa: E402
 from tools.critic_agent import CriticAgent                             # noqa: E402
@@ -58,8 +59,12 @@ INDICATOR_BUFFER_DAYS = 60   # SMA25 / MACD(26) の計算に必要なバッフ�
 POSITION_SIZE_RATIO   = 0.20 # 1トレードあたり資金の20%を投入
 STOP_LOSS_PCT         = 0.05 # -5% でストップロス
 TAKE_PROFIT_PCT       = 0.10 # +10% で利益確定
-MAX_HOLD_DAYS         = 10   # 最大保有日数（営業日）
 BUY_SCORE_THRESHOLD   = 0.40 # テクニカルスコアの BUY 閾値（-1〜+1）CLI の --threshold で上書き可
+
+# 最大保有日数（営業日）は engine.constants.BACKTEST_MAX_HOLD_DAYS を既定値とし、
+# CLI の --max-hold-days で上書きする。
+# ※ engine.constants.MAX_HOLD_DAYS は本番 ExitAgent 専用（初期値 0 = 無効）であり、
+#    バックテストからは参照しない。
 
 # ── ニュートラルゾーン（不感帯）定数 ──────────────────────────────────
 # 0.0 にするとニュートラルゾーンなし（従来の厳格モード）
@@ -208,6 +213,7 @@ def run_simulation(
     buy_threshold: float = BUY_SCORE_THRESHOLD,
     macd_neutral_ratio: float = 0.0,
     sma_neutral_pct:    float = 0.0,
+    max_hold_days:      int   = BACKTEST_MAX_HOLD_DAYS,
 ) -> tuple[list[dict], list[float]]:
     """
     Time Travel シミュレーション。
@@ -251,7 +257,7 @@ def run_simulation(
                 exit_reason = "STOP_LOSS"
             elif pnl_pct >= TAKE_PROFIT_PCT:
                 exit_reason = "TAKE_PROFIT"
-            elif hold_days_done >= MAX_HOLD_DAYS:
+            elif hold_days_done >= max_hold_days:
                 exit_reason = "MAX_HOLD"
             elif score_exit < -0.5:
                 exit_reason = "SIGNAL_REVERSAL"
@@ -393,7 +399,7 @@ def calc_metrics(
     # → OVERRIDE 後の N 日間の実際の値動きを遡及して計算（近似）
     override_saved = 0.0
     for t in overridden:
-        # OVERRIDE した日の価格でポジションを入れ "MAX_HOLD_DAYS後" に手放した場合の損益
+        # OVERRIDE した日の価格でポジションを入れ "max_hold_days後" に手放した場合の損益
         # ここではログに保存した entry_price で保守的に0とする
         # （実際には run の外でデータを参照できないため 0 推定を返す）
         override_saved += 0.0  # 次セクションで後付け計算
@@ -419,10 +425,11 @@ def estimate_override_contribution(
     overridden: list[dict],
     df: pd.DataFrame,
     initial_capital: float,
+    max_hold_days: int = BACKTEST_MAX_HOLD_DAYS,
 ) -> float:
     """
     OVERRIDE されたトレードが実際にどれだけの損失を回避したかを推定する。
-    仮に BUY した場合、MAX_HOLD_DAYS 後（または期末）の価格で決済したと仮定。
+    仮に BUY した場合、max_hold_days 後（または期末）の価格で決済したと仮定。
     """
     saved_total = 0.0
     for t in overridden:
@@ -430,8 +437,8 @@ def estimate_override_contribution(
         entry_price = t.get("override_avoided_entry_price", 0.0)
         if entry_price == 0:
             continue
-        # entry_date 以降 MAX_HOLD_DAYS 営業日後の終値
-        future = df.loc[df.index > entry_date].head(MAX_HOLD_DAYS)
+        # entry_date 以降 max_hold_days 営業日後の終値
+        future = df.loc[df.index > entry_date].head(max_hold_days)
         if future.empty:
             continue
         exit_price = float(future["Close"].iloc[-1])
@@ -472,6 +479,7 @@ def build_report(
     trades: list[dict],
     use_critic: bool,
     override_contribution: float,
+    max_hold_days: int = BACKTEST_MAX_HOLD_DAYS,
 ) -> str:
     today = datetime.now().strftime("%Y-%m-%d")
     pnl_sign = "+" if metrics["total_pnl"] >= 0 else ""
@@ -537,7 +545,7 @@ period: {start.date()} to {end.date()}
 | BUY 閾値（テクニカルスコア） | {BUY_SCORE_THRESHOLD:.2f} |
 | ストップロス | -{STOP_LOSS_PCT*100:.0f}% |
 | 利益確定 | +{TAKE_PROFIT_PCT*100:.0f}% |
-| 最大保有日数 | {MAX_HOLD_DAYS} 営業日 |
+| 最大保有日数 | {max_hold_days} 営業日 |
 | 1トレード投入比率 | {POSITION_SIZE_RATIO*100:.0f}% |
 | CriticAgent | {'有効 (Ollama)' if use_critic else '無効'} |
 {critic_section}
@@ -591,6 +599,10 @@ def main() -> None:
     parser.add_argument("--capital",   type=float, default=10000, help="初期資金（デフォルト: 10000）")
     parser.add_argument("--no-critic", action="store_true",    help="CriticAgent を呼び出さない")
     parser.add_argument("--threshold", type=float, default=BUY_SCORE_THRESHOLD, help=f"BUY スコア閾値（デフォルト: {BUY_SCORE_THRESHOLD}）")
+    parser.add_argument(
+        "--max-hold-days", type=int, default=BACKTEST_MAX_HOLD_DAYS,
+        help=f"最大保有日数・営業日（デフォルト: {BACKTEST_MAX_HOLD_DAYS}）",
+    )
     args = parser.parse_args()
 
     ticker    = args.ticker.upper()
@@ -614,6 +626,7 @@ def main() -> None:
         initial_capital = args.capital,
         use_critic      = use_critic,
         buy_threshold   = args.threshold,
+        max_hold_days   = args.max_hold_days,
     )
 
     # ── メトリクス
@@ -621,7 +634,9 @@ def main() -> None:
 
     # ── OVERRIDE 貢献推定
     overridden = [t for t in trades if t["critic_decision"] == "OVERRIDE"]
-    override_contribution = estimate_override_contribution(overridden, df, args.capital)
+    override_contribution = estimate_override_contribution(
+        overridden, df, args.capital, max_hold_days=args.max_hold_days
+    )
     metrics["override_saved"] = override_contribution
 
     # ── コンソール出力
@@ -639,6 +654,7 @@ def main() -> None:
         trades                = trades,
         use_critic            = use_critic,
         override_contribution = override_contribution,
+        max_hold_days         = args.max_hold_days,
     )
     report_path.write_text(report_md, encoding="utf-8")
     logger.info("レポート保存: %s", report_path)
