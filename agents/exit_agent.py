@@ -4,14 +4,19 @@ exit_agent.py — 保有ポジション監視・売却判断エージェント
 main.py の Selling Loop（Stage 0）で Buying Loop の前に毎日実行され、
 data/portfolio.json の全保有銘柄に対して以下の基準で売却判断を行う。
 
-判断基準:
+判断基準（この順に評価する）:
   TAKE_PROFIT  : 現在価格 >= 目標株価、または含み益 >= +10%
   STOP_LOSS    : 現在価格 <= ストップロス価格、または含み損 <= -5%
+  MAX_HOLD     : 保有期間が MAX_HOLD_DAYS 営業日に到達（TIME_EXIT）
   THESIS_BROKEN: 購入時の理由が現在ニュースで LLM 判定により否定された
   HOLD         : 上記以外（継続保有）
 
+MAX_HOLD を THESIS_BROKEN より前に置くのは、時間切れが確定している
+ポジションで LLM API を消費しないようにするため。
+
 依存:
   - data/portfolio.json   : 保有ポジション一覧
+  - engine/constants       : MAX_HOLD_DAYS（0 で TIME_EXIT 無効）
   - skills/news_monitor   : 最新ニュース取得
   - tools/auto_logger     : 売却ログ生成 & 購入ログの CLOSED 更新
   - yfinance              : 現在価格取得
@@ -25,12 +30,14 @@ import logging
 from datetime import date, datetime
 from pathlib import Path
 
+import numpy as np
 import yfinance as yf
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import skills.news_monitor as _news_mod
 import skills.training_data_collector as _training_mod
+from engine.constants import MAX_HOLD_DAYS
 from tools.auto_logger import ObsidianLogger
 
 logger = logging.getLogger(__name__)
@@ -79,6 +86,35 @@ def _rule_based_thesis_break(news_text: str) -> bool:
     has_break_keyword = any(kw in news_text.lower() for kw in _THESIS_BREAK_KEYWORDS)
 
     return all_negative and has_break_keyword
+
+
+def _business_days_held(entry_date: str, today: date | None = None) -> int | None:
+    """
+    entry_date から today までの経過営業日数を返す。判定不能なら None。
+
+    None を返すケース（呼び出し側は TIME_EXIT をスキップして HOLD 側に倒す）:
+      - entry_date が空文字 / None
+      - entry_date が ISO 形式としてパースできない
+      - entry_date が未来日
+
+    既知の制約: numpy.busday_count は土日のみを除外し、**米国市場の祝日は
+    営業日としてカウントする**。祝日カレンダー用の依存パッケージを増やさない
+    方針のため、実際の営業日数よりわずかに多く数えられ、TIME_EXIT が本来より
+    少し早く発火しうる（保有を引き延ばさない方向の誤差）。
+    """
+    if not entry_date:
+        return None
+
+    try:
+        entry = date.fromisoformat(str(entry_date)[:10])
+    except (TypeError, ValueError):
+        return None
+
+    ref = today or date.today()
+    if entry > ref:
+        return None
+
+    return int(np.busday_count(entry, ref))
 
 
 def _safe_log_path(base: Path, filename: str) -> Path | None:
@@ -232,6 +268,25 @@ class ExitAgent:
         if not stop and pnl_pct <= STOP_LOSS_PCT:
             reason = f"含み損 {pnl_pct:+.2f}% が固定損切り閾値 {STOP_LOSS_PCT:.0f}% を超過（ATR未設定フォールバック）"
             return self._build(pos, "SELL", "STOP_LOSS", reason, current, pnl_pct)
+
+        # 最大保有日数チェック（TIME_EXIT）
+        # MAX_HOLD_DAYS が 0 / None のときは分岐ごと無効。
+        # LLM を呼ぶ THESIS_BROKEN より前に置き、時間切れが確定している
+        # ポジションで API を消費しないようにする。
+        if MAX_HOLD_DAYS:
+            held_days = _business_days_held(pos.get("entry_date", ""))
+            if held_days is None:
+                logger.warning(
+                    "  [ExitAgent] %s entry_date が不正・未設定・未来日のため "
+                    "TIME_EXIT 判定をスキップ: %r",
+                    ticker, pos.get("entry_date", ""),
+                )
+            elif held_days >= MAX_HOLD_DAYS:
+                reason = (
+                    f"最大保有日数 {MAX_HOLD_DAYS} 営業日を経過"
+                    f"（保有 {held_days} 営業日, {pnl_pct:+.2f}%）"
+                )
+                return self._build(pos, "SELL", "MAX_HOLD", reason, current, pnl_pct)
 
         # Thesis 破綻チェック（LLM — mock_mode 時はスキップ）
         if not mock_mode:
@@ -474,6 +529,8 @@ def _derive_rule(exit_type: str, pnl: float) -> str:
         return f"利確成功 ({pnl:+.2f}%)。同様のセットアップでルール継続適用。"
     if exit_type == "STOP_LOSS":
         return f"損切り実行 ({pnl:+.2f}%)。エントリー条件を再検証すること。"
+    if exit_type == "MAX_HOLD":
+        return f"最大保有日数到達で機械的決済 ({pnl:+.2f}%)。想定期間内に動かない銘柄に資金を寝かせないこと。"
     if exit_type == "THESIS_BROKEN":
         return "購入理由が崩れた時点での即時撤退は正しい判断。感情的なホールドを避けること。"
     return "継続保有中。次回チェックへ。"

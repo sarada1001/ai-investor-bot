@@ -28,6 +28,16 @@ SIGNAL_MAP: dict[str, float] = {
     "negative": -1.0,
 }
 
+# ── Exit 判定 ──────────────────────────────────────────────
+# 最大保有日数（営業日）。0 または None で TIME_EXIT を無効化する。
+# バックテスト（run_backtest.py / run_agent_exam.py）と同じ値を使うこと。
+MAX_HOLD_DAYS: int = 0    # ← 初期値は 0（無効）。有効化は別コミットで行う
+
+# バックテスト / Agent Exam の `--max-hold-days` 既定値。
+# 本番 ExitAgent は上の MAX_HOLD_DAYS を参照するため、両者は独立して動く。
+# （本番を無効化したままバックテストを 10 営業日前提で回せるようにするための分離）
+BACKTEST_MAX_HOLD_DAYS: int = 10
+
 # ── 本番スクリーニング対象 Universe（100銘柄 / S&P500+NASDAQ100 主要銘柄）──────
 # バックテスト検証済み (threshold=0.60, 勝率46.0%, 取引数189/3ヶ月 @ 39→100銘柄比 2.70x)
 PRODUCTION_UNIVERSE: list[str] = [
