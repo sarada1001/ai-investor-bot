@@ -2,8 +2,12 @@
 """
 run_weekly_reflection.py — 週次自動反省会スクリプト
 
-直近7日間の obsidian_logs を読み込み、Ollama（Gemini フォールバック）で
-メタ教訓を生成し、wiki/concepts/Weekly_Reflection_YYYY-MM-DD.md に保存する。
+直近7日間の obsidian_logs を読み込み、LLM でメタ教訓を生成し、
+wiki/concepts/Weekly_Reflection_YYYY-MM-DD.md に保存する。
+
+LLM のバックエンド選択（Ollama / Gemini）とモデル名は
+`skills/llm_factory.py` に一元化してある。このスクリプトは
+モデル名を一切持たず、独自のフォールバックも行わない。
 
 Usage:
     python scripts/run_weekly_reflection.py            # 通常実行
@@ -14,29 +18,30 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import requests
 from dotenv import load_dotenv
 
 # ─────────────────────────────────────────────────────────────
 # パス設定
+#
+# skills.llm_factory はインポート時に GEMINI_MODEL 等を読むため、
+# sys.path 登録と .env ロードを **インポートより先** に済ませておく。
+# （cron は cwd をプロジェクトルートにするが、sys.path に入るのは
+#   スクリプトのある scripts/ なので明示登録が要る）
 # ─────────────────────────────────────────────────────────────
 
-SCRIPT_DIR   = Path(__file__).parent
+SCRIPT_DIR   = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 load_dotenv(PROJECT_ROOT / ".env")
 
 LOG_DIR      = PROJECT_ROOT / "data" / "knowledge_base" / "obsidian_logs"
 CONCEPTS_DIR = PROJECT_ROOT / "data" / "knowledge_base" / "wiki" / "concepts"
-
-OLLAMA_URL   = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api/generate"
-OLLAMA_MODEL = "llama3.1:latest"
-OLLAMA_TIMEOUT = 300  # seconds — 週次要約は長文になるため余裕を持たせる
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,50 +52,74 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
-# LLM ユーティリティ（server_librarian.py と同じパターン）
+# LLM ユーティリティ
+#
+# バックエンド（Ollama / Gemini）の選択・モデル名・API キーの扱いは
+# すべて skills/llm_factory.py に委譲する。ここで REST を直接叩いたり
+# モデル名を書いたりしないこと — それが 2026-02〜08 の半年間、
+# 廃止モデル `gemini-2.0-flash` を呼び続けて無言に失敗した原因である。
 # ─────────────────────────────────────────────────────────────
 
-def _call_gemini(prompt: str) -> str:
-    api_key = os.getenv("GOOGLE_API_KEY", "")
-    if not api_key:
-        return ""
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash:generateContent?key={api_key}"
-    )
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    try:
-        resp = requests.post(url, json=payload, timeout=60)
-        resp.raise_for_status()
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception:
-        return ""
+def _describe_exception(exc: BaseException) -> str:
+    """例外から「原因特定に足る情報」を可能な限り引き出して 1 行にする。
 
+    LLM クライアントは requests / httpx / google.api_core と層が違い、
+    HTTP ステータスやレスポンスボディを載せる属性名が統一されていない。
+    どれか 1 つでも拾えれば「モデル名が違う(404)」「キー無効(403)」
+    「レート超過(429)」を切り分けられるため、総当たりで探す。
+    """
+    parts = [f"{type(exc).__name__}: {exc}"]
 
-def _call_ollama(prompt: str) -> str:
-    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
-    try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
-        resp.raise_for_status()
-        return resp.json().get("response", "").strip()
-    except requests.exceptions.ConnectionError as e:
-        logger.error("Ollama に接続できません: %s", e)
-        return "[ERROR] Ollama に接続できませんでした。"
-    except requests.exceptions.Timeout:
-        logger.error("Ollama タイムアウト (%d 秒)", OLLAMA_TIMEOUT)
-        return "[ERROR] Ollama がタイムアウトしました。"
-    except Exception as e:
-        return f"[ERROR] {e}"
+    for attr in ("status_code", "code"):
+        status = getattr(exc, attr, None)
+        if status is not None and not callable(status):
+            parts.append(f"{attr}={status}")
+            break
+
+    response = getattr(exc, "response", None)
+    if response is not None:
+        body = getattr(response, "text", None)
+        if body is None:
+            body = str(response)
+        parts.append(f"body={body[:500]}")
+
+    # ラッパー例外（langchain 等）はメッセージが薄いことがあるため元例外も添える。
+    # 逆に本文を二重に持つ場合もあるので長さは切り詰める。
+    cause = exc.__cause__ or exc.__context__
+    if cause is not None:
+        parts.append(f"cause={type(cause).__name__}: {str(cause)[:300]}")
+
+    return " | ".join(parts)
 
 
 def call_llm(prompt: str) -> str:
-    """Gemini 優先 → Ollama フォールバック。"""
-    result = _call_gemini(prompt)
-    if result and not result.startswith("[ERROR]"):
-        logger.info("Gemini で生成しました。")
-        return result
-    logger.info("Gemini 失敗 → Ollama にフォールバックします。")
-    return _call_ollama(prompt)
+    """llm_factory 経由で LLM を呼び出し、生成テキストを返す。
+
+    .env の `FORCE_GEMINI` / `GEMINI_MODEL` / `OLLAMA_MODEL` /
+    `DISABLE_GEMINI` がそのまま効く。失敗は握りつぶさず送出し、
+    呼び出し元が原因つきでログに残す。
+
+    Raises:
+        Exception: LLM の生成・接続に失敗した場合（llm_factory 由来の例外を含む）
+        RuntimeError: 応答が空だった場合
+    """
+    from skills.llm_factory import get_llm
+
+    # json_mode=False 必須: 本スクリプトの出力は Markdown 文章であり、
+    # format="json" を付けると Llama 側で文章が崩壊する（llm_factory 参照）。
+    llm, source = get_llm(temperature=0)
+    model = getattr(llm, "model", "unknown")
+    logger.info("LLM 呼び出し: source=%s model=%s", source, model)
+
+    response = llm.invoke(prompt)
+    text = str(getattr(response, "content", "") or "").strip()
+    if not text:
+        raise RuntimeError(
+            f"LLM が空応答を返しました (source={source}, model={model})"
+        )
+
+    logger.info("LLM 生成成功: source=%s model=%s 文字数=%d", source, model, len(text))
+    return text
 
 
 # ─────────────────────────────────────────────────────────────
@@ -274,10 +303,14 @@ def main() -> None:
         sys.exit(0)
 
     logger.info("LLM に週次反省レポートを生成依頼します...")
-    llm_output = call_llm(prompt)
-
-    if llm_output.startswith("[ERROR]"):
-        logger.error("LLM 生成に失敗しました: %s", llm_output)
+    try:
+        llm_output = call_llm(prompt)
+    except Exception as exc:
+        # 「失敗しました」だけのログにしないこと。ここが無言だったせいで
+        # 廃止モデルによる失敗が半年間気づかれなかった。
+        logger.error(
+            "LLM 生成に失敗しました — %s", _describe_exception(exc), exc_info=True,
+        )
         sys.exit(1)
 
     content = build_output_markdown(llm_output, logs, today)
