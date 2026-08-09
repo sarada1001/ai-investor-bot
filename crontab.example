@@ -1,0 +1,13 @@
+SHELL=/bin/bash
+MAILTO=""
+#0 5 * * 1-5 /home/naito/ai-investor-bot/auto_push.sh >> /home/naito/ai-investor-bot/auto_push.log 2>&1
+#0 12 * * 1-5 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 scripts/prewarm_rag_cache.py >> /home/naito/ai-investor-bot/logs/prewarm.log 2>&1
+0 13 * * 1-5 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 scripts/health_check.py >> /home/naito/ai-investor-bot/logs/health.log 2>&1
+#30 13 * * 1-5 /home/naito/ai-investor-bot/run_bot.sh >> /home/naito/ai-investor-bot/main.log 2>&1
+50 13 * * 1-5 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 scripts/run_performance_report.py >> /home/naito/ai-investor-bot/logs/performance.log 2>&1
+0 14 * * 1-5 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 server_librarian.py >> /home/naito/ai-investor-bot/server_librarian.log 2>&1
+5 14 * * 1-5 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 server_librarian.py --ingest >> /home/naito/ai-investor-bot/server_librarian.log 2>&1
+#30 18 * * 0-4 /home/naito/ai-investor-bot/run_bot.sh >> /home/naito/ai-investor-bot/main.log 2>&1
+0 21 * * * cp /home/naito/ai-investor-bot/data/portfolio.json /home/naito/ai-investor-bot/backups/portfolio_$(date +\%Y\%m\%d).json
+0 15 * * 6 cd /home/naito/ai-investor-bot && /home/naito/ai-investor-bot/venv/bin/python3 scripts/run_weekly_reflection.py >> /home/naito/ai-investor-bot/logs/weekly_reflection.log 2>&1
+0 23 * * 1-5 /home/naito/ai-investor-bot/run_bot.sh >> /home/naito/bot_cron.log 2>&1
