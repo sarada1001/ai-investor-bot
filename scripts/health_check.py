@@ -131,7 +131,7 @@ _RECOMMENDED_ENV_KEYS: tuple[str, ...] = (
     "ALPACA_PAPER_TRADING",  # 未設定だと True（ペーパー）扱い。安全側だが明示すべき
     "FORCE_GEMINI",
     "DISABLE_GEMINI",
-    "GEMINI_MODEL",          # 未設定だと gemini-2.0-flash 固定。モデル廃止で無言死する
+    "GEMINI_MODEL",          # 未設定だと llm_factory の暗黙既定に落ちる。モデル廃止で無言死する
 )
 
 # 通知・ログから値を伏せる対象。ここに挙げた環境変数の「値」が

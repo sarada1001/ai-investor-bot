@@ -137,7 +137,14 @@ class ExitAgent:
 
     NAME = "ExitAgent"
 
-    def __init__(self, bbs, llm_model: str = "gemini-2.0-flash") -> None:
+    def __init__(self, bbs, llm_model: str | None = None) -> None:
+        """llm_model=None（既定）で .env の GEMINI_MODEL に従う。
+
+        以前はここで既定値にモデル名を直書きしており、.env の設定を
+        常に上書きしていた。廃止モデルを指し続けた結果、thesis 判定が
+        毎回 429 でルールベースにフォールバックしていた。
+        明示指定はテスト・調査目的の注入口としてのみ残す。
+        """
         self.bbs     = bbs
         from skills.llm_factory import get_llm_instance
         self._llm    = get_llm_instance(gemini_model=llm_model)

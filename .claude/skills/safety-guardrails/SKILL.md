@@ -116,7 +116,13 @@ tools/critic_agent.py が最終発注前にLLM（Ollama）を用いてリスク�
 >   過去の失敗ルール**と照合し、APPROVE / OVERRIDE を判定する。
 > - LLMバックエンドは3段フォールバック（原文は Ollama のみ記載）：
 >   1. Ollama（`llama3.1`、タイムアウト60秒）
->   2. Gemini API（`gemini-2.0-flash`、Ollama接続エラー/タイムアウト時に自動切替）
+>   2. Gemini API（モデルは `.env` の `GEMINI_MODEL`、Ollama接続エラー/
+>      タイムアウト時に自動切替）
+>      ※ 2026-08 更新: 以前は `gemini-2.0-flash` を直書きしていたが、
+>      モデル名の解決は `skills/llm_factory.get_gemini_model()` に一元化した。
+>      `tools/critic_agent.py` にモデル名を再び直書きしないこと
+>      （廃止時に `.env` を直しても反映されず、Gemini フォールバックが
+>      無言に死ぬ。`tests/test_llm_model_resolution.py` が防止している）。
 >   3. `_FALLBACK_RESPONSE` — 両方失敗時は **`HOLD` を返す**
 >      （= 発注を止める側に倒すフェイルセーフ。「LLM障害時に発注が素通り
 >      しない」ことが設計意図なので、フォールバックを APPROVE 側に変えては

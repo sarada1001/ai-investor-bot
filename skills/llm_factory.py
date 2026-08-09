@@ -11,6 +11,7 @@ skills/llm_factory.py — 統一 LLM ファクトリー
 環境変数:
   OLLAMA_BASE_URL    : Ollama エンドポイント（デフォルト: http://localhost:11434）
   OLLAMA_MODEL       : 使用モデル（デフォルト: llama3.1）
+  GEMINI_MODEL       : Gemini のモデル名（未設定時は _FALLBACK_GEMINI_MODEL）
   FORCE_GEMINI=true  : Ollama を無視して Gemini を常に使用
   DISABLE_GEMINI=true: Gemini フォールバックを完全封鎖（課金ゼロ保証）
 """
@@ -29,11 +30,29 @@ load_dotenv()
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 _OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.1")
-_DEFAULT_GEMINI  = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-# FORCE_GEMINI / DISABLE_GEMINI は get_llm() 内で毎回 os.getenv() を呼んで読む。
-# モジュールレベルで固定すると cron 起動時に .env が未ロードのまま False になる。
+# FORCE_GEMINI / DISABLE_GEMINI / GEMINI_MODEL は get_llm() 内で毎回 os.getenv() を
+# 呼んで読む。モジュールレベルで固定すると cron 起動時に .env が未ロードのまま
+# 既定値に落ちる。
+
+# Gemini のモデル名を知っているのはこのモジュールだけにする。
+# 呼び出し側にモデル名を直書きすると、Google がそのモデルを廃止した瞬間に
+# .env を直しても反映されず、429 (limit: 0) を出し続けて無言に失敗する。
+# 実際に ExitAgent / rag_search / preflight_check が gemini-2.0-flash を直書きし、
+# 廃止後も .env の GEMINI_MODEL を上書きしていた（2026-08 に全廃）。
+_FALLBACK_GEMINI_MODEL = "gemini-2.5-flash"
 
 _ollama_available: bool | None = None  # None = 未チェック
+
+
+def get_gemini_model() -> str:
+    """使用する Gemini モデル名を返す（.env の GEMINI_MODEL を毎回読む）。
+
+    モデル名を必要とする呼び出し元（Gemini API を直接叩く preflight_check・
+    CriticAgent・server_librarian）は、必ずこの関数から取得すること。
+    モデル名をそれぞれのモジュールに直書きしてはならない。
+    """
+    load_dotenv(override=False)
+    return os.getenv("GEMINI_MODEL") or _FALLBACK_GEMINI_MODEL
 
 
 def _check_ollama() -> bool:
@@ -75,7 +94,7 @@ def get_llm(
     force_gemini   = os.getenv("FORCE_GEMINI",   "false").lower() == "true"
 
     model_ollama = ollama_model or _OLLAMA_MODEL
-    model_gemini = gemini_model or _DEFAULT_GEMINI
+    model_gemini = gemini_model or get_gemini_model()
 
     use_ollama = (not force_gemini) and _check_ollama()
 

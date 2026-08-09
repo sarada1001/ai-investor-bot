@@ -113,6 +113,37 @@ Google側で廃止済み（`404 NOT_FOUND: This model ... is no longer available
   `gemini-2.5-flash` に修正（コミット `5e200ce`）
 - `tools/ollama_tunnel.py` は削除せず、将来ローカルLLMに戻す場合の参考実装として保持
 
+### 追記（2026-08-10）: 上記対応の取りこぼしと、モデル名の一元化
+
+2026-07 の対応は「ハードコードされていた3箇所」を現行モデル名に**書き換える**
+ものだったが、`.env` を**上書きする側**の箇所が3つ残っていた：
+
+| 箇所 | 形態 |
+|---|---|
+| `agents/exit_agent.py` | `__init__` の引数デフォルト `llm_model="gemini-2.0-flash"` |
+| `skills/rag_search.py` | `get_llm_instance(gemini_model="gemini-2.0-flash")` 明示指定 |
+| `scripts/preflight_check.py` | `ChatGoogleGenerativeAI(model="gemini-2.0-flash")` 直呼び |
+
+`skills/llm_factory.py` の既定値も `gemini-2.0-flash` のままだった。
+本番 `.env` が `gemini-2.5-flash` を指していても、これらが引数で上書きするため
+**無効化されていた**。結果、`bot_cron.log` には ExitAgent の thesis 判定
+（購入理由がニュースで否定されたかの LLM 判断）が毎日全保有銘柄で
+`429 RESOURCE_EXHAUSTED (limit: 0)` になり、価格ベースのルールベース
+フォールバックのみで運用されていた記録が残っている。
+`limit: 0` は枠切れではなく「廃止モデルには割り当てが存在しない」の意味で、
+リトライでは永久に回復しない。
+
+**対応**: モデル名を書き換えるのではなく、**モデル名を知っているのは
+`skills/llm_factory.py` だけ**という状態にした。
+
+- `llm_factory.get_gemini_model()` が `.env` の `GEMINI_MODEL` を毎回解決
+  （モジュールレベルで固定しないため、cron のインポート順にも影響されない）
+- 呼び出し側（ExitAgent / rag_search / preflight_check / critic_agent /
+  server_librarian）からモデル名リテラルを全廃
+- `tests/test_llm_model_resolution.py` が (1) `.env` の変更が全経路に伝播すること
+  (2) `llm_factory.py` 以外に `gemini-N` リテラルが存在しないこと の両方を検証。
+  静的スキャンはコメント・docstring を AST で除外している
+
 ### 追記（2026-07-09）: FundamentalAgent判定の単一サンプル観察と今後の運用方針
 
 Gemini切替後の動作確認として、CAT銘柄でFundamentalAgentをread-only実行した

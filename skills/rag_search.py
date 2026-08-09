@@ -26,7 +26,11 @@ load_dotenv()
 _embeddings = None
 _db_cache: dict = {}
 _llm_flash = None   # flash: HyDE 仮説生成（軽量）
-_llm_pro   = None   # pro  : 深層分析（gemini-2.5-pro → 2.0-flash に降格してコスト削減）
+_llm_pro   = None   # pro  : 深層分析
+# かつて pro は上位モデルを指していたが、コスト削減で軽量モデルに降格された時点で
+# flash との差は消えている。現在はどちらも llm_factory の既定モデルを使う
+# （モデル名は .env の GEMINI_MODEL が唯一の指定箇所）。
+# インスタンスを分けているのは呼び出し経路を残すためで、モデルの差ではない。
 
 _RETRY_DELAYS = (15, 30, 60)  # seconds, escalating backoff on 429
 
@@ -34,8 +38,9 @@ _RETRY_DELAYS = (15, 30, 60)  # seconds, escalating backoff on 429
 def _call_llm(prompt: str, flash: bool = False) -> str:
     """
     Call LLM with exponential backoff on 429 RESOURCE_EXHAUSTED.
-    flash=True  → 軽量（Ollama or gemini-2.0-flash）
-    flash=False → 深層分析（Ollama or gemini-2.0-flash）
+    flash=True  → HyDE 仮説生成用インスタンス
+    flash=False → 深層分析用インスタンス
+    どちらも llm_factory の既定モデル（Ollama or .env の GEMINI_MODEL）を使う。
     """
     llm = _get_llm_flash() if flash else _get_llm_pro()
     for attempt, delay in enumerate((*_RETRY_DELAYS, None)):
@@ -67,10 +72,10 @@ def _get_llm_flash():
 
 
 def _get_llm_pro():
-    """深層分析モデル: gemini-2.5-pro から 2.0-flash に降格してコスト削減"""
+    """深層分析モデル: llm_factory の既定モデルを使う（モデル名は直書きしない）"""
     global _llm_pro
     if _llm_pro is None:
-        _llm_pro = get_llm_instance(gemini_model="gemini-2.0-flash")
+        _llm_pro = get_llm_instance()
     return _llm_pro
 
 

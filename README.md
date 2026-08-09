@@ -859,6 +859,13 @@ data/cache/ohlcv_cache.db
 | 完全封鎖オプション | なし | `DISABLE_GEMINI=true` で RuntimeError |
 | バックエンド切替 | コード変更が必要 | 環境変数1行で完結 |
 
+> ⚠️ **上表は当時の変更内容です。** `gemini-2.0-flash` は 2026-07 に Google 側で
+> 提供終了しました（呼び出すと `429 RESOURCE_EXHAUSTED / limit: 0` になり、
+> リトライでは回復しません）。現在のモデルは `.env` の `GEMINI_MODEL` で指定し、
+> コード上のモデル名ハードコードは全廃済みです
+> （`skills/llm_factory.get_gemini_model()` が唯一の解決経路。
+> `tests/test_llm_model_resolution.py` が再発を防いでいます）。
+
 ```bash
 # GPU サーバー本番環境（.env 設定例）
 OLLAMA_BASE_URL=http://localhost:11434
@@ -890,7 +897,7 @@ DISABLE_GEMINI=true   # ← これだけで全エージェントの Gemini 課�
 - **feat: skills/api_guard.py — tenacity 指数バックオフ** — yfinance の 429/接続リセットエラーを自動リトライ（4試行、5〜60s バックオフ）。スクリーナー・バックテスト・OHLCV 取得の全 `yf.download()` を `yf_download_safe()` に置換
 - **feat: skills/ohlcv_cache.py — SQLite 24h TTL キャッシュ** — A/B バックテストで同一銘柄の重複 API 呼び出しを排除。バックテスト実行時間短縮・API 呼び出し 50% 削減
 - **feat: skills/llm_factory.py — 統一 LLM ファクトリー** — 8コンポーネントに直書きされていた `ChatGoogleGenerativeAI` を1箇所に集約。Ollama 優先 / Gemini フォールバック / `DISABLE_GEMINI=true` で課金ゼロ保証
-- **perf: skills/rag_search.py — `gemini-2.5-pro` → `gemini-2.0-flash` 降格** — 最高コストモデルを除去し、Ollama オフロード時のコスト完全ゼロを実現
+- **perf: skills/rag_search.py — `gemini-2.5-pro` → `gemini-2.0-flash` 降格** — 最高コストモデルを除去し、Ollama オフロード時のコスト完全ゼロを実現（※ `gemini-2.0-flash` は 2026-07 に提供終了。現在は `.env` の `GEMINI_MODEL` で指定し、コード上のハードコードは廃止済み）
 - **feat: screens/screener.py — `universe` 引数追加** — `screen_sp500()` / `screen_sp500_intraday()` が `PRODUCTION_UNIVERSE` を受け取れるよう改修
 
 ---

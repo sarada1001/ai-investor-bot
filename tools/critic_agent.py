@@ -6,7 +6,7 @@ APPROVE / OVERRIDE を判定して返す。
 
 LLMバックエンド（優先順）:
   1. Ollama (llama3.1) — ローカル LLM
-  2. Gemini API (gemini-2.5-flash) — Ollamaが接続エラー/タイムアウト時に自動切替
+  2. Gemini API (.env の GEMINI_MODEL) — Ollamaが接続エラー/タイムアウト時に自動切替
   3. _FALLBACK_RESPONSE — 両方が失敗した場合の安全フォールバック
 """
 
@@ -24,7 +24,9 @@ OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434") + "/api
 OLLAMA_MODEL    = "llama3.1"
 OLLAMA_TIMEOUT  = 60  # seconds
 
-GEMINI_MODEL    = "gemini-2.5-flash"
+# Gemini のモデル名はここに直書きせず、skills.llm_factory.get_gemini_model() が
+# .env の GEMINI_MODEL から毎回解決する。直書きするとモデル廃止時に .env を
+# 直しても反映されず、Gemini フォールバックが無言に死ぬ。
 GEMINI_TIMEOUT  = 30  # seconds
 
 # フォールバック値（Ollama・Gemini 両方が失敗した場合にシステムを止めない）
@@ -217,8 +219,9 @@ class CriticAgent:
         """
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
+            from skills.llm_factory import get_gemini_model
             llm  = ChatGoogleGenerativeAI(
-                model       = GEMINI_MODEL,
+                model       = get_gemini_model(),
                 temperature = 0,
                 request_timeout = GEMINI_TIMEOUT,
             )

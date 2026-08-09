@@ -101,13 +101,18 @@ def check_alpaca(verbose: bool) -> CheckResult:
 def check_gemini(verbose: bool) -> CheckResult:
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
+        from skills.llm_factory import get_gemini_model
         key = os.getenv("GOOGLE_API_KEY", "")
         if not key:
             return CheckResult("Google Gemini", False, "FAIL", "GOOGLE_API_KEY 未設定", critical=True)
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=key)
+        # get_llm() 経由にしないのは意図的。この検査の目的は「GOOGLE_API_KEY が
+        # Gemini API で実際に通るか」であり、Ollama が稼働していると get_llm() は
+        # Gemini を一切叩かず検査が空振りする。モデル名だけを factory から取る。
+        model = get_gemini_model()
+        llm = ChatGoogleGenerativeAI(model=model, google_api_key=key)
         res = llm.invoke("Reply with OK only.")
         return CheckResult("Google Gemini", True, "OK",
-                           f"model=gemini-2.0-flash  応答: {str(res.content)[:30]}", critical=True)
+                           f"model={model}  応答: {str(res.content)[:30]}", critical=True)
     except Exception as e:
         return CheckResult("Google Gemini", False, "FAIL", str(e)[:80], critical=True)
 
