@@ -87,6 +87,10 @@ if __name__ == "__main__":
                         help="除外するエージェント名（アブレーション実験用）")
     parser.add_argument("--run-audit",   action="store_true",
                         help="AuditAgent によるエージェント成績評価を実行し agent_status.json を更新する。")
+    parser.add_argument("--research-mode", action="store_true", dest="research_mode",
+                        help="研究モード: 発注・LINE・Obsidian を完全無効化し "
+                             "HOLD 判断を data/research/hold_cases.jsonl に記録する。"
+                             "介入実験データ収集用。")
 
     # ── デーモンモード ───────────────────────────────────────────
     parser.add_argument(
@@ -148,7 +152,8 @@ if __name__ == "__main__":
             print(f"  {i}. {r['ticker']:<6}  スコア {r['score']:>2}  {r['reason']}")
         raise SystemExit(0)
 
-    _run_audit_flag = getattr(args, "run_audit", False)
+    _run_audit_flag   = getattr(args, "run_audit",     False)
+    _research_mode    = getattr(args, "research_mode", False)
 
     # ── daemon モード ─────────────────────────────────────────────
     if args.daemon:
@@ -184,6 +189,7 @@ if __name__ == "__main__":
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
             run_audit       = _run_audit_flag,
+            research_mode   = _research_mode,
         )
 
     # ── tickers モード（複数銘柄固定ウォッチリスト） ──────────────
@@ -196,6 +202,7 @@ if __name__ == "__main__":
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
             run_audit       = _run_audit_flag,
+            research_mode   = _research_mode,
         )
 
     # ── 単一銘柄モード（従来動作） ────────────────────────────────
@@ -215,4 +222,5 @@ if __name__ == "__main__":
             hybrid_mode     = args.hybrid,
             excluded_agents = args.exclude,
             run_audit       = _run_audit_flag,
+            research_mode   = _research_mode,
         )

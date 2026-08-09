@@ -108,3 +108,8 @@ bot_log.txt
 *.pkl
 *.pickle
 latest_summary.md
+
+# 研究・分析の生成物（実行すれば再生成可能・本番と開発機で必ず競合する）
+data/analytics/
+data/research/
+data/evaluation/agent_status_history.jsonl

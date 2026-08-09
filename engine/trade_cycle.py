@@ -50,6 +50,7 @@ def run_trade_cycle(
     hybrid_mode:      bool            = False,
     excluded_agents:  list[str] | None = None,
     run_audit:        bool            = False,
+    research_mode:    bool            = False,
 ) -> dict:
     """
     スイングトレード分析サイクルをステージゲート方式で実行する。
@@ -58,7 +59,18 @@ def run_trade_cycle(
     Gate   : マクロ NEGATIVE → ブレーキ HOLD / Tech・News 双方 NEUTRAL → HOLD
     Stage 2: FundamentalAgent（Gate 通過時のみ）
     Stage 3: ManagerAgent（最終評価 & 発注）
+
+    research_mode=True の場合:
+        - Alpaca 発注を完全無効化（dry_run=True を強制）
+        - LINE 通知を無効化
+        - Obsidian / TradeGuard への書き込みを無効化
+        - HOLD 判断を data/research/hold_cases.jsonl に記録
     """
+    # 研究モード: 発注・通知・外部書き込みを全て無効化
+    if research_mode:
+        dry_run     = True
+        notify_line = False
+
     excluded_agents = excluded_agents or []
     excluded_keys: list[str] = list({
         k for a in excluded_agents
@@ -326,6 +338,21 @@ def run_trade_cycle(
             "order":  None,
             "dry_run": dry_run,
         }
+        # HOLD 原因エージェントの特定（research_mode の有無に関わらず付与）
+        from engine.research_helpers import _identify_hold_causes
+        _gate_causes = _identify_hold_causes(
+            sigs=judgment["signals"],
+            weights=eff_weights,
+            macro_forced_hold=gate["macro_brake"],
+        )
+        judgment["primary_reason_agent"] = _gate_causes["primary"]
+        judgment["contributing_agents"]  = _gate_causes["contributing"]
+
+        # 研究モード: hold_cases.jsonl に Gate HOLD を記録
+        if research_mode:
+            from engine.research_helpers import _save_hold_case
+            _save_hold_case(ticker, judgment, bbs, "gate", eff_weights)
+
         bbs.write("GateAgent", "manager_judgment", judgment)
 
         _decision_box([
@@ -388,7 +415,13 @@ def run_trade_cycle(
     judgment = ManagerAgent(bbs).run(
         ticker, dry_run=dry_run, phase_tag="S3", mock_mode=mock_mode,
         effective_weights=eff_weights, excluded_keys=excluded_keys,
+        research_mode=research_mode,
     )
+
+    # 研究モード: Manager HOLD を hold_cases.jsonl に記録
+    if research_mode and not judgment.get("is_strong_buy"):
+        from engine.research_helpers import _save_hold_case
+        _save_hold_case(ticker, judgment, bbs, "manager", eff_weights)
 
     # ── Stage 4: リスク管理 & ポジションサイジング（STRONG BUY 時のみ）──
     order_result: dict | None = None
@@ -490,9 +523,10 @@ def run_trade_cycle(
         bbs.write("ManagerAgent", "manager_judgment", judgment)
 
         # ── ポートフォリオ登録 ────────────────────────────────────
+        # research_mode 時は Obsidian / portfolio 書き込みを無効化
         _order_ok = (
-            order_result.get("success")
-            or order_result.get("dry_run")
+            not research_mode
+            and (order_result.get("success") or order_result.get("dry_run"))
         )
         if _order_ok:
             try:

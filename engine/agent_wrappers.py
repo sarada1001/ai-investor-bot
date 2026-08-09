@@ -561,8 +561,8 @@ class ManagerAgent:
             if wiki_context else ""
         )
         prompt = (
-            f"スイングトレード分析結果を投資家向けに200文字以内で要約してください。"
-            f"過去実績がある場合は現在の判断との整合性も言及してください。\n"
+            f"スイングトレード分析結果を投資家向けに400文字程度で要約してください。"
+            f"各エージェントのシグナルと最終判断の根拠を含め、過去実績がある場合は整合性にも言及してください。\n"
             f"{history_block}\n"
             f"銘柄: {ticker}\n"
             f"最終判断: {decision}  (加重スコア: {score:+.3f})\n"
@@ -576,7 +576,7 @@ class ManagerAgent:
             f"{sigs['liquidity']:+.2f} — {reasons['liquidity'][:80]}"
         )
         try:
-            return self._llm.invoke(prompt).content.strip()[:200]
+            return self._llm.invoke(prompt).content.strip()
         except Exception as e:
             return f"LLM要約エラー: {e}"
 
@@ -588,6 +588,7 @@ class ManagerAgent:
         mock_mode: bool                 = False,
         effective_weights: dict | None  = None,
         excluded_keys: list[str] | None = None,
+        research_mode: bool             = False,
     ) -> dict:
         from engine.trade_helpers import _fetch_wiki_context  # avoid circular at module level
 
@@ -769,6 +770,18 @@ class ManagerAgent:
             "is_strong_buy":       is_strong_buy,
             "dry_run":             dry_run,
         }
+
+        # HOLD 原因エージェントを特定して judgment に付与（研究・運用両方で有効）
+        if not is_strong_buy:
+            from engine.research_helpers import _identify_hold_causes
+            _causes = _identify_hold_causes(sigs, w, macro_forced_hold)
+            judgment["primary_reason_agent"] = _causes["primary"]
+            judgment["contributing_agents"]  = _causes["contributing"]
+            # 研究モード: hold_cases.jsonl に保存
+            if research_mode:
+                from engine.research_helpers import _save_hold_case
+                _save_hold_case(ticker, judgment, self.bbs, "manager", w)
+
         self.bbs.write(self.NAME, "manager_judgment", judgment)
         _phase_footer()
         return judgment

@@ -82,6 +82,7 @@ def run_watchlist_cycle(
     hybrid_mode:      bool             = False,
     excluded_agents:  list[str] | None = None,
     run_audit:        bool             = False,
+    research_mode:    bool             = False,
 ) -> list[dict]:
     """複数銘柄を順番に run_trade_cycle() で分析し、結果を集約して返す。"""
     results: list[dict] = []
@@ -104,6 +105,7 @@ def run_watchlist_cycle(
                 hybrid_mode     = hybrid_mode,
                 excluded_agents = excluded_agents,
                 run_audit       = _first_run_audit,
+                research_mode   = research_mode,
             )
             _first_run_audit = False
         except Exception as e:

@@ -25,6 +25,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from engine.evaluation_history import append_agent_status_history
+
 logger = logging.getLogger(__name__)
 
 # =========================================================
@@ -348,6 +350,7 @@ def evaluate_and_update_status() -> dict[str, dict]:
         json.dumps(status_dict, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    append_agent_status_history(existing, status_dict, source="audit_agent")
     return status_dict
 
 
