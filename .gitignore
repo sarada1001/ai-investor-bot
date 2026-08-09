@@ -47,6 +47,10 @@ data/trade_guard_state.json
 data/training/open_positions_index.json
 data/training/training_data.jsonl
 data/training/training_data_prod.jsonl
+# health_check の自己申告記録。ホストごとに独立した値でなければならない
+# （git 経由で共有されると、開発機の実行時刻が本番の「前回実行」を上書きし、
+#  本番で health_check が止まっていても検知できなくなる）
+data/health_last_run.json
 
 # ライブ取引認証状態（24h有効期限付き・コミット不要）
 data/live_trading_enabled.json

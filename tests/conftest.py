@@ -54,6 +54,15 @@ _REDIRECTED_PATHS: tuple[tuple[str, str, str], ...] = (
     # BBS_DIR は CWD 相対の Path("bbs")。張り替えないと run_trade_cycle を
     # 呼ぶテストが本番 bbs/ にセッションファイルを増やし続ける。
     ("engine.bbs",                     "BBS_DIR",         "bbs"),
+    # health_check は読み取り専用だが、唯一書き込む health_last_run.json と
+    # 追記する logs/health.log がテストで汚れないよう tmp に向ける。
+    # 読み取り側（portfolio / training）も、本番データの内容でテスト結果が
+    # 変わらないよう同じ tmp に揃える。
+    ("scripts.health_check",           "HEALTH_LOG_PATH",      "logs/health.log"),
+    ("scripts.health_check",           "LAST_RUN_PATH",        "data/health_last_run.json"),
+    ("scripts.health_check",           "PORTFOLIO_PATH",       "data/portfolio.json"),
+    ("scripts.health_check",           "POSITIONS_INDEX_PATH", "data/training/open_positions_index.json"),
+    ("scripts.health_check",           "TRAINING_DATA_PATH",   "data/training/training_data.jsonl"),
 )
 
 # 事前に mkdir しておくディレクトリ（tmp ルートからの相対パス）。
@@ -66,6 +75,7 @@ _TMP_DIRS: tuple[str, ...] = (
     "data",
     "data/knowledge_base/obsidian_logs",
     "data/training",
+    "logs",
 )
 
 
