@@ -1,0 +1,118 @@
+# ============================================================
+# .dockerignore
+# ------------------------------------------------------------
+# ここに書いたものは「ビルドコンテキスト」から除外される。
+#
+# ビルドコンテキストとは:
+#   `docker compose build` を実行すると、Docker はまずカレント
+#   ディレクトリ配下を丸ごと tar に固めて Docker デーモンへ送る。
+#   これがビルドコンテキスト。Dockerfile の COPY はこの tar の
+#   中からしかファイルを取り出せない。
+#
+# なぜ除外が重要か（このプロジェクト固有の理由）:
+#   1. venv/ だけで 6.5GB、unzipped_docs/ が 411MB ある。
+#      除外しないと毎回 7GB 超を転送することになり、ビルドが
+#      数分〜十数分単位で遅くなる。
+#   2. .env には Alpaca 実弾取引の API キーが入っている。
+#      コンテキストに含めると COPY . . でイメージに焼き込まれ、
+#      イメージを誰かに渡した時点でキーが漏れる。
+#   3. data/ bbs/ logs/ は「ホスト側にあるのが正」の状態ファイル。
+#      イメージに焼き込むと、コンテナ内の古いスナップショットと
+#      ホストの最新状態が混ざって事故になる（過去に実際に発生）。
+# ============================================================
+
+# ── 機密情報 ────────────────────────────────────────────────
+# .env は docker-compose.yml の env_file で「実行時に」渡す。
+# イメージには絶対に入れない。
+.env
+.env.*
+# テンプレートは値が入っていないので、参照用に入れておく
+!.env.example
+
+# ── 巨大かつコンテナ内では無意味なもの ──────────────────────
+# venv/ (6.5GB): ホストの Python 3.14 用にビルドされた仮想環境。
+# コンテナは Python 3.12 なので ABI が合わず、そもそも動かない。
+# コンテナ内の依存は requirements.txt から作り直す。
+venv/
+.venv/
+env/
+ENV/
+
+# unzipped_docs/ (411MB): 決算 PDF の展開物。実行時には使わない。
+unzipped_docs/
+*.zip
+*.pdf
+
+# .git/ (23MB): コンテナ内で git 操作はしない。
+# コード更新は「ホストで git pull → docker compose build」で行う。
+.git/
+.gitignore
+.gitattributes
+
+# ── 状態ファイル（volume でホストからマウントする） ─────────
+# 詳細は docs/DOCKER.md「volume の設計意図」を参照。
+# ここで除外しておかないと、COPY . . でイメージ内に古いコピーが
+# 作られ、volume マウント前の一瞬だけそれが見えるなど紛らわしい。
+data/
+bbs/
+logs/
+backups/
+chroma_db_saved/
+chroma_db/
+latest_summary.md
+*.log
+
+# ── Python のビルド生成物 ──────────────────────────────────
+# ホストの Python 3.14 が吐いた .pyc は 3.12 では読めないため
+# 持ち込む意味がないどころか、混乱の元になる。
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# ── テスト・開発ツールのキャッシュ ──────────────────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.ipynb
+
+# ── エージェント／ドキュメント類（実行には不要） ────────────
+# everything-claude-code/ は空ディレクトリ、他は Claude Code や
+# 研究メモ用。イメージに入れても実行には一切使われない。
+everything-claude-code/
+.claude/
+.agents/
+.github/
+trading_agents_research/
+docs/
+
+# ── Docker 自身の設定ファイル ──────────────────────────────
+# イメージの中に Dockerfile を入れる必要はない。
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# ── OS・エディタのゴミ ─────────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── その他 ────────────────────────────────────────────────
+*.sqlite3
+*.db
+*.pkl
+*.pickle
+*.tmp
+*.bak
+.cache/

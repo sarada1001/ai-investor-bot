@@ -39,6 +39,14 @@ chroma_db/
 # BBS セッションログ（実行ごとに生成される一時ファイル）
 bbs/
 
+# portfolio.json の日次バックアップ（保有ポジションそのもの。ホスト固有の状態）
+# ディレクトリ自体は Docker の volume マウント先として必要なので .gitkeep で残す
+backups/*
+!backups/.gitkeep
+
+# Docker スモークテスト用の一時ディレクトリ（docs/DOCKER.md 8章）
+.smoke/
+
 # 実行時状態ファイル（ローカル/本番の実行環境に依存、頻繁に更新されるため追跡しない）
 data/portfolio.json
 data/agent_status.json
