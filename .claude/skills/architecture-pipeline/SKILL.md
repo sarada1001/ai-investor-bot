@@ -23,6 +23,7 @@ description: システム全体のレイヤー構成、Stage-Gate Pipeline（tra
 ┌────────────────────▼─────────────────────────────────┐
 │  engine/runner.py   Watchlist Cycle                  │
 │  （screener選出銘柄のみループ。デフォルト5銘柄/日）  │
+│  ├─ Stage 0: Selling Loop [ExitAgent]（1サイクル1回）│
 │  ├─ DipScan subloop (15分間隔 / 急落エントリー)      │
 │  └─ run_trade_cycle() per ticker                     │
 └────────────────────┬─────────────────────────────────┘
@@ -44,6 +45,31 @@ description: システム全体のレイヤー構成、Stage-Gate Pipeline（tra
 │  ──► LINE通知                                        │
 └──────────────────────────────────────────────────────┘
 ```
+
+## Stage 0（Selling Loop）の実行単位
+
+Stage 0 は保有ポジションの売却判断であり、**分析対象銘柄に依存しない
+ポートフォリオ単位の処理**。そのため実行単位は「銘柄」ではなく「サイクル」。
+
+- 複数銘柄実行（`--screen` / `--tickers` / デーモン複数銘柄）:
+  `run_watchlist_cycle()` が銘柄ループの**前に1回だけ** `run_exit_stage()` を
+  呼び、結果を `exit_results` で各 `run_trade_cycle()` に渡す。受け取った側は
+  判定を再実行せず、同じ内容を自分の BBS の `exit_decisions` に転記する。
+- 単一銘柄実行（`--ticker` / デーモン単一銘柄 / `scripts/run_ablation_test.py`）:
+  `exit_results=None`（既定）なので `run_trade_cycle()` が従来通り自分で実行する。
+- サイクル冒頭の Stage 0 が例外で落ちた場合は `exit_results=None` に戻し、
+  銘柄ごとの Stage 0 にフォールバックする（**保有監視が欠落する経路を作らない**）。
+
+> **[検証済み — 2026-08-13 修正の経緯]**
+> 以前は Stage 0 が `run_trade_cycle()` 内にあり、銘柄数だけ ExitAgent の
+> thesis 判定（保有ポジションごとに LLM 1回）が重複していた。
+> 保有3銘柄 × 分析5銘柄 = 同一内容の判定を15回実行し、Gemini 無料枠
+> （20 req/day）の75%を消費して RESOURCE_EXHAUSTED (429) を誘発していた。
+> 実行回数は `tests/test_stage0_single_execution.py` が固定している。
+>
+> 副作用として、1回の実行の**最中に**ストップロス到達した銘柄を後続銘柄の
+> Stage 0 が拾う挙動は無くなった（監視はサイクル冒頭のスナップショットのみ）。
+> デーモンは1時間毎に回るため実質的な監視頻度は変わらない。
 
 ## Stage-Gate Pipeline と ABORT（Gate）条件
 

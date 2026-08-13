@@ -11,7 +11,7 @@ from tools.alpaca_client import AlpacaClient as _AlpacaClient
 from engine.constants   import TARGET_TICKER, DAEMON_INTERVAL_SECS, _W, PRODUCTION_UNIVERSE
 from engine.display     import _log
 from engine.notify      import send_line_message, send_line_notification
-from engine.trade_cycle import run_trade_cycle
+from engine.trade_cycle import run_trade_cycle, run_exit_stage, init_alpaca_and_sync
 
 _DIP_SCAN_INTERVAL_SECS = 900  # 15分ごとに急落スキャン
 
@@ -94,6 +94,30 @@ def run_watchlist_cycle(
         print(f"    {i}. {t}")
     print(f"{bar}\n")
 
+    # ── Stage 0: Selling Loop（1サイクルにつき1回のみ）───────────────
+    # 保有ポジションの評価は分析対象銘柄に依存しないため、銘柄ループの前に
+    # 1度だけ実行し、結果を各 run_trade_cycle() へ渡す。
+    # 以前は run_trade_cycle() の内部にあり、銘柄数だけ ExitAgent の
+    # thesis LLM 判定が重複していた（保有3×分析5 = 同一判定を15回）。
+    #
+    # research_mode は run_trade_cycle 内で dry_run / notify_line を強制的に
+    # 落とすため、外に出した Stage 0 にも同じ抑制を適用する
+    # （適用しないと研究モードで実際の売り注文が飛ぶ）。
+    _exit_dry_run     = dry_run or research_mode
+    _exit_notify_line = notify_line and not research_mode
+    try:
+        _exit_alpaca = init_alpaca_and_sync(mock_mode)
+        exit_results: list[dict] | None = run_exit_stage(
+            mock_mode     = mock_mode,
+            alpaca_client = _exit_alpaca if not _exit_dry_run else None,
+            notify_line   = _exit_notify_line,
+        )
+    except Exception as e:
+        # 保有監視が丸ごと欠落しないよう、失敗時は従来通り
+        # 各 run_trade_cycle() 側で Stage 0 を実行させる（リトライ扱い）。
+        _log(f"[Watchlist] Stage 0 実行エラー: {e} — 銘柄ごとの Stage 0 にフォールバックします")
+        exit_results = None
+
     _first_run_audit = run_audit
     for ticker in tickers:
         try:
@@ -106,6 +130,7 @@ def run_watchlist_cycle(
                 excluded_agents = excluded_agents,
                 run_audit       = _first_run_audit,
                 research_mode   = research_mode,
+                exit_results    = exit_results,
             )
             _first_run_audit = False
         except Exception as e:

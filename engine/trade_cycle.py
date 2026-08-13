@@ -42,6 +42,78 @@ from engine.trade_helpers import (
 from agents.exit_agent import add_position as _portfolio_add
 
 
+class _DiscardBBS:
+    """Stage 0 をポートフォリオ単位で1回だけ走らせるときの書き込み先。
+
+    ExitAgent は評価結果を BBS に書くが、ウォッチリスト実行では
+    結果を各銘柄のセッションファイルへ後から転記する。
+    bbs/ に新種のセッションファイルを増やさないためのダミー。
+    """
+
+    def write(self, agent_name: str, key: str, data: object) -> None:
+        return None
+
+
+def init_alpaca_and_sync(mock_mode: bool = False):
+    """Alpaca クライアントを初期化し portfolio.json を同期する。
+
+    初期化に失敗した場合は None を返す（呼び出し側は dry_run 相当で継続）。
+    run_trade_cycle と run_watchlist_cycle の Stage 0 から共用する。
+    """
+    if mock_mode:
+        return None
+    try:
+        alpaca = _AlpacaClient()
+        _log("[Portfolio] Alpaca ポジションと portfolio.json を同期中...")
+        _sync = alpaca.sync_portfolio(_PORTFOLIO_PATH)
+        _log(f"[Portfolio] 同期完了: Alpaca={_sync['alpaca_positions']} 件  "
+             f"追加={_sync['added']}  除去={_sync['removed']}")
+        is_open, market_msg = alpaca.is_market_open()
+        market_icon = "🟢" if is_open else "🔴"
+        _log(f"[Market] {market_icon} {market_msg}")
+        return alpaca
+    except Exception as _e:
+        _log(f"[Alpaca] 初期化エラー: {_e} — dry_run モードで継続")
+        return None
+
+
+def run_exit_stage(
+    bbs                = None,
+    mock_mode:   bool  = False,
+    alpaca_client      = None,
+    notify_line: bool  = False,
+) -> list[dict]:
+    """Stage 0（Selling Loop）を1回実行し、売却判断リストを返す。
+
+    保有ポジションの評価はポートフォリオ単位であり、分析対象銘柄には依存しない。
+    そのためウォッチリスト実行では run_watchlist_cycle() が銘柄ループの前に
+    ここを1度だけ呼び、結果を各 run_trade_cycle() へ渡す
+    （銘柄数だけ ExitAgent の thesis LLM 判定が重複するのを防ぐため）。
+
+    bbs=None のときは書き込みを捨てる。呼び出し側が結果を受け取り、
+    銘柄ごとの BBS へ転記する前提。
+    """
+    _stage_header(0, "Selling Loop  [ExitAgent]")
+    exit_results = ExitAgent(bbs if bbs is not None else _DiscardBBS()).run(
+        mock_mode=mock_mode,
+        alpaca_client=alpaca_client,
+        phase_tag="S0",
+    )
+    if exit_results:
+        sell_tickers = [r["ticker"] for r in exit_results if r["action"] == "SELL"]
+        if sell_tickers and notify_line:
+            for r in [r for r in exit_results if r["action"] == "SELL"]:
+                order = r.get("order_result", {})
+                send_line_message(
+                    f"【ECC 売却実行】{r['ticker']}\n"
+                    f"種別: {r['exit_type']}\n"
+                    f"理由: {r['reason']}\n"
+                    f"損益: {r['pnl_pct']:+.2f}%\n"
+                    + (f"注文ID: {order.get('order_id')}" if order.get("order_id") else "")
+                )
+    return exit_results
+
+
 def run_trade_cycle(
     ticker:           str             = TARGET_TICKER,
     dry_run:          bool            = False,
@@ -51,6 +123,7 @@ def run_trade_cycle(
     excluded_agents:  list[str] | None = None,
     run_audit:        bool            = False,
     research_mode:    bool            = False,
+    exit_results:     list[dict] | None = None,
 ) -> dict:
     """
     スイングトレード分析サイクルをステージゲート方式で実行する。
@@ -65,6 +138,11 @@ def run_trade_cycle(
         - LINE 通知を無効化
         - Obsidian / TradeGuard への書き込みを無効化
         - HOLD 判断を data/research/hold_cases.jsonl に記録
+
+    exit_results:
+        None（既定）なら Stage 0 をこのサイクル内で実行する（単一銘柄モード）。
+        リストが渡された場合は上流（run_watchlist_cycle）で実行済みとみなし、
+        判定を再実行せず結果を BBS に転記するだけにする。
     """
     # 研究モード: 発注・通知・外部書き込みを全て無効化
     if research_mode:
@@ -118,40 +196,25 @@ def run_trade_cycle(
                                         "trend_reason": f"{agent_name} 除外済"})
 
     # ── Alpaca クライアント初期化 & portfolio 同期 ──────────────────
-    _alpaca: _AlpacaClient | None = None
-    if not mock_mode:
-        try:
-            _alpaca = _AlpacaClient()
-            _log("[Portfolio] Alpaca ポジションと portfolio.json を同期中...")
-            _sync = _alpaca.sync_portfolio(_PORTFOLIO_PATH)
-            _log(f"[Portfolio] 同期完了: Alpaca={_sync['alpaca_positions']} 件  "
-                 f"追加={_sync['added']}  除去={_sync['removed']}")
-            is_open, market_msg = _alpaca.is_market_open()
-            market_icon = "🟢" if is_open else "🔴"
-            _log(f"[Market] {market_icon} {market_msg}")
-        except Exception as _e:
-            _log(f"[Alpaca] 初期化エラー: {_e} — dry_run モードで継続")
-            _alpaca = None
+    _alpaca: _AlpacaClient | None = init_alpaca_and_sync(mock_mode)
 
     # ── Stage 0: Selling Loop（保有ポジション売却チェック）─────────
-    _stage_header(0, "Selling Loop  [ExitAgent]")
-    exit_results = ExitAgent(bbs).run(
-        mock_mode=mock_mode,
-        alpaca_client=_alpaca if not dry_run else None,
-        phase_tag="S0",
-    )
-    if exit_results:
-        sell_tickers = [r["ticker"] for r in exit_results if r["action"] == "SELL"]
-        if sell_tickers and notify_line:
-            for r in [r for r in exit_results if r["action"] == "SELL"]:
-                order = r.get("order_result", {})
-                send_line_message(
-                    f"【ECC 売却実行】{r['ticker']}\n"
-                    f"種別: {r['exit_type']}\n"
-                    f"理由: {r['reason']}\n"
-                    f"損益: {r['pnl_pct']:+.2f}%\n"
-                    + (f"注文ID: {order.get('order_id')}" if order.get("order_id") else "")
-                )
+    # 保有監視はポートフォリオ単位なので、ウォッチリスト実行では
+    # run_watchlist_cycle() が銘柄ループ前に1回だけ実行し、その結果を
+    # exit_results で受け取る。ここでは判定を再実行せず BBS に転記する。
+    if exit_results is None:
+        run_exit_stage(
+            bbs,
+            mock_mode     = mock_mode,
+            alpaca_client = _alpaca if not dry_run else None,
+            notify_line   = notify_line,
+        )
+    else:
+        _log("[ExitAgent] Stage 0 はサイクル冒頭で実行済み — 判定結果を BBS に転記します")
+        bbs.write("ExitAgent", "exit_decisions", {
+            "date":    datetime.date.today().isoformat(),
+            "results": exit_results,
+        })
 
     _account_equity: float = 0.0
 
