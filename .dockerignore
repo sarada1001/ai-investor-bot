@@ -85,7 +85,6 @@ build/
 # 研究メモ用。イメージに入れても実行には一切使われない。
 everything-claude-code/
 .claude/
-.agents/
 .github/
 trading_agents_research/
 docs/

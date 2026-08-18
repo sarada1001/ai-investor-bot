@@ -38,6 +38,31 @@ _RETRY_DELAYS         = (15, 30, 60)
 _EDGAR_STALENESS_DAYS = 90   # re-fetch after ~one quarter
 _FETCH_LOG_PATH       = Path("data/edgar_fetch_log.json")
 
+# Fields that belong at the top level of an FA result dict.
+# Gemini occasionally nests these inside the "analysis" object; _normalize_fa_result
+# promotes them so the rest of the pipeline always finds them at the top level.
+_ANALYSIS_PROMOTED_KEYS: tuple[str, ...] = ("trend", "score", "trend_reason")
+
+
+def _normalize_fa_result(result: dict[str, Any]) -> dict[str, Any]:
+    """
+    Promote trend/score/trend_reason from a nested "analysis" dict to the top level.
+
+    Gemini sometimes places these fields inside the "analysis" sub-object rather
+    than at the top level as specified in the prompt schema.  This function is the
+    single canonical fix applied immediately after _parse_json() in every analysis
+    path so the rest of the pipeline always sees a consistent flat structure.
+
+    Only promotes a field when it is absent at the top level; never overwrites an
+    existing top-level value.
+    """
+    analysis = result.get("analysis")
+    if isinstance(analysis, dict):
+        for key in _ANALYSIS_PROMOTED_KEYS:
+            if key not in result and key in analysis:
+                result[key] = analysis[key]
+    return result
+
 
 def _is_japanese(text: str) -> bool:
     return bool(re.search(r"[぀-ヿ一-鿿]", text))
@@ -179,6 +204,14 @@ class FundamentalAgent:
             km  = re.search(pat, candidate, re.DOTALL)
             if km:
                 partial[key] = km.group(1).replace("\\n", "\n")
+
+        # score is a bare number, not a quoted string — needs a separate pattern
+        score_m = re.search(r'"score"\s*:\s*(-?\d+(?:\.\d+)?)', candidate)
+        if score_m:
+            try:
+                partial["score"] = float(score_m.group(1))
+            except ValueError:
+                pass
 
         # Try to extract nested analysis dict
         analysis_m = re.search(r'"analysis"\s*:\s*(\{[^}]*\})', candidate, re.DOTALL)
@@ -368,6 +401,7 @@ class FundamentalAgent:
 
         raw    = self._call_llm(prompt)
         result = self._parse_json(raw)
+        result = _normalize_fa_result(result)
 
         # investment_signal → trend の整合フォールバック
         if "investment_signal" in result and "trend" not in result:
@@ -572,6 +606,7 @@ class FundamentalAgent:
         try:
             raw    = self._call_llm(prompt)
             result = self._parse_json(raw)
+            result = _normalize_fa_result(result)
         except Exception as e:
             result = {"error": str(e), "raw_llm_output": ""}
             raw    = ""
