@@ -176,38 +176,46 @@ class LiquidityAnalysis:
     VTA (Verbal Technical Analysis) の出力スキーマ。
     生の板情報・資金フロー数値を自然言語に変換したサマリーを保持する。
     """
-    verbal_annotation: str   = ""        # ManagerAgentへ渡す自然言語サマリー (VTA)
-    ask_ratio:         float = 0.5       # Ask側板数量比率 (0.0–1.0)
-    bid_ratio:         float = 0.5       # Bid側板数量比率 (0.0–1.0)
-    net_large_inflow:  float = 0.0       # 大口（超大口+大口）純流入額 USD
-    net_small_inflow:  float = 0.0       # 小口純流入額 USD
-    pressure:          str   = "neutral" # "buy_dominant" | "sell_dominant" | "neutral"
-    score:             float = 0.0       # 複合シグナルスコア (-1.0〜+1.0)
-    data_source:       str   = "mock"    # "mock" | "live" | "error"
+    verbal_annotation:    str   = ""        # ManagerAgentへ渡す自然言語サマリー (VTA)
+    ask_ratio:            float = 0.5       # Ask側板数量比率 (0.0–1.0)
+    bid_ratio:            float = 0.5       # Bid側板数量比率 (0.0–1.0)
+    net_large_inflow:     float = 0.0       # 大口（超大口+大口）純流入額 USD
+    net_small_inflow:     float = 0.0       # 小口純流入額 USD
+    pressure:             str   = "neutral" # "buy_dominant" | "sell_dominant" | "neutral"
+    score:                float = 0.0       # 複合シグナルスコア (-1.0〜+1.0)
+    data_source:          str   = "mock"    # "mock" | "mock_fallback" | "live" | "error"
+    eligible_for_trading: bool  = False     # False = mock/mock_fallback → 発注スコアへの寄与=0
 
     def to_dict(self) -> dict:
         return {
-            "verbal_annotation": self.verbal_annotation,
-            "ask_ratio":         self.ask_ratio,
-            "bid_ratio":         self.bid_ratio,
-            "net_large_inflow":  self.net_large_inflow,
-            "net_small_inflow":  self.net_small_inflow,
-            "pressure":          self.pressure,
-            "score":             self.score,
-            "data_source":       self.data_source,
+            "verbal_annotation":    self.verbal_annotation,
+            "ask_ratio":            self.ask_ratio,
+            "bid_ratio":            self.bid_ratio,
+            "net_large_inflow":     self.net_large_inflow,
+            "net_small_inflow":     self.net_small_inflow,
+            "pressure":             self.pressure,
+            "score":                self.score,
+            "data_source":          self.data_source,
+            "eligible_for_trading": self.eligible_for_trading,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "LiquidityAnalysis":
+        # eligible_for_trading: 明示フィールドを優先。旧データには存在しないため
+        # data_source == "live" から後方互換推論する（保守的フォールバック）。
+        _eligible = data.get("eligible_for_trading")
+        if _eligible is None:
+            _eligible = str(data.get("data_source", "")) == "live"
         return cls(
-            verbal_annotation = str(data.get("verbal_annotation", "")),
-            ask_ratio         = float(data.get("ask_ratio",        0.5)),
-            bid_ratio         = float(data.get("bid_ratio",        0.5)),
-            net_large_inflow  = float(data.get("net_large_inflow", 0.0)),
-            net_small_inflow  = float(data.get("net_small_inflow", 0.0)),
-            pressure          = str(data.get("pressure",          "neutral")),
-            score             = float(data.get("score",            0.0)),
-            data_source       = str(data.get("data_source",       "mock")),
+            verbal_annotation    = str(data.get("verbal_annotation",    "")),
+            ask_ratio            = float(data.get("ask_ratio",          0.5)),
+            bid_ratio            = float(data.get("bid_ratio",          0.5)),
+            net_large_inflow     = float(data.get("net_large_inflow",   0.0)),
+            net_small_inflow     = float(data.get("net_small_inflow",   0.0)),
+            pressure             = str(data.get("pressure",            "neutral")),
+            score                = float(data.get("score",              0.0)),
+            data_source          = str(data.get("data_source",         "mock")),
+            eligible_for_trading = bool(_eligible),
         )
 
 

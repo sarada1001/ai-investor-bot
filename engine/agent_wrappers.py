@@ -55,6 +55,22 @@ def _safe_float_score(val: object, default: float = 0.0) -> float:
         return default
 
 
+def _liquidity_trading_score(liquidity_data: dict) -> float:
+    """
+    Return the trading-eligible liquidity score.
+
+    Only data_source == "live" (real Futu OpenD data) may contribute to weighted
+    scores in Gate and Manager.  "mock_fallback" (OpenD connection failure) and
+    "mock" (MOOMOO_USE_MOCK=true) carry fabricated data and must return 0.0.
+
+    The raw score and verbal_annotation are preserved in BBS for diagnostics;
+    this function is the single enforcement point so Gate and Manager stay in sync.
+    """
+    if not liquidity_data.get("eligible_for_trading", False):
+        return 0.0
+    return _safe_float_score(liquidity_data.get("score", 0.0))
+
+
 def _prefer_score(data: dict, trend_key: str = "trend") -> float:
     """
     エージェント結果 dict から連続スコアを優先取得する。
@@ -111,7 +127,8 @@ def _gate_check(bbs: BBS, ticker: str) -> dict:
     macro_is_shadow = bool(macro_data.get("suspended"))
     macro_sig       = 0.0 if macro_is_shadow else _trend_to_signal(macro_data.get("trend", "neutral"))
     # LiquidityAgent の連続スコア（Gate 判定には影響せず、表示・参照のみ）
-    liquidity_sig   = _safe_float_score(liquidity_data.get("score", 0.0))
+    # mock / mock_fallback は 0.0 として扱う（実データのみ有効）
+    liquidity_sig   = _liquidity_trading_score(liquidity_data)
 
     macro_brake  = macro_sig < 0.0
     signals_flat = tech_sig <= 0.0 and news_sig <= 0.0
@@ -428,6 +445,8 @@ class LiquidityAgent:
         _log(f"  {annotation[:90]}")
         _sep()
         _log(f"流動性シグナル  : {s_icon} [{score_bar}] {score:+.4f}  (pressure: {pressure})")
+        if not result.get("eligible_for_trading", False):
+            _log(f"  ⚠ data_source={data_source!r} → 発注スコアへの寄与 = 0.0 (eligible_for_trading=False)")
 
         self.bbs.write(self.NAME, "liquidity_analysis", result)
         _phase_footer()
@@ -643,7 +662,9 @@ class ManagerAgent:
         )
 
         # ── Liquidity シグナル ──────────────────────────────────
-        liquidity_sig    = _safe_float_score(liquidity_data.get("score", 0.0))
+        # mock / mock_fallback（Futu OpenD 接続失敗）は 0.0 に強制。
+        # raw score は BBS に保持されており、verbal_annotation はデバッグ参照可能。
+        liquidity_sig    = _liquidity_trading_score(liquidity_data)
         liquidity_reason = liquidity_data.get("verbal_annotation", "データなし")
 
         score = round(

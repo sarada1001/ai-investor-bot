@@ -32,7 +32,7 @@ from engine.notify        import send_line_message
 from engine.agent_wrappers import (
     TechnicalAgent, NewsAgent, MacroAgent, SocialAgent, LiquidityAgent,
     FundamentalAgent, ManagerAgent, RiskAgent, ExitAgent,
-    _gate_check, _gate_display,
+    _gate_check, _gate_display, _liquidity_trading_score,
 )
 from engine.mock_helpers  import _run_mock_stage1, _run_mock_stage2, _run_mock_risk
 from engine.trade_helpers import (
@@ -371,7 +371,8 @@ def run_trade_cycle(
         _sg_hype         = float(_social_gate.get("hype_score", 0.0))
         _sg_sig_gate_raw = {"POSITIVE": +1.0, "NEUTRAL": 0.0, "NEGATIVE": -1.0}.get(_sg_sentiment, 0.0)
         _sg_sig_gate     = _sg_sig_gate_raw
-        _liq_sig_gate    = float(_liq_gate.get("score", 0.0))
+        # mock / mock_fallback 時は 0.0（実データのみ寄与可）
+        _liq_sig_gate    = _liquidity_trading_score(_liq_gate)
         score = round(
             gate["news_signal"]    * eff_weights["news"]
             + gate["tech_signal"]  * eff_weights["technical"]

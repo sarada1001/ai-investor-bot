@@ -32,6 +32,11 @@ _FLOW_SCALE_USD: float = 5_000_000.0
 # 板圧力を「優勢」と判定するBid/Ask比率閾値
 _DOMINANT_THRESHOLD: float = 0.55
 
+# 実売買スコアへの寄与を許可する data_source 値の集合。
+# "mock" (MOOMOO_USE_MOCK=true) と "mock_fallback" (OpenD 接続失敗) は
+# 架空データであるため発注判断に寄与させない。
+_TRADING_ELIGIBLE_SOURCES: frozenset[str] = frozenset({"live"})
+
 
 # ──────────────────────────────────────────────
 # 定量計算
@@ -209,16 +214,17 @@ def analyze_liquidity(ticker: str, use_mock: bool | None = None) -> dict:
         flow = fetcher.get_capital_flow()
     except Exception as e:
         return {
-            "ticker":            ticker,
-            "verbal_annotation": f"流動性データ取得エラー: {e}。分析をスキップ。",
-            "ask_ratio":         0.5,
-            "bid_ratio":         0.5,
-            "net_large_inflow":  0.0,
-            "net_small_inflow":  0.0,
-            "pressure":          "neutral",
-            "score":             0.0,
-            "data_source":       "error",
-            "error":             str(e),
+            "ticker":               ticker,
+            "verbal_annotation":    f"流動性データ取得エラー: {e}。分析をスキップ。",
+            "ask_ratio":            0.5,
+            "bid_ratio":            0.5,
+            "net_large_inflow":     0.0,
+            "net_small_inflow":     0.0,
+            "pressure":             "neutral",
+            "score":                0.0,
+            "data_source":          "error",
+            "eligible_for_trading": False,
+            "error":                str(e),
         }
 
     # 定量計算（LLMを使わないPythonロジック）
@@ -244,15 +250,16 @@ def analyze_liquidity(ticker: str, use_mock: bool | None = None) -> dict:
     )
 
     return {
-        "ticker":            ticker,
-        "verbal_annotation": verbal_annotation,
-        "ask_ratio":         ask_ratio,
-        "bid_ratio":         bid_ratio,
-        "net_large_inflow":  net_large_inflow,
-        "net_small_inflow":  net_small_inflow,
-        "pressure":          pressure,
-        "score":             score,
-        "data_source":       fetcher.data_source,
+        "ticker":               ticker,
+        "verbal_annotation":    verbal_annotation,
+        "ask_ratio":            ask_ratio,
+        "bid_ratio":            bid_ratio,
+        "net_large_inflow":     net_large_inflow,
+        "net_small_inflow":     net_small_inflow,
+        "pressure":             pressure,
+        "score":                score,
+        "data_source":          fetcher.data_source,
+        "eligible_for_trading": fetcher.data_source in _TRADING_ELIGIBLE_SOURCES,
     }
 
 
