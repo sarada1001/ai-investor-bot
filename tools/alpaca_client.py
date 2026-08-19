@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -527,26 +528,130 @@ class AlpacaClient:
 
         Returns:
             {"success": True, "order_id": ..., "status": ..., "qty": ...,
-             "filled_qty": ..., "symbol": ..., "side": ...}
+             "filled_qty": ..., "fill_price": float|None, "symbol": ..., "side": ...}
             {"success": False, "error": ...}
 
-        qty     — 注文の発注株数（stop qty不足チェックに使用）
+        qty        — 注文の発注株数（stop qty不足チェックに使用）
         filled_qty — 約定済み株数
+        fill_price — 約定平均価格（未約定時は None）
         """
         try:
             order = self._tc.get_order_by_id(order_id)
+            try:
+                fill_price = float(order.filled_avg_price) if order.filled_avg_price else None
+            except (TypeError, ValueError):
+                fill_price = None
             return {
                 "success":    True,
                 "order_id":   str(order.id),
                 "status":     str(order.status),
                 "qty":        float(order.qty or 0),
                 "filled_qty": float(order.filled_qty or 0),
+                "fill_price": fill_price,
                 "symbol":     order.symbol,
                 "side":       str(order.side),
             }
         except Exception as e:
             logger.error("  [AlpacaClient] 注文取得エラー (%s): %s", order_id, e)
             return {"success": False, "error": str(e), "order_id": order_id}
+
+    def wait_for_fill(
+        self,
+        order_id: str,
+        *,
+        interval_secs: float = 2.0,
+        max_attempts: int = 10,
+    ) -> dict:
+        """
+        BUY 注文の fill 完了をポーリングで確認する。
+
+        Paper/Live API は注文直後に PENDING_NEW を返し、数秒後に FILLED に遷移する。
+        terminal status に到達するか max_attempts 回で打ち切る（無限待ちなし）。
+
+        Terminal statuses (成功・失敗いずれもポーリング停止):
+            filled / partially_filled  → filled_qty でbroker stopを作成する対象
+            canceled / cancelled / rejected / expired → filled_qty=0 の可能性あり
+
+        Returns:
+            成功・terminal  : {"success": True,  "terminal": True,  "timed_out": False,
+                               "status": str, "filled_qty": float, "fill_price": float|None}
+            タイムアウト    : {"success": True,  "terminal": False, "timed_out": True,
+                               "filled_qty": 0.0, "fill_price": None}
+            API エラー      : {"success": False, "terminal": False, "timed_out": False,
+                               "error": str, "order_id": str}
+        """
+        _TERMINAL = frozenset({
+            "filled", "partially_filled",
+            "canceled", "cancelled", "rejected", "expired", "done_for_day",
+        })
+
+        def _norm(raw) -> str:
+            if raw is None:
+                return "unknown"
+            s = str(raw).strip().lower()
+            return s.rsplit(".", 1)[-1] if "." in s else s
+
+        for attempt in range(max_attempts):
+            try:
+                info = self.get_order(order_id)
+            except Exception as exc:
+                logger.error(
+                    "  [AlpacaClient] wait_for_fill get_order 例外 (%s): %s", order_id, exc,
+                )
+                return {
+                    "success": False, "order_id": order_id, "error": str(exc),
+                    "terminal": False, "timed_out": False,
+                }
+
+            if not info.get("success"):
+                return {
+                    "success":  False,
+                    "order_id": order_id,
+                    "error":    info.get("error", "get_order failed"),
+                    "terminal": False,
+                    "timed_out": False,
+                }
+
+            status     = _norm(info.get("status"))
+            filled_qty = float(info.get("filled_qty") or 0)
+            fill_price = info.get("fill_price")
+
+            if status in _TERMINAL:
+                logger.info(
+                    "  [AlpacaClient] wait_for_fill: %s terminal status=%s"
+                    "  filled_qty=%.0f  attempt=%d",
+                    order_id, status, filled_qty, attempt + 1,
+                )
+                return {
+                    "success":    True,
+                    "order_id":   order_id,
+                    "status":     status,
+                    "filled_qty": filled_qty,
+                    "fill_price": fill_price,
+                    "terminal":   True,
+                    "timed_out":  False,
+                }
+
+            logger.debug(
+                "  [AlpacaClient] wait_for_fill: %s status=%s  attempt=%d/%d  next in %.1fs",
+                order_id, status, attempt + 1, max_attempts, interval_secs,
+            )
+            if attempt < max_attempts - 1:
+                time.sleep(interval_secs)
+
+        logger.warning(
+            "  [AlpacaClient] wait_for_fill タイムアウト (%s) — %d 回ポーリング後も non-terminal",
+            order_id, max_attempts,
+        )
+        return {
+            "success":    True,
+            "order_id":   order_id,
+            "status":     "unknown",
+            "filled_qty": 0.0,
+            "fill_price": None,
+            "terminal":   False,
+            "timed_out":  True,
+        }
 
     # ----------------------------------------------------------
     # portfolio.json 同期

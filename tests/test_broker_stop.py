@@ -176,15 +176,16 @@ class TestCancelOrder:
 
 class TestGetOrder:
     def test_get_order_returns_status_and_qty(self):
-        """status / qty / filled_qty が返る。"""
+        """status / qty / filled_qty / fill_price が返る。"""
         client = _make_client()
         mock_order = MagicMock()
-        mock_order.id          = "stop-001"
-        mock_order.status      = "accepted"
-        mock_order.qty         = "10"
-        mock_order.filled_qty  = "0"
-        mock_order.symbol      = "AAPL"
-        mock_order.side        = "sell"
+        mock_order.id               = "stop-001"
+        mock_order.status           = "accepted"
+        mock_order.qty              = "10"
+        mock_order.filled_qty       = "0"
+        mock_order.filled_avg_price = None
+        mock_order.symbol           = "AAPL"
+        mock_order.side             = "sell"
         client._tc.get_order_by_id.return_value = mock_order
 
         result = client.get_order("stop-001")
@@ -193,6 +194,25 @@ class TestGetOrder:
         assert result["status"]     == "accepted"
         assert result["qty"]        == pytest.approx(10.0)
         assert result["filled_qty"] == pytest.approx(0.0)
+        assert result["fill_price"] is None
+
+    def test_get_order_returns_fill_price_when_filled(self):
+        """約定済みの場合 fill_price が返る。"""
+        client = _make_client()
+        mock_order = MagicMock()
+        mock_order.id               = "buy-001"
+        mock_order.status           = "filled"
+        mock_order.qty              = "10"
+        mock_order.filled_qty       = "10"
+        mock_order.filled_avg_price = 195.5
+        mock_order.symbol           = "AAPL"
+        mock_order.side             = "buy"
+        client._tc.get_order_by_id.return_value = mock_order
+
+        result = client.get_order("buy-001")
+
+        assert result["success"]    is True
+        assert result["fill_price"] == pytest.approx(195.5)
 
     def test_get_order_api_error_returns_failure(self):
         client = _make_client()
@@ -1123,3 +1143,314 @@ class TestStrictCancelVerificationRealSDKStatus:
         results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.ACCEPTED")
         alpaca.place_sell.assert_not_called()
         assert results[0]["exit_type"] == "STOP_CANCEL_UNCONFIRMED"
+
+
+# ─────────────────────────────────────────────────────────────
+# 12. wait_for_fill — BUY 注文のfill確認ポーリング（Bug 1対応）
+# ─────────────────────────────────────────────────────────────
+
+class TestWaitForFill:
+    """AlpacaClient.wait_for_fill() のポーリング動作テスト。"""
+
+    def _get_order_result(
+        self,
+        status: str,
+        filled_qty: float = 0.0,
+        fill_price: float | None = None,
+    ) -> dict:
+        return {
+            "success":    True,
+            "order_id":   "buy-001",
+            "status":     status,
+            "qty":        10.0,
+            "filled_qty": filled_qty,
+            "fill_price": fill_price,
+            "symbol":     "AAPL",
+            "side":       "buy",
+        }
+
+    def test_immediate_fill_returns_terminal(self):
+        """get_order が即座に filled を返す場合、terminal=True で返る。"""
+        c = _make_client()
+        with patch.object(c, "get_order", return_value=self._get_order_result(
+            "filled", filled_qty=10.0, fill_price=195.0,
+        )):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["success"]    is True
+        assert result["terminal"]   is True
+        assert result["timed_out"]  is False
+        assert result["status"]     == "filled"
+        assert result["filled_qty"] == pytest.approx(10.0)
+        assert result["fill_price"] == pytest.approx(195.0)
+
+    def test_pending_new_then_filled_polls_until_terminal(self):
+        """PENDING_NEW → NEW → FILLED の遷移でポーリングを続け filled を検出する。"""
+        c = _make_client()
+        responses = [
+            self._get_order_result("OrderStatus.PENDING_NEW", 0.0),
+            self._get_order_result("OrderStatus.NEW",         0.0),
+            self._get_order_result("OrderStatus.FILLED",     10.0, 195.5),
+        ]
+        with patch.object(c, "get_order", side_effect=responses):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["terminal"]   is True
+        assert result["status"]     == "filled"
+        assert result["filled_qty"] == pytest.approx(10.0)
+        assert result["fill_price"] == pytest.approx(195.5)
+
+    def test_timeout_returns_timed_out_true_and_zero_fill(self):
+        """max_attempts 回ポーリングして非 terminal のまま → timed_out=True, filled_qty=0。"""
+        c = _make_client()
+        non_terminal = self._get_order_result("pending_new", 0.0)
+        with patch.object(c, "get_order", return_value=non_terminal):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001", max_attempts=3)
+
+        assert result["success"]    is True
+        assert result["terminal"]   is False
+        assert result["timed_out"]  is True
+        assert result["filled_qty"] == pytest.approx(0.0)
+
+    def test_rejected_returns_terminal_with_zero_fill(self):
+        """rejected は terminal status で filled_qty=0 を返す（stop を作らない）。"""
+        c = _make_client()
+        with patch.object(c, "get_order", return_value=self._get_order_result(
+            "OrderStatus.REJECTED", 0.0,
+        )):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["terminal"]   is True
+        assert result["status"]     == "rejected"
+        assert result["filled_qty"] == pytest.approx(0.0)
+
+    def test_canceled_returns_terminal_with_zero_fill(self):
+        """canceled は terminal status で filled_qty=0 を返す。"""
+        c = _make_client()
+        with patch.object(c, "get_order", return_value=self._get_order_result(
+            "OrderStatus.CANCELED", 0.0,
+        )):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["terminal"]   is True
+        assert result["status"]     == "canceled"
+        assert result["filled_qty"] == pytest.approx(0.0)
+
+    def test_partially_filled_returns_terminal_with_partial_qty(self):
+        """partially_filled は terminal で filled_qty=7 を返す（stop は 7 株分作成対象）。"""
+        c = _make_client()
+        with patch.object(c, "get_order", return_value=self._get_order_result(
+            "OrderStatus.PARTIALLY_FILLED", filled_qty=7.0, fill_price=194.0,
+        )):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["terminal"]   is True
+        assert result["status"]     == "partially_filled"
+        assert result["filled_qty"] == pytest.approx(7.0)
+        assert result["fill_price"] == pytest.approx(194.0)
+
+    def test_get_order_api_error_returns_success_false(self):
+        """get_order が失敗レスポンスを返す場合、success=False で返る。"""
+        c = _make_client()
+        with patch.object(c, "get_order", return_value={
+            "success": False, "error": "API error", "order_id": "buy-001",
+        }):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["success"]  is False
+        assert "error" in result
+
+    def test_get_order_exception_returns_success_false(self):
+        """get_order が例外を投げる場合、success=False で返る（fail-safe）。"""
+        c = _make_client()
+        with patch.object(c, "get_order", side_effect=RuntimeError("connection error")):
+            with patch("time.sleep"):
+                result = c.wait_for_fill("buy-001")
+
+        assert result["success"] is False
+        assert "error" in result
+
+    def test_sleep_called_between_polls_not_after_terminal(self):
+        """ポーリング間に sleep が呼ばれ、terminal 後は呼ばれないこと。"""
+        c = _make_client()
+        responses = [
+            self._get_order_result("pending_new", 0.0),  # non-terminal → sleep
+            self._get_order_result("filled", 10.0),       # terminal → return (no sleep)
+        ]
+        with patch.object(c, "get_order", side_effect=responses):
+            with patch("time.sleep") as mock_sleep:
+                c.wait_for_fill("buy-001", interval_secs=2.0)
+
+        mock_sleep.assert_called_once_with(2.0)
+
+    def test_initial_zero_fill_updated_to_polled_fill_for_broker_stop(self):
+        """
+        place_buy が filled_qty=0 で返り、wait_for_fill が filled_qty=10 を返す場合、
+        order_result が更新され broker stop が qty=10 で作成されること（Bug 1 統合確認）。
+        """
+        alpaca = MagicMock()
+
+        # place_buy: PENDING_NEW / filled_qty=0
+        order_result = {
+            "success": True, "order_id": "buy-001",
+            "status": "OrderStatus.PENDING_NEW",
+            "filled_qty": 0.0, "requested_qty": 10,
+            "symbol": "AAPL",
+        }
+
+        # wait_for_fill: FILLED / filled_qty=10
+        alpaca.wait_for_fill.return_value = {
+            "success": True, "terminal": True, "timed_out": False,
+            "status": "filled", "filled_qty": 10.0, "fill_price": 195.0,
+        }
+        alpaca.place_broker_stop.return_value = {
+            "success": True, "order_id": "stop-001", "stop_price": 185.0,
+        }
+
+        # trade_cycle の fill ポーリング + broker stop 作成フローを再現
+        _fill_poll = alpaca.wait_for_fill(order_result["order_id"])
+        if _fill_poll.get("success") and _fill_poll.get("terminal"):
+            order_result["filled_qty"] = _fill_poll.get("filled_qty", 0)
+            if _fill_poll.get("fill_price"):
+                order_result["fill_price"] = _fill_poll["fill_price"]
+
+        stop_price  = 185.0
+        filled_qty  = float(order_result.get("filled_qty") or 0)
+        req_qty     = float(order_result.get("requested_qty") or 10)
+        if filled_qty > 0:
+            alpaca.place_broker_stop("AAPL", filled_qty, stop_price)
+
+        # 初回 filled_qty=0 ではなく、ポーリング後の 10 で stop が作成される
+        alpaca.place_broker_stop.assert_called_once_with("AAPL", 10.0, 185.0)
+
+
+# ─────────────────────────────────────────────────────────────
+# 13. state mutation policy — dry_run/hybrid/mock は portfolio 等を汚染しない（Bug 2対応）
+# ─────────────────────────────────────────────────────────────
+
+class TestStateMutationPolicy:
+    """
+    Bug 2: dry_run / hybrid / mock が portfolio.json と TradeGuard を
+    汚染しないことを確認する。
+
+    _order_ok 判定式（修正後）:
+        not research_mode and not dry_run and not mock_mode and not hybrid_mode
+        and bool(order_result.get("success"))
+    """
+
+    def _order_ok(
+        self,
+        research_mode: bool,
+        dry_run: bool,
+        mock_mode: bool,
+        hybrid_mode: bool,
+        order_result: dict,
+    ) -> bool:
+        """trade_cycle の修正後 _order_ok 判定を再現する。"""
+        return (
+            not research_mode
+            and not dry_run
+            and not mock_mode
+            and not hybrid_mode
+            and bool(order_result.get("success"))
+        )
+
+    # ── 条件式ユニットテスト ────────────────────────────────
+
+    def test_dry_run_order_ok_false(self):
+        """dry_run=True → _order_ok=False (portfolio に書かれない)。"""
+        assert not self._order_ok(
+            False, True, False, False,
+            {"dry_run": True, "success": False},
+        )
+
+    def test_hybrid_order_ok_false(self):
+        """hybrid_mode=True → _order_ok=False (portfolio に書かれない)。"""
+        assert not self._order_ok(
+            False, False, False, True,
+            {"dry_run": True, "success": False},
+        )
+
+    def test_mock_order_ok_false(self):
+        """mock_mode=True → _order_ok=False (portfolio に書かれない)。"""
+        assert not self._order_ok(
+            False, False, True, False,
+            {"dry_run": True, "success": False},
+        )
+
+    def test_research_mode_order_ok_false(self):
+        """research_mode=True は dry_run=True を強制するため _order_ok=False。"""
+        assert not self._order_ok(
+            True, True, False, False,
+            {"success": False},
+        )
+
+    def test_real_buy_success_order_ok_true(self):
+        """全フラグ=False かつ success=True → _order_ok=True (登録される)。"""
+        assert self._order_ok(
+            False, False, False, False,
+            {"success": True},
+        )
+
+    def test_real_buy_failed_order_ok_false(self):
+        """全フラグ=False でも success=False → _order_ok=False。"""
+        assert not self._order_ok(
+            False, False, False, False,
+            {"success": False},
+        )
+
+    def test_order_result_dry_run_flag_alone_does_not_enable_write(self):
+        """order_result["dry_run"]=True があっても dry_run 引数が True なら _order_ok=False。"""
+        assert not self._order_ok(
+            False, True, False, False,
+            {"dry_run": True, "mock": False, "success": False},
+        )
+
+    # ── 振る舞いテスト: _portfolio_add / record_buy が呼ばれないこと ──
+
+    def test_dry_run_portfolio_add_not_called(self):
+        """dry_run=True のとき _portfolio_add は呼ばれない。"""
+        portfolio_add = MagicMock()
+        order_result  = {"dry_run": True, "success": False}
+        if self._order_ok(False, True, False, False, order_result):
+            portfolio_add("AAPL", 100.0, 1)
+        portfolio_add.assert_not_called()
+
+    def test_hybrid_portfolio_add_not_called(self):
+        """hybrid_mode=True のとき _portfolio_add は呼ばれない。"""
+        portfolio_add = MagicMock()
+        order_result  = {"dry_run": True, "success": False}
+        if self._order_ok(False, False, False, True, order_result):
+            portfolio_add("AAPL", 100.0, 1)
+        portfolio_add.assert_not_called()
+
+    def test_mock_portfolio_add_not_called(self):
+        """mock_mode=True のとき _portfolio_add は呼ばれない。"""
+        portfolio_add = MagicMock()
+        order_result  = {"dry_run": True, "success": False}
+        if self._order_ok(False, False, True, False, order_result):
+            portfolio_add("AAPL", 100.0, 1)
+        portfolio_add.assert_not_called()
+
+    def test_dry_run_trade_guard_record_buy_not_called(self):
+        """dry_run=True のとき TradeGuard.record_buy は呼ばれない。"""
+        record_buy   = MagicMock()
+        order_result = {"dry_run": True, "success": False}
+        if self._order_ok(False, True, False, False, order_result):
+            record_buy("AAPL")
+        record_buy.assert_not_called()
+
+    def test_real_buy_portfolio_add_called(self):
+        """real BUY (success=True) のとき _portfolio_add が呼ばれる。"""
+        portfolio_add = MagicMock()
+        order_result  = {"success": True}
+        if self._order_ok(False, False, False, False, order_result):
+            portfolio_add("AAPL", 100.0, 1)
+        portfolio_add.assert_called_once()

@@ -579,9 +579,29 @@ def run_trade_cycle(
         elif _alpaca is not None:
             order_result = _alpaca.place_buy(ticker, rec_shares)
             if order_result.get("success"):
-                _log(f"  ✅ 注文完了: order_id={order_result.get('order_id')}")
+                _log(f"  ✅ 注文受付完了: order_id={order_result.get('order_id')}")
                 _log(f"     status  : {order_result.get('status')}")
                 _log(f"     symbol  : {order_result.get('symbol')} × {order_result.get('qty')} 株")
+                # Paper/Live API は注文直後に PENDING_NEW / filled_qty=0 を返し、
+                # 数秒後に FILLED に遷移する。broker stop は約定済み数量で作るため、
+                # ここで最大 20 秒ポーリングして最新 filled_qty / fill_price を取得する。
+                _oid = order_result.get("order_id")
+                if _oid:
+                    _log(f"  [BuyFill] 約定確認ポーリング中 (max 20s)...")
+                    _fill_poll = _alpaca.wait_for_fill(_oid)
+                    if _fill_poll.get("success") and _fill_poll.get("terminal"):
+                        order_result["filled_qty"] = _fill_poll.get("filled_qty", order_result.get("filled_qty", 0))
+                        _fp = _fill_poll.get("fill_price")
+                        if _fp:
+                            order_result["fill_price"] = _fp
+                        _log(
+                            f"  [BuyFill] ✅ 約定確認: status={_fill_poll.get('status')}"
+                            f"  filled_qty={order_result['filled_qty']:.0f}"
+                        )
+                    elif _fill_poll.get("timed_out"):
+                        _log("  [BuyFill] ⚠️  タイムアウト — 次回 reconcile で再確認します")
+                    else:
+                        _log(f"  [BuyFill] ⚠️  API エラー — 次回 reconcile で再確認します")
                 if notify_line:
                     _buy_price = order_result.get("fill_price") or risk_data.get("current_price", 0.0)
                     send_line_message(
@@ -601,10 +621,16 @@ def run_trade_cycle(
         bbs.write("ManagerAgent", "manager_judgment", judgment)
 
         # ── ポートフォリオ登録 ────────────────────────────────────
-        # research_mode 時は Obsidian / portfolio 書き込みを無効化
+        # 「注文受付成功」≠「約定成功」。実 BUY 注文が Alpaca に受け付けられたときのみ
+        # portfolio.json / TradeGuard へ書き込む。
+        # dry_run / mock / hybrid は order_result["dry_run"]=True を返すが、
+        # これは架空ポジションであり実 portfolio へ登録してはならない。
         _order_ok = (
             not research_mode
-            and (order_result.get("success") or order_result.get("dry_run"))
+            and not dry_run
+            and not mock_mode
+            and not hybrid_mode
+            and bool(order_result.get("success"))
         )
         if _order_ok:
             try:
