@@ -189,6 +189,78 @@ class ExitAgent:
             if decision["action"] != "SELL":
                 continue
 
+            # ── broker-side stop の状態確認と厳密キャンセル ──────────
+            # 二重 SELL を防ぐため、stop の最終状態を確認してから SELL する。
+            #
+            # 判定結果（proceed_sell）:
+            #   True  → stop を安全にキャンセル確認済み or stop なし → SELL 続行
+            #   False → stop が約定済み or キャンセル未確認 → SELL 中止
+            proceed_sell = True
+
+            if alpaca_client is not None:
+                _stop_id     = pos.get("stop_order_id")
+                _stop_status = pos.get("broker_stop_status", "none")
+
+                if _stop_id and _stop_status == "open":
+                    # Step 1: キャンセルリクエスト
+                    _cancel = alpaca_client.cancel_order(_stop_id)
+
+                    # Step 2: 実際の注文状態を確認（cancel API の成否に関わらず）
+                    _order_info   = alpaca_client.get_order(_stop_id)
+                    _order_status = (
+                        _order_info.get("status", "unknown")
+                        if _order_info.get("success") else "unknown"
+                    )
+
+                    _CANCELLED_STATUSES = frozenset({
+                        "canceled", "cancelled", "expired", "done_for_day",
+                    })
+                    _FILLED_STATUSES = frozenset({
+                        "filled", "partially_filled",
+                    })
+
+                    if _order_status in _CANCELLED_STATUSES:
+                        # キャンセル確認 → SELL 続行
+                        update_position_stop_order(pos["ticker"], _stop_id, "cancelled")
+                        logger.info(
+                            "  [ExitAgent] %s broker stop キャンセル確認 (status=%s) → SELL 続行",
+                            pos["ticker"], _order_status,
+                        )
+
+                    elif _order_status in _FILLED_STATUSES:
+                        # broker stop が先に約定済み → 二重 SELL を防止
+                        logger.info(
+                            "  [ExitAgent] %s broker stop が既に約定済み (status=%s)"
+                            " — 二重 SELL 防止のため通常 SELL をスキップ",
+                            pos["ticker"], _order_status,
+                        )
+                        update_position_stop_order(pos["ticker"], _stop_id, "filled")
+                        decision["action"]    = "HOLD"
+                        decision["exit_type"] = "BROKER_STOP_FILLED"
+                        decision["reason"]    = (
+                            f"broker stop が既に約定 (status={_order_status}) — 二重 SELL 防止"
+                        )
+                        proceed_sell = False
+
+                    else:
+                        # 状態不明またはまだ active → SELL を中止（二重約定リスク）
+                        logger.critical(
+                            "  [ExitAgent] CRITICAL: %s broker stop のキャンセルを確認できません "
+                            "(cancel_api_ok=%s, order_status=%s) "
+                            "— 二重 SELL リスクのため SELL を中止します",
+                            pos["ticker"], _cancel.get("success"), _order_status,
+                        )
+                        decision["action"]    = "HOLD"
+                        decision["exit_type"] = "STOP_CANCEL_UNCONFIRMED"
+                        decision["reason"]    = (
+                            f"broker stop キャンセル未確認 (status={_order_status})"
+                            " — 二重 SELL 防止"
+                        )
+                        proceed_sell = False
+
+            if not proceed_sell:
+                continue
+
             # Alpaca 売り注文（live mode のみ）
             order_result: dict | None = None
             if alpaca_client is not None:
@@ -491,10 +563,21 @@ def add_position(
     stop_loss_price: float | None = None,
     buy_log_file: str = "",
     thesis: str = "",
+    entry_order_id: str | None = None,
+    stop_order_id: str | None = None,
+    broker_stop_status: str = "none",
 ) -> None:
     """
     portfolio.json に新規ポジションを追加する。
     STRONG BUY 発注成功直後に main.py から呼ぶ。
+
+    broker_stop_status の取り得る値:
+      "none"         — broker stop 未作成
+      "open"         — Alpaca に GTC stop 注文が生存中
+      "pending_fill" — BUY が未約定のため stop 未作成
+      "filled"       — broker stop が約定（ポジションが自動決済された）
+      "cancelled"    — stop をキャンセル済み（ExitAgent の通常 SELL 前）
+      "error"        — stop 作成試みたが失敗（無保護状態）
     """
     portfolio = _load_portfolio()
 
@@ -505,26 +588,249 @@ def add_position(
         return
 
     position = {
-        "id":              f"pos_{date.today().strftime('%Y%m%d')}_{ticker.upper()}",
-        "ticker":          ticker.upper(),
-        "entry_date":      date.today().isoformat(),
-        "entry_price":     round(entry_price, 4),
-        "shares":          shares,
-        "target_price":    round(target_price, 2) if target_price else None,
-        "stop_loss_price": round(stop_loss_price, 2) if stop_loss_price else None,
-        "buy_log_file":    buy_log_file,
-        "thesis":          thesis,
-        "status":          "OPEN",
+        "id":                 f"pos_{date.today().strftime('%Y%m%d')}_{ticker.upper()}",
+        "ticker":             ticker.upper(),
+        "entry_date":         date.today().isoformat(),
+        "entry_price":        round(entry_price, 4),
+        "shares":             shares,
+        "target_price":       round(target_price, 2) if target_price else None,
+        "stop_loss_price":    round(stop_loss_price, 2) if stop_loss_price else None,
+        "buy_log_file":       buy_log_file,
+        "thesis":             thesis,
+        "status":             "OPEN",
+        "entry_order_id":     entry_order_id,
+        "stop_order_id":      stop_order_id,
+        "broker_stop_status": broker_stop_status,
     }
     portfolio.setdefault("positions", []).append(position)
     portfolio["updated_at"] = datetime.now().isoformat()
     _save_portfolio(portfolio)
     logger.info(
-        "  [ExitAgent] ポジション追加: %s ×%d @ $%.2f  (target=$%s  stop=$%s)",
+        "  [ExitAgent] ポジション追加: %s ×%d @ $%.2f  (target=$%s  stop=$%s  broker_stop=%s)",
         ticker, shares, entry_price,
         f"{target_price:.2f}" if target_price else "N/A",
         f"{stop_loss_price:.2f}" if stop_loss_price else "N/A",
+        broker_stop_status,
     )
+
+
+def update_position_stop_order(
+    ticker: str,
+    stop_order_id: str | None,
+    broker_stop_status: str,
+    entry_order_id: str | None = None,
+    portfolio_path: Path = PORTFOLIO_PATH,
+) -> bool:
+    """
+    portfolio.json の既存ポジションに broker stop 情報を書き込む。
+
+    Returns:
+        True  — 更新成功
+        False — ティッカーが見つからない / 書き込みエラー
+    """
+    try:
+        portfolio = _load_portfolio()
+        updated = False
+        for pos in portfolio.get("positions", []):
+            if pos["ticker"].upper() == ticker.upper():
+                pos["broker_stop_status"] = broker_stop_status
+                pos["stop_order_id"]      = stop_order_id
+                if entry_order_id is not None:
+                    pos["entry_order_id"] = entry_order_id
+                updated = True
+                break
+        if not updated:
+            logger.warning("  [ExitAgent] update_position_stop_order: %s not found", ticker)
+            return False
+        portfolio["updated_at"] = datetime.now().isoformat()
+        _save_portfolio(portfolio)
+        logger.info(
+            "  [ExitAgent] %s broker_stop_status=%s  stop_order_id=%s",
+            ticker, broker_stop_status, stop_order_id,
+        )
+        return True
+    except Exception as e:
+        logger.error("  [ExitAgent] update_position_stop_order エラー (%s): %s", ticker, e)
+        return False
+
+
+def reconcile_broker_stops(alpaca_client, portfolio_path: Path = PORTFOLIO_PATH) -> dict:
+    """
+    bot 再起動時: portfolio.json の stop_order_id を Alpaca の状態と照合し、
+    必要に応じて broker-side stop を自動再作成する。
+
+    照合対象:
+      - Alpaca position qty
+      - local portfolio qty
+      - stop order qty
+      - stop order status
+
+    検出・対応ケース（ポジションごと）:
+      ok          — stop_order_id が Alpaca open orders に存在 → 正常
+      refilled    — stop_order_id が filled 状態 → broker stop が約定済み
+      repaired    — stop が消失 / 未作成だったが自動再作成に成功
+      missing     — stop が消失し再作成にも失敗 → CRITICAL ログ
+      no_stop     — stop_loss_price がないため再作成不可 → WARNING
+      qty_mismatch — stop qty < Alpaca position qty → 一部無保護
+
+    Returns:
+        {"ok": [...], "refilled": [...], "repaired": [...],
+         "missing": [...], "no_stop": [...], "qty_mismatch": [...]}
+    """
+    result: dict[str, list[str]] = {
+        "ok": [], "refilled": [], "repaired": [],
+        "missing": [], "no_stop": [], "qty_mismatch": [],
+    }
+
+    if alpaca_client is None:
+        return result
+
+    portfolio = _load_portfolio()
+    positions = portfolio.get("positions", [])
+    if not positions:
+        return result
+
+    # Alpaca 側の open orders を一括取得
+    try:
+        from alpaca.trading.requests import GetOrdersRequest
+        from alpaca.trading.enums import QueryOrderStatus
+        open_orders = alpaca_client._tc.get_orders(GetOrdersRequest(
+            status=QueryOrderStatus.OPEN,
+        ))
+        open_order_ids = {str(o.id) for o in open_orders}
+    except Exception as e:
+        logger.error("  [BrokerStop] reconcile: open orders 取得失敗: %s", e)
+        return result
+
+    # Alpaca の保有ポジション（symbol → qty マップ）
+    try:
+        alpaca_pos_map: dict[str, float] = {
+            p.symbol.upper(): float(p.qty)
+            for p in alpaca_client._tc.get_all_positions()
+        }
+    except Exception as e:
+        logger.error("  [BrokerStop] reconcile: positions 取得失敗: %s", e)
+        alpaca_pos_map = {}
+
+    def _try_recreate(ticker: str, pos: dict, alpaca_qty: float) -> bool:
+        """stop を自動再作成する。成功したら result["repaired"] に追加し True を返す。"""
+        sl_price = pos.get("stop_loss_price")
+        if not sl_price or float(sl_price) <= 0:
+            logger.warning(
+                "  [BrokerStop] %s stop_loss_price が未設定 — broker stop を再作成できません",
+                ticker,
+            )
+            result["no_stop"].append(ticker)
+            return False
+        stop_res = alpaca_client.place_broker_stop(ticker, alpaca_qty, float(sl_price))
+        if stop_res.get("success"):
+            update_position_stop_order(
+                ticker, stop_res["order_id"], "open",
+                portfolio_path=portfolio_path,
+            )
+            result["repaired"].append(ticker)
+            logger.info(
+                "  [BrokerStop] %s broker stop 自動再作成完了: id=%s  qty=%.0f  stop=$%.2f",
+                ticker, stop_res["order_id"], alpaca_qty, float(sl_price),
+            )
+            return True
+        else:
+            result["missing"].append(ticker)
+            update_position_stop_order(ticker, None, "error", portfolio_path=portfolio_path)
+            logger.critical(
+                "  [BrokerStop] CRITICAL: %s broker stop 再作成失敗 — ポジションが無保護状態 (%s)",
+                ticker, stop_res.get("error"),
+            )
+            return False
+
+    def _check_qty_mismatch(ticker: str, pos: dict, stop_id: str, alpaca_qty: float) -> None:
+        """stop order qty と Alpaca position qty を照合し、不一致をログに出す。"""
+        local_qty = float(pos.get("shares", 0))
+        if local_qty != alpaca_qty:
+            logger.warning(
+                "  [BrokerStop] %s qty 不一致: portfolio=%d  Alpaca=%d",
+                ticker, int(local_qty), int(alpaca_qty),
+            )
+        if not stop_id:
+            return
+        try:
+            stop_info = alpaca_client.get_order(stop_id)
+            if stop_info.get("success"):
+                stop_qty = float(stop_info.get("qty") or 0)
+                if stop_qty < alpaca_qty:
+                    logger.warning(
+                        "  [BrokerStop] %s stop qty 不足: stop=%.0f < Alpaca=%.0f"
+                        " — 未保護株数=%.0f",
+                        ticker, stop_qty, alpaca_qty, alpaca_qty - stop_qty,
+                    )
+                    result["qty_mismatch"].append(ticker)
+        except Exception as e:
+            logger.warning("  [BrokerStop] %s stop qty 確認エラー: %s", ticker, e)
+
+    for pos in positions:
+        ticker      = pos["ticker"].upper()
+        stop_id     = pos.get("stop_order_id")
+        stop_status = pos.get("broker_stop_status", "none")
+        alpaca_qty  = alpaca_pos_map.get(ticker)  # None if not in Alpaca
+
+        # Alpaca にポジションがなければ sync_portfolio() が除去するので無視
+        if alpaca_qty is None:
+            continue
+
+        # ── ケース1: broker stop が "open" のはずの場合 ────────────
+        if stop_id and stop_status == "open":
+            if stop_id in open_order_ids:
+                result["ok"].append(ticker)
+                logger.info("  [BrokerStop] reconcile OK: %s (stop_id=%s)", ticker, stop_id)
+                _check_qty_mismatch(ticker, pos, stop_id, alpaca_qty)
+
+            else:
+                # open orders にない → 状態を個別確認
+                order_info = alpaca_client.get_order(stop_id)
+                status_str = order_info.get("status", "unknown") if order_info.get("success") else "unknown"
+
+                if status_str in ("filled", "partially_filled"):
+                    # broker stop が約定済み
+                    result["refilled"].append(ticker)
+                    update_position_stop_order(
+                        ticker, stop_id, "filled", portfolio_path=portfolio_path,
+                    )
+                    logger.info(
+                        "  [BrokerStop] %s broker stop が約定済み"
+                        " → portfolio は次回 sync_portfolio() で除去",
+                        ticker,
+                    )
+
+                elif status_str in ("canceled", "cancelled", "expired", "rejected", "unknown"):
+                    # stop が無効化 or 見つからない → 再作成試行
+                    logger.warning(
+                        "  [BrokerStop] %s broker stop が消失 (status=%s) — 自動再作成を試みます",
+                        ticker, status_str,
+                    )
+                    _try_recreate(ticker, pos, alpaca_qty)
+
+                else:
+                    # pending_cancel など予期しない状態
+                    logger.warning(
+                        "  [BrokerStop] %s broker stop の状態が不明 (status=%s) — スキップ",
+                        ticker, status_str,
+                    )
+
+        # ── ケース2: stop が未作成 / 失敗 / pending_fill の場合 ────
+        elif not stop_id or stop_status in ("none", "error", "pending_fill"):
+            logger.warning(
+                "  [BrokerStop] %s broker stop がありません (broker_stop_status=%s)"
+                " — 自動再作成を試みます",
+                ticker, stop_status,
+            )
+            _try_recreate(ticker, pos, alpaca_qty)
+
+        # ── ケース3: cancelled / filled は無視（正常終了状態）──────
+        # broker_stop_status == "cancelled" は ExitAgent が通常 SELL 済み
+        # broker_stop_status == "filled"    は broker stop 約定済み
+        # どちらも sync_portfolio() が除去するので何もしない
+
+    return result
 
 
 # ============================================================

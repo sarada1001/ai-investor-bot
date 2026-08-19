@@ -39,7 +39,11 @@ from engine.trade_helpers import (
     _agent_to_weight_key, _compute_effective_weights,
     _fetch_past_lessons, _fetch_wiki_context,
 )
-from agents.exit_agent import add_position as _portfolio_add
+from agents.exit_agent import (
+    add_position as _portfolio_add,
+    update_position_stop_order as _update_position_stop_order,
+    reconcile_broker_stops as _reconcile_broker_stops,
+)
 
 
 class _DiscardBBS:
@@ -68,6 +72,16 @@ def init_alpaca_and_sync(mock_mode: bool = False):
         _sync = alpaca.sync_portfolio(_PORTFOLIO_PATH)
         _log(f"[Portfolio] 同期完了: Alpaca={_sync['alpaca_positions']} 件  "
              f"追加={_sync['added']}  除去={_sync['removed']}")
+
+        # broker stop の整合性チェック（起動時 reconcile）
+        _recon = _reconcile_broker_stops(alpaca)
+        if _recon.get("missing"):
+            _log(f"[BrokerStop] ⚠️  CRITICAL: broker stop 消失 — {_recon['missing']}")
+        if _recon.get("no_stop"):
+            _log(f"[BrokerStop] ⚠️  WARNING: broker stop なし — {_recon['no_stop']}")
+        if _recon.get("refilled"):
+            _log(f"[BrokerStop] ℹ broker stop 約定済み — {_recon['refilled']}")
+
         is_open, market_msg = alpaca.is_market_open()
         market_icon = "🟢" if is_open else "🔴"
         _log(f"[Market] {market_icon} {market_msg}")
@@ -620,17 +634,77 @@ def run_trade_cycle(
                     _target = _atr_tp if _atr_tp else (
                         round(_actual_entry * 1.10, 2) if _actual_entry else None
                     )
+                    _entry_order_id = order_result.get("order_id")
                     _portfolio_add(
-                        ticker          = ticker,
-                        entry_price     = _actual_entry,
-                        shares          = rec_shares,
-                        target_price    = _target,
-                        stop_loss_price = _stop_price,
-                        buy_log_file    = _buy_log.name,
-                        thesis          = judgment.get("rationale", ""),
+                        ticker              = ticker,
+                        entry_price         = _actual_entry,
+                        shares              = rec_shares,
+                        target_price        = _target,
+                        stop_loss_price     = _stop_price,
+                        buy_log_file        = _buy_log.name,
+                        thesis              = judgment.get("rationale", ""),
+                        entry_order_id      = _entry_order_id,
+                        broker_stop_status  = "none",
                     )
                     _log(f"  [Portfolio] {ticker} ×{rec_shares} を portfolio.json に登録しました")
                     _TradeGuard().record_buy(ticker)
+
+                    # ── broker-side stop 作成（live / paper 共通、dry_run/mock 除く）──
+                    # BUY が約定済みの場合のみ stop を作成する。
+                    # filled_qty=0 はまだ未約定（指値が刺さっていない）を意味するので
+                    # stop を作らず CRITICAL ログで無保護状態を明示する。
+                    # 部分約定は filled_qty 分だけ stop を作成し、残りは未保護として警告する。
+                    _is_real_order = (
+                        not dry_run and not mock_mode and not hybrid_mode
+                        and order_result.get("success")
+                        and _alpaca is not None
+                        and _stop_price
+                    )
+                    if _is_real_order:
+                        _filled_qty   = float(order_result.get("filled_qty") or 0)
+                        _req_qty      = float(order_result.get("requested_qty") or rec_shares)
+                        if _filled_qty > 0:
+                            _stop_res = _alpaca.place_broker_stop(ticker, _filled_qty, _stop_price)
+                            if _stop_res.get("success"):
+                                _log(
+                                    f"  [BrokerStop] ✅ stop 作成: "
+                                    f"id={_stop_res['order_id']}  "
+                                    f"stop=${_stop_price:.2f}  qty={_filled_qty:.0f}"
+                                )
+                                _update_position_stop_order(
+                                    ticker, _stop_res["order_id"], "open",
+                                    entry_order_id=_entry_order_id,
+                                )
+                                if _filled_qty < _req_qty:
+                                    _log(
+                                        f"  [BrokerStop] ⚠️  部分約定: "
+                                        f"{_filled_qty:.0f}/{_req_qty:.0f} 株のみ保護"
+                                        f" — 残り {_req_qty - _filled_qty:.0f} 株は無保護"
+                                    )
+                            else:
+                                import logging as _log_mod
+                                _log_mod.getLogger(__name__).critical(
+                                    "[BrokerStop] CRITICAL: %s BUY 約定済みだが broker stop 作成失敗 "
+                                    "— ポジションが無保護状態 (%s)",
+                                    ticker, _stop_res.get("error"),
+                                )
+                                _log(
+                                    f"  [BrokerStop] ❌ CRITICAL: stop 作成失敗 — "
+                                    f"無保護状態です: {_stop_res.get('error')}"
+                                )
+                                _update_position_stop_order(ticker, None, "error")
+                        else:
+                            import logging as _log_mod
+                            _log_mod.getLogger(__name__).warning(
+                                "[BrokerStop] %s BUY 注文が未約定 (filled_qty=0) — "
+                                "broker stop を作成できません。約定後に手動確認が必要",
+                                ticker,
+                            )
+                            _log(
+                                f"  [BrokerStop] ⚠️  BUY 未約定 (filled_qty=0) — "
+                                f"broker stop 作成を保留中"
+                            )
+                            _update_position_stop_order(ticker, None, "pending_fill")
             except Exception as e:
                 _log(f"  [Portfolio] 登録エラー（ログは保存済）: {e}")
 

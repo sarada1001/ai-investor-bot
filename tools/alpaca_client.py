@@ -449,6 +449,106 @@ class AlpacaClient:
             }
 
     # ----------------------------------------------------------
+    # broker-side stop 注文
+    # ----------------------------------------------------------
+
+    def place_broker_stop(self, symbol: str, qty: int | float, stop_price: float) -> dict:
+        """
+        GTC stop sell 注文を Alpaca に送信する（broker-side stop-loss）。
+
+        BUY 約定後に呼び出すことで、bot プロセスが停止していても
+        Alpaca 側でポジションを保護する。
+
+        Args:
+            symbol:     銘柄コード
+            qty:        株数（BUY の filled_qty と一致させること）
+            stop_price: stop 発動価格（ATR ベース stop_loss_price）
+
+        Returns:
+            成功: {"success": True, "order_id": ..., "stop_price": ..., ...}
+            失敗: {"success": False, "error": ...}
+        """
+        sym = symbol.upper()
+
+        _blocked = _live_gate_check(sym, "sell")
+        if _blocked is not None:
+            return _blocked
+
+        from alpaca.trading.requests import StopOrderRequest
+        from alpaca.trading.enums import OrderSide, TimeInForce
+
+        try:
+            req = StopOrderRequest(
+                symbol        = sym,
+                qty           = qty,
+                side          = OrderSide.SELL,
+                time_in_force = TimeInForce.GTC,
+                stop_price    = round(stop_price, 2),
+            )
+            order = self._tc.submit_order(req)
+            result = {
+                "success":    True,
+                "order_id":   str(order.id),
+                "status":     str(order.status),
+                "symbol":     order.symbol,
+                "qty":        float(order.qty),
+                "stop_price": round(stop_price, 2),
+                "side":       "sell",
+                "order_type": "stop",
+            }
+            logger.info(
+                "  [AlpacaClient] broker stop 作成: id=%s  stop=$%.2f  qty=%.0f",
+                result["order_id"], stop_price, float(qty),
+            )
+            return result
+        except Exception as e:
+            logger.error("  [AlpacaClient] broker stop 作成エラー (%s): %s", sym, e)
+            return {"success": False, "skipped": False, "error": str(e), "symbol": sym}
+
+    def cancel_order(self, order_id: str) -> dict:
+        """
+        open 注文を ID で取り消す。
+
+        Returns:
+            {"success": True, "order_id": ...}
+            {"success": False, "error": ..., "order_id": ...}
+        """
+        try:
+            self._tc.cancel_order_by_id(order_id)
+            logger.info("  [AlpacaClient] 注文キャンセル完了: %s", order_id)
+            return {"success": True, "order_id": order_id}
+        except Exception as e:
+            logger.error("  [AlpacaClient] 注文キャンセルエラー (%s): %s", order_id, e)
+            return {"success": False, "error": str(e), "order_id": order_id}
+
+    def get_order(self, order_id: str) -> dict:
+        """
+        order_id で注文の現在状態を取得する。
+
+        Returns:
+            {"success": True, "order_id": ..., "status": ..., "qty": ...,
+             "filled_qty": ..., "symbol": ..., "side": ...}
+            {"success": False, "error": ...}
+
+        qty     — 注文の発注株数（stop qty不足チェックに使用）
+        filled_qty — 約定済み株数
+        """
+        try:
+            order = self._tc.get_order_by_id(order_id)
+            return {
+                "success":    True,
+                "order_id":   str(order.id),
+                "status":     str(order.status),
+                "qty":        float(order.qty or 0),
+                "filled_qty": float(order.filled_qty or 0),
+                "symbol":     order.symbol,
+                "side":       str(order.side),
+            }
+        except Exception as e:
+            logger.error("  [AlpacaClient] 注文取得エラー (%s): %s", order_id, e)
+            return {"success": False, "error": str(e), "order_id": order_id}
+
+    # ----------------------------------------------------------
     # portfolio.json 同期
     # ----------------------------------------------------------
 
