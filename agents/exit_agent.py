@@ -207,9 +207,8 @@ class ExitAgent:
 
                     # Step 2: 実際の注文状態を確認（cancel API の成否に関わらず）
                     _order_info   = alpaca_client.get_order(_stop_id)
-                    _order_status = (
-                        _order_info.get("status", "unknown")
-                        if _order_info.get("success") else "unknown"
+                    _order_status = _normalize_order_status(
+                        _order_info.get("status") if _order_info.get("success") else None
                     )
 
                     _CANCELLED_STATUSES = frozenset({
@@ -537,20 +536,22 @@ class ExitAgent:
 # Portfolio I/O（public — main.py から呼び出し可能）
 # ============================================================
 
-def _load_portfolio() -> dict:
-    if not PORTFOLIO_PATH.exists():
+def _load_portfolio(path: Path | None = None) -> dict:
+    p = path if path is not None else PORTFOLIO_PATH
+    if not p.exists():
         return {"updated_at": datetime.now().isoformat(), "schema_version": "1.0", "positions": []}
     try:
-        with open(PORTFOLIO_PATH, encoding="utf-8") as f:
+        with open(p, encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error("  [ExitAgent] portfolio.json 読み込みエラー: %s → 空ポートフォリオで継続", e)
         return {"updated_at": datetime.now().isoformat(), "schema_version": "1.0", "positions": []}
 
 
-def _save_portfolio(data: dict) -> None:
-    PORTFOLIO_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(PORTFOLIO_PATH, "w", encoding="utf-8") as f:
+def _save_portfolio(data: dict, path: Path | None = None) -> None:
+    p = path if path is not None else PORTFOLIO_PATH
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     logger.info("  [ExitAgent] portfolio.json を更新しました")
 
@@ -619,17 +620,20 @@ def update_position_stop_order(
     stop_order_id: str | None,
     broker_stop_status: str,
     entry_order_id: str | None = None,
-    portfolio_path: Path = PORTFOLIO_PATH,
+    portfolio_path: Path | None = None,
 ) -> bool:
     """
     portfolio.json の既存ポジションに broker stop 情報を書き込む。
+
+    portfolio_path が None のとき PORTFOLIO_PATH を読み書きする（テスト時はパッチ可）。
+    read path と write path は必ず同一になる。
 
     Returns:
         True  — 更新成功
         False — ティッカーが見つからない / 書き込みエラー
     """
     try:
-        portfolio = _load_portfolio()
+        portfolio = _load_portfolio(portfolio_path)
         updated = False
         for pos in portfolio.get("positions", []):
             if pos["ticker"].upper() == ticker.upper():
@@ -643,7 +647,7 @@ def update_position_stop_order(
             logger.warning("  [ExitAgent] update_position_stop_order: %s not found", ticker)
             return False
         portfolio["updated_at"] = datetime.now().isoformat()
-        _save_portfolio(portfolio)
+        _save_portfolio(portfolio, portfolio_path)
         logger.info(
             "  [ExitAgent] %s broker_stop_status=%s  stop_order_id=%s",
             ticker, broker_stop_status, stop_order_id,
@@ -654,7 +658,7 @@ def update_position_stop_order(
         return False
 
 
-def reconcile_broker_stops(alpaca_client, portfolio_path: Path = PORTFOLIO_PATH) -> dict:
+def reconcile_broker_stops(alpaca_client, portfolio_path: Path | None = None) -> dict:
     """
     bot 再起動時: portfolio.json の stop_order_id を Alpaca の状態と照合し、
     必要に応じて broker-side stop を自動再作成する。
@@ -685,7 +689,7 @@ def reconcile_broker_stops(alpaca_client, portfolio_path: Path = PORTFOLIO_PATH)
     if alpaca_client is None:
         return result
 
-    portfolio = _load_portfolio()
+    portfolio = _load_portfolio(portfolio_path)
     positions = portfolio.get("positions", [])
     if not positions:
         return result
@@ -787,7 +791,9 @@ def reconcile_broker_stops(alpaca_client, portfolio_path: Path = PORTFOLIO_PATH)
             else:
                 # open orders にない → 状態を個別確認
                 order_info = alpaca_client.get_order(stop_id)
-                status_str = order_info.get("status", "unknown") if order_info.get("success") else "unknown"
+                status_str = _normalize_order_status(
+                    order_info.get("status") if order_info.get("success") else None
+                )
 
                 if status_str in ("filled", "partially_filled"):
                     # broker stop が約定済み
@@ -836,6 +842,20 @@ def reconcile_broker_stops(alpaca_client, portfolio_path: Path = PORTFOLIO_PATH)
 # ============================================================
 # Internal helpers
 # ============================================================
+
+def _normalize_order_status(status) -> str:
+    """Alpaca OrderStatus enum ("OrderStatus.CANCELED") を bare lowercase に正規化する。
+
+    bare string ("canceled") はそのまま返す。None は "unknown" にマップする。
+    broker_stop_status（ローカル状態）とは別物なので混同しないこと。
+    """
+    if status is None:
+        return "unknown"
+    s = str(status).strip().lower()
+    if "." in s:
+        s = s.rsplit(".", 1)[-1]
+    return s
+
 
 def _derive_rule(exit_type: str, pnl: float) -> str:
     if exit_type == "TAKE_PROFIT":

@@ -844,3 +844,282 @@ class TestBuyFillCheckLogic:
         )
         assert "error" in logs
         update.assert_called_with("AAPL", None, "error")
+
+
+# ─────────────────────────────────────────────────────────────
+# 8. _normalize_order_status
+# ─────────────────────────────────────────────────────────────
+
+class TestNormalizeOrderStatus:
+    """Alpaca OrderStatus enum 文字列の正規化テスト。"""
+
+    def _n(self, s):
+        from agents.exit_agent import _normalize_order_status
+        return _normalize_order_status(s)
+
+    def test_enum_canceled(self):
+        assert self._n("OrderStatus.CANCELED") == "canceled"
+
+    def test_enum_filled(self):
+        assert self._n("OrderStatus.FILLED") == "filled"
+
+    def test_enum_partially_filled(self):
+        assert self._n("OrderStatus.PARTIALLY_FILLED") == "partially_filled"
+
+    def test_enum_new(self):
+        assert self._n("OrderStatus.NEW") == "new"
+
+    def test_enum_accepted(self):
+        assert self._n("OrderStatus.ACCEPTED") == "accepted"
+
+    def test_enum_pending_new(self):
+        assert self._n("OrderStatus.PENDING_NEW") == "pending_new"
+
+    def test_enum_expired(self):
+        assert self._n("OrderStatus.EXPIRED") == "expired"
+
+    def test_enum_rejected(self):
+        assert self._n("OrderStatus.REJECTED") == "rejected"
+
+    def test_bare_canceled(self):
+        assert self._n("canceled") == "canceled"
+
+    def test_bare_cancelled(self):
+        assert self._n("cancelled") == "cancelled"
+
+    def test_bare_filled(self):
+        assert self._n("filled") == "filled"
+
+    def test_none_returns_unknown(self):
+        assert self._n(None) == "unknown"
+
+    def test_side_enum_not_affected(self):
+        # OrderSide.SELL は reconcile で使わないが壊れないことを確認
+        assert self._n("OrderSide.SELL") == "sell"
+
+
+# ─────────────────────────────────────────────────────────────
+# 9. reconcile — 実 SDK 形式ステータス文字列
+# ─────────────────────────────────────────────────────────────
+
+class TestReconcileRealSDKStatus:
+    """Alpaca SDK が返す "OrderStatus.XXX" 形式での reconcile 動作テスト。"""
+
+    def _make_pf_with_open_stop(self, tmp_path):
+        return _make_portfolio_file(tmp_path, [{
+            "ticker": "AAPL", "entry_price": 200.0, "shares": 10,
+            "stop_loss_price": 185.0,
+            "stop_order_id": "stop-old",
+            "broker_stop_status": "open",
+            "entry_order_id": "buy-001",
+        }])
+
+    def test_canceled_enum_triggers_repair(self, tmp_path):
+        """'OrderStatus.CANCELED' を canceled と認識して broker stop を再作成する。"""
+        from agents.exit_agent import reconcile_broker_stops
+
+        pf = self._make_pf_with_open_stop(tmp_path)
+        alpaca = MagicMock()
+        alpaca._tc.get_orders.return_value        = []           # stop-old は open にない
+        alpaca._tc.get_all_positions.return_value = [_make_alpaca_position("AAPL", 10.0)]
+        alpaca.get_order.return_value = {
+            "success": True, "status": "OrderStatus.CANCELED",
+            "qty": 10.0, "filled_qty": 0.0,
+        }
+        alpaca.place_broker_stop.return_value = {
+            "success": True, "order_id": "stop-new", "stop_price": 185.0,
+        }
+
+        result = reconcile_broker_stops(alpaca, portfolio_path=pf)
+
+        assert "AAPL" in result["repaired"]
+        alpaca.place_broker_stop.assert_called_once_with("AAPL", 10.0, 185.0)
+
+        data = json.loads(pf.read_text())
+        pos = data["positions"][0]
+        assert pos["stop_order_id"]      == "stop-new"
+        assert pos["broker_stop_status"] == "open"
+
+    def test_filled_enum_sets_refilled(self, tmp_path):
+        """'OrderStatus.FILLED' を filled と認識して refilled に分類する。"""
+        from agents.exit_agent import reconcile_broker_stops
+
+        pf = self._make_pf_with_open_stop(tmp_path)
+        alpaca = MagicMock()
+        alpaca._tc.get_orders.return_value        = []
+        alpaca._tc.get_all_positions.return_value = [_make_alpaca_position("AAPL", 10.0)]
+        alpaca.get_order.return_value = {
+            "success": True, "status": "OrderStatus.FILLED",
+            "qty": 10.0, "filled_qty": 10.0,
+        }
+
+        result = reconcile_broker_stops(alpaca, portfolio_path=pf)
+
+        assert "AAPL" in result["refilled"]
+        alpaca.place_broker_stop.assert_not_called()
+
+        data = json.loads(pf.read_text())
+        assert data["positions"][0]["broker_stop_status"] == "filled"
+
+    def test_partially_filled_enum_sets_refilled(self, tmp_path):
+        """'OrderStatus.PARTIALLY_FILLED' を partially_filled と認識して refilled に分類する。"""
+        from agents.exit_agent import reconcile_broker_stops
+
+        pf = self._make_pf_with_open_stop(tmp_path)
+        alpaca = MagicMock()
+        alpaca._tc.get_orders.return_value        = []
+        alpaca._tc.get_all_positions.return_value = [_make_alpaca_position("AAPL", 10.0)]
+        alpaca.get_order.return_value = {
+            "success": True, "status": "OrderStatus.PARTIALLY_FILLED",
+            "qty": 10.0, "filled_qty": 7.0,
+        }
+
+        result = reconcile_broker_stops(alpaca, portfolio_path=pf)
+
+        assert "AAPL" in result["refilled"]
+        alpaca.place_broker_stop.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────
+# 10. portfolio_path isolation
+# ─────────────────────────────────────────────────────────────
+
+class TestPortfolioPathIsolation:
+    """portfolio_path 引数が read/write 両方に正しく伝達されることを確認する。"""
+
+    def test_reconcile_writes_only_to_explicit_path(self, tmp_path):
+        """reconcile(portfolio_path=B) は B のみ更新し、PORTFOLIO_PATH (A) は変更しない。"""
+        from agents.exit_agent import reconcile_broker_stops
+
+        # A: モジュールデフォルト (PORTFOLIO_PATH にパッチ)
+        path_a = tmp_path / "portfolio_a.json"
+        path_a.write_text(json.dumps({
+            "schema_version": "1.0", "updated_at": "2026-01-01", "positions": [],
+        }))
+        mtime_a_before = path_a.stat().st_mtime
+
+        # B: 明示的に渡すポートフォリオ
+        path_b = tmp_path / "portfolio_b.json"
+        path_b.write_text(json.dumps({
+            "schema_version": "1.0", "updated_at": "2026-01-01",
+            "positions": [{
+                "ticker": "AAPL", "entry_price": 200.0, "shares": 10,
+                "stop_loss_price": 185.0, "stop_order_id": None,
+                "broker_stop_status": "none", "entry_order_id": None,
+            }],
+        }))
+
+        alpaca = MagicMock()
+        alpaca._tc.get_orders.return_value        = []
+        alpaca._tc.get_all_positions.return_value = [_make_alpaca_position("AAPL", 10.0)]
+        alpaca.place_broker_stop.return_value = {
+            "success": True, "order_id": "stop-new", "stop_price": 185.0,
+        }
+
+        with patch("agents.exit_agent.PORTFOLIO_PATH", path_a):
+            result = reconcile_broker_stops(alpaca, portfolio_path=path_b)
+
+        # B のみ更新されている
+        assert "AAPL" in result["repaired"]
+        data_b = json.loads(path_b.read_text())
+        assert data_b["positions"][0]["stop_order_id"] == "stop-new"
+
+        # A は変更されていない
+        assert path_a.stat().st_mtime == mtime_a_before
+
+    def test_update_position_stop_order_writes_only_to_explicit_path(self, tmp_path):
+        """update_position_stop_order(portfolio_path=tmp) は tmp のみ変更する。"""
+        from agents.exit_agent import update_position_stop_order
+
+        # デフォルト path にパッチ
+        default_path = tmp_path / "default_portfolio.json"
+        default_path.write_text(json.dumps({
+            "schema_version": "1.0", "updated_at": "2026-01-01", "positions": [],
+        }))
+        mtime_default_before = default_path.stat().st_mtime
+
+        # 明示的な path
+        target_path = tmp_path / "target_portfolio.json"
+        target_path.write_text(json.dumps({
+            "schema_version": "1.0", "updated_at": "2026-01-01",
+            "positions": [{
+                "ticker": "AAPL", "entry_price": 200.0, "shares": 10,
+                "stop_loss_price": 185.0, "stop_order_id": None,
+                "broker_stop_status": "none", "entry_order_id": None,
+            }],
+        }))
+
+        with patch("agents.exit_agent.PORTFOLIO_PATH", default_path):
+            result = update_position_stop_order(
+                "AAPL", "stop-xyz", "open",
+                portfolio_path=target_path,
+            )
+
+        assert result is True
+
+        # target_path は更新されている
+        data = json.loads(target_path.read_text())
+        assert data["positions"][0]["stop_order_id"]      == "stop-xyz"
+        assert data["positions"][0]["broker_stop_status"] == "open"
+
+        # default_path は変更されていない
+        assert default_path.stat().st_mtime == mtime_default_before
+
+
+# ─────────────────────────────────────────────────────────────
+# 11. strict cancel verification — 実 SDK 形式ステータス文字列
+# ─────────────────────────────────────────────────────────────
+
+class TestStrictCancelVerificationRealSDKStatus:
+    """ExitAgent.run() の broker stop 状態確認が実 API 形式を正しく処理する。"""
+
+    def _run_exit_with_status(self, tmp_path, sdk_status: str):
+        """指定 SDK 形式 status を返す alpaca mock で ExitAgent.run() を実行する。"""
+        pf = _portfolio_with_open_stop(tmp_path, "open")
+        alpaca = MagicMock()
+        alpaca.cancel_order.return_value = {"success": True, "order_id": "stop-001"}
+        alpaca.get_order.return_value    = {
+            "success": True, "status": sdk_status,
+            "qty": 10.0, "filled_qty": 0.0,
+        }
+        alpaca.place_sell.return_value = {
+            "success": True, "order_id": "sell-001", "skipped": False, "filled_qty": 10,
+        }
+        with patch("agents.exit_agent.PORTFOLIO_PATH", pf), \
+             patch("agents.exit_agent.MAX_HOLD_DAYS", 0):
+            agent = _make_exit_agent(fetch_price=175.0, portfolio_file=pf)
+            results = agent.run(mock_mode=False, alpaca_client=alpaca)
+        return results, alpaca
+
+    def test_canceled_enum_allows_sell(self, tmp_path):
+        """'OrderStatus.CANCELED' → SELL 続行。"""
+        results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.CANCELED")
+        alpaca.place_sell.assert_called_once()
+        assert results[0]["action"] == "SELL"
+
+    def test_filled_enum_blocks_sell(self, tmp_path):
+        """'OrderStatus.FILLED' → 二重 SELL 防止で HOLD。"""
+        results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.FILLED")
+        alpaca.place_sell.assert_not_called()
+        assert results[0]["action"]    == "HOLD"
+        assert results[0]["exit_type"] == "BROKER_STOP_FILLED"
+
+    def test_partially_filled_enum_blocks_sell(self, tmp_path):
+        """'OrderStatus.PARTIALLY_FILLED' → 二重 SELL 防止で HOLD。"""
+        results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.PARTIALLY_FILLED")
+        alpaca.place_sell.assert_not_called()
+        assert results[0]["action"]    == "HOLD"
+        assert results[0]["exit_type"] == "BROKER_STOP_FILLED"
+
+    def test_new_enum_blocks_sell_as_fail_safe(self, tmp_path):
+        """'OrderStatus.NEW' (まだ active) → fail-safe で SELL を中止。"""
+        results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.NEW")
+        alpaca.place_sell.assert_not_called()
+        assert results[0]["action"]    == "HOLD"
+        assert results[0]["exit_type"] == "STOP_CANCEL_UNCONFIRMED"
+
+    def test_accepted_status_blocks_sell_as_fail_safe(self, tmp_path):
+        """'OrderStatus.ACCEPTED' (まだ active) → fail-safe で SELL を中止。"""
+        results, alpaca = self._run_exit_with_status(tmp_path, "OrderStatus.ACCEPTED")
+        alpaca.place_sell.assert_not_called()
+        assert results[0]["exit_type"] == "STOP_CANCEL_UNCONFIRMED"
